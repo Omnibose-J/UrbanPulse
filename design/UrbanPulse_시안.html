@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanPulse 시안 v1</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+/* Tokens from UrbanPulse_디자인명세서.md §3 (light only in this mockup). */
+:root{
+  --bg:#FFFFFF; --bg-subtle:#F5F6F8; --bg-muted:#ECEEF2; --border:#E1E4EA;
+  --text:#14171F; --text-sub:#5A6272; --text-off:#6B7383;
+  --brand:#4F46E5; --brand-soft:#EEEDFD;
+  --lv0:#2FB67C; --lv1:#E8B400; --lv2:#EE7A1E; --lv3:#C9244E;
+  --rel0:#CFE3F7; --rel1:#7FA9DA; --rel2:#2D5C9E;
+  --canvas:#E9EBF0;
+  --font:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);font-family:var(--font);color:var(--text);word-break:keep-all}
+.wrap{display:flex;flex-wrap:wrap;gap:40px;justify-content:center;padding:32px 16px 48px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.cap{font-size:13px;color:var(--text-sub)}
+.phone{width:390px;height:844px;background:var(--bg);border-radius:28px;overflow:hidden;box-shadow:0 12px 32px rgb(20 23 31/14%);display:flex;flex-direction:column}
+.bar{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.logo{display:flex;align-items:center;gap:6px;font-weight:700;font-size:16px;letter-spacing:-.2px}
+.lang{font-size:13px;color:var(--text-sub)}
+.lang b{color:var(--text)}
+.back{background:none;border:0;padding:8px;margin-left:-8px;cursor:pointer;color:var(--text);font:inherit}
+.body{flex:1;overflow-y:auto;padding:4px 16px 24px;display:flex;flex-direction:column;gap:20px}
+h1{margin:0;font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.4px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--text-sub)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.tabs{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:2px}
+.tab{border:0;background:none;border-radius:10px;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:inherit;color:var(--text-sub)}
+.tab .d{font-size:16px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.tab .w{font-size:11px}
+.tab.on{background:var(--brand-soft)}
+.tab.on .d,.tab.on .w{color:var(--brand)}
+.tab .h{width:4px;height:4px;border-radius:50%;background:var(--lv3)}
+.tab .h.none{background:transparent}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--bg-subtle);border-radius:12px;padding:4px}
+.seg button{height:38px;border:0;border-radius:9px;background:none;font:inherit;font-size:14px;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}
+.seg button.on{background:var(--bg);color:var(--brand);font-weight:600;box-shadow:0 1px 2px rgb(20 23 31/10%)}
+.seg button.off{color:var(--text-off);cursor:not-allowed}
+.controls{display:flex;flex-direction:column;gap:8px}
+.notice{font-size:12px;color:var(--text-sub);min-height:0}
+.hero{border:1px solid var(--border);border-radius:16px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:6px}
+.hero .k{font-size:12px;color:var(--text-sub);display:flex;justify-content:space-between;align-items:center}
+.hero .t{font-size:40px;line-height:46px;font-weight:700;color:var(--brand);letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.hero .r{font-size:15px}
+.hero .more{font-size:13px;color:var(--text-sub);margin-top:4px}
+.hero .none{font-size:18px;font-weight:600;line-height:26px}
+.badge{font-size:11px;font-weight:600;color:#4B5363;background:#F1F2F5;border-radius:999px;padding:3px 8px}
+.link{border:0;background:var(--brand-soft);color:var(--brand);font:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:10px 12px;text-align:left;cursor:pointer;margin-top:6px}
+.strip-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text-sub);margin-bottom:8px}
+.strip{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px}
+.cell{height:34px;border:0;border-radius:4px;padding:0;cursor:pointer}
+.cell.pale{box-shadow:inset 0 0 0 1px rgb(20 23 31/20%)}
+.marks{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px;margin-top:4px}
+.marks span{height:4px;border-radius:2px}
+.hours{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px;font-size:11px;color:var(--text-sub);margin-top:4px;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-sub);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.readout{font-size:13px;margin-top:8px;min-height:18px}
+.alt{display:flex;justify-content:space-between;align-items:center;border:0;background:none;padding:12px 0;border-top:1px solid var(--border);font:inherit;font-size:14px;cursor:pointer;color:var(--text);width:100%}
+.alt b{color:var(--brand);font-weight:600}
+.foot{font-size:11px;color:var(--text-sub);text-align:center;padding-top:8px}
+.search{height:48px;border-radius:12px;background:var(--bg-subtle);display:flex;align-items:center;gap:8px;padding:0 14px;color:var(--text-sub);font-size:15px}
+.sec{display:flex;flex-direction:column}
+.sec h2{margin:0 0 4px;font-size:13px;font-weight:600;color:var(--text-sub)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);font-size:16px;cursor:pointer;background:none;border-left:0;border-right:0;border-top:0;font-family:inherit;color:var(--text);width:100%;text-align:left}
+.est{font-size:11px;font-weight:600;color:#4B5363;background:#F1F2F5;border-radius:999px;padding:3px 8px;vertical-align:middle;margin-left:6px}
+button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="col"><div class="phone" id="home"></div><div class="cap">홈</div></div>
+  <div class="col"><div class="phone" id="detail"></div><div class="cap">장소 상세 · A1 (눌러 보세요)</div></div>
+  <div class="col"><div class="phone" id="station"></div><div class="cap">역세권 · B (추정)</div></div>
+</div>
+<script>
+// Example data only (mockup). Levels 0..3 for 09..23 h; activity 0..1 per purpose.
+const HOURS=[9,10,11,12,13,14,15,16,17,18,19,20,21,22,23];
+const LV={weekday:[0,0,0,1,1,1,1,1,1,2,2,1,1,0,0],fri:[0,0,0,1,1,1,1,1,2,2,2,2,1,1,0],
+  weekend:[0,0,1,1,2,3,3,3,2,2,2,1,1,0,0],busyHol:[0,1,2,2,3,3,3,3,3,2,2,2,2,1,0]};
+const ACT={sight:[.1,.2,.4,.7,.8,.8,.8,.8,.7,.8,.8,.7,.5,.4,.2],
+  food:[.1,.2,.5,.9,.8,.5,.4,.4,.6,.9,.9,.7,.5,.3,.1],
+  shop:[.1,.2,.4,.6,.7,.8,.8,.8,.7,.6,.5,.4,.2,.1,0]};
+const DAYS=[{w:'오늘',d:'29',full:'9월 29일 (화)',lv:'weekday'},{w:'수',d:'30',full:'9월 30일 (수)',lv:'weekday'},
+  {w:'목',d:'1',full:'10월 1일 (목)',lv:'weekday'},{w:'금',d:'2',full:'10월 2일 (금)',lv:'fri'},
+  {w:'토',d:'3',full:'10월 3일 (토) 개천절',lv:'busyHol',hol:1},{w:'일',d:'4',full:'10월 4일 (일)',lv:'weekend'},
+  {w:'월',d:'5',full:'10월 5일 (월) 대체공휴일',lv:'weekend',hol:1},{w:'화',d:'6',full:'10월 6일 (화)',lv:'weekday'}];
+const LVNAME=['여유','보통','약간 붐빔','붐빔'], LVC=['--lv0','--lv1','--lv2','--lv3'];
+const PURP=[['sight','구경·산책'],['food','맛집'],['shop','쇼핑']];
+const TOL=[['calm','한적하게'],['moderate','적당히'],['busy','붐벼도 OK']];
+const ACTWORD={sight:'거리',food:'음식점',shop:'매장'};
+const CLOCK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+const LOGO='<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="9" width="4" height="8" rx="1.5" fill="#4F46E5"/><rect x="7" y="2" width="4" height="15" rx="1.5" fill="#4F46E5"/><rect x="13" y="6" width="4" height="11" rx="1.5" fill="#4F46E5"/></svg>';
+const v=n=>`var(${n})`;
+
+// On/off table (구현설계서 4.4, non-foreign A1 place).
+function flag(p,t){ if(t==='calm'&&(p==='food'||p==='shop'))return'off';
+  if((t==='calm'&&p==='sight')||(t==='moderate'&&p==='shop'))return'ref'; return'on'; }
+
+// Recommendation rule (구현설계서 4.4): candidates by activity, window score = worst hour.
+function recommend(day,p,t){
+  const L=LV[DAYS[day].lv], A=ACT[p], th=p==='shop'?.6:.5;
+  const sc=i=>t==='calm'?A[i]-.6*L[i]:t==='moderate'?A[i]-.5*Math.abs(L[i]-1):A[i]-.2*Math.max(L[i]-2,0);
+  const ok=i=>A[i]>=th, wins=[];
+  for(let i=0;i<15;i++){ if(!ok(i))continue; wins.push({hs:[i],s:sc(i)});
+    if(i<14&&ok(i+1))wins.push({hs:[i,i+1],s:Math.min(sc(i),sc(i+1))}); }
+  wins.sort((a,b)=>b.s-a.s||b.hs.length-a.hs.length);
+  const pick=[]; for(const w of wins){ if(pick.length===3)break;
+    if(pick.every(q=>!q.hs.some(h=>w.hs.includes(h))))pick.push(w); }
+  const maxL=w=>Math.max(...w.hs.map(i=>L[i]));
+  const bad=!pick.length||(t==='calm'&&maxL(pick[0])>=2)||(t==='moderate'&&maxL(pick[0])===3);
+  return {pick,bad,best:pick.length?pick[0].s:-9,L,A};
+}
+const span=hs=>`${HOURS[hs[0]]}~${HOURS[hs[hs.length-1]]+1}시`;
+
+const S={day:0,p:'sight',t:'moderate',notice:'',hour:null};
+function setP(p){ S.notice=''; if(flag(p,S.t)==='off'){ S.notice=`${PURP.find(x=>x[0]===p)[1]}은 '한적하게'가 아직 준비 중이라 '적당히'로 바꿨어요.`; S.t='moderate'; } S.p=p; S.hour=null; draw(); }
+function setT(t){ if(flag(S.p,t)==='off')return; S.t=t; S.notice=''; S.hour=null; draw(); }
+function setD(d){ S.day=d; S.hour=null; draw(); }
+function setH(h){ S.hour=S.hour===h?null:h; draw(); }
+
+function altDay(){
+  const cur=recommend(S.day,S.p,S.t); let best=null;
+  DAYS.forEach((_,d)=>{ if(d===S.day)return; const r=recommend(d,S.p,S.t); if(r.bad)return;
+    if(!best||r.best>best.r.best||(r.best===best.r.best&&Math.abs(d-S.day)<Math.abs(best.d-S.day)))best={d,r}; });
+  if(!best)return null; if(!cur.bad&&best.r.best<=cur.best)return null; return best;
+}
+
+function strip(levels,colors,marks,clickable){
+  const cells=levels.map((l,i)=>`<button class="cell${colors[l]==='--lv1'||colors[l]==='--rel0'?' pale':''}" style="background:${v(colors[l])}" ${clickable?`onclick="setH(${i})"`:''} aria-label="${HOURS[i]}시"></button>`).join('');
+  const mk=HOURS.map((_,i)=>`<span style="background:${marks.includes(i)?v('--brand'):'transparent'}"></span>`).join('');
+  const hr=HOURS.map((h,i)=>`<span>${i%3===0?h:''}</span>`).join('');
+  return `<div class="strip">${cells}</div><div class="marks">${mk}</div><div class="hours">${hr}</div>`;
+}
+
+function draw(){
+  const f=flag(S.p,S.t), r=recommend(S.day,S.p,S.t), alt=altDay(), day=DAYS[S.day];
+  const tabs=DAYS.map((x,i)=>`<button class="tab${i===S.day?' on':''}" onclick="setD(${i})"><span class="w">${x.w}</span><span class="d">${x.d}</span><span class="h${x.hol?'':' none'}"></span></button>`).join('');
+  const purp=PURP.map(([k,n])=>`<button class="${k===S.p?'on':''}" onclick="setP('${k}')">${n}</button>`).join('');
+  const tol=TOL.map(([k,n])=>{const off=flag(S.p,k)==='off';
+    return `<button class="${k===S.t?'on':''}${off?' off':''}" ${off?'aria-disabled="true" title="준비 중"':''} onclick="setT('${k}')">${off?CLOCK:''}${n}</button>`;}).join('');
+  let hero;
+  if(r.bad){
+    hero=`<div class="hero"><div class="k">추천 시간</div><div class="none">이날은 조건에 맞는 시간이 없어요</div>
+      ${alt?`<button class="link" onclick="setD(${alt.d})">${DAYS[alt.d].w==='오늘'?'오늘':DAYS[alt.d].full.split(' (')[0]} ${span(alt.r.pick[0].hs)}이 나아요 →</button>`:''}</div>`;
+  } else {
+    const w=r.pick[0], L=Math.max(...w.hs.map(i=>r.L[i]));
+    const a=Math.min(...w.hs.map(i=>r.A[i]));
+    const rest=r.pick.slice(1).sort((a,b)=>a.hs[0]-b.hs[0]).map(q=>span(q.hs)).join(' · ');
+    hero=`<div class="hero"><div class="k"><span>추천 시간</span>${f==='ref'?'<span class="badge" title="검증에 쓴 날이 아직 적어요">참고용</span>':''}</div>
+      <div class="t">${span(w.hs)}</div><div class="r">사람 ${LVNAME[L]} · ${ACTWORD[S.p]} ${a>=.5?'활발':'보통'}</div>
+      ${rest?`<div class="more">다른 시간 ${rest}</div>`:''}</div>`;
+  }
+  const marks=r.bad?[]:r.pick[0].hs;
+  const read=S.hour!==null?`${HOURS[S.hour]}시 · 사람 ${LVNAME[r.L[S.hour]]}`:'';
+  document.getElementById('detail').innerHTML=`
+  <div class="bar"><button class="back" onclick="" aria-label="뒤로">‹</button><div class="lang"><b>KO</b> · EN</div></div>
+  <div class="body">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1>성수카페거리</h1>
+      <span class="pill"><span class="dot" style="background:${v('--lv1')}"></span>지금 보통 · 14:30 기준</span></div>
+    <div class="tabs">${tabs}</div>
+    <div class="controls"><div class="seg" role="radiogroup" aria-label="목적">${purp}</div>
+      <div class="seg" role="radiogroup" aria-label="혼잡">${tol}</div>
+      ${S.notice?`<div class="notice">${S.notice}</div>`:''}</div>
+    ${hero}
+    <div><div class="strip-h"><span>${day.full}</span>${day.hol?'<span class="badge">연휴 예측 · 참고용</span>':''}</div>
+      ${strip(r.L,LVC,marks,true)}
+      <div class="readout">${read}</div>
+      <div class="legend">${LVNAME.map((n,i)=>`<span><span class="dot" style="background:${v(LVC[i])}"></span>${n}</span>`).join('')}</div></div>
+    ${alt&&!r.bad?`<button class="alt" onclick="setD(${alt.d})"><span>더 나은 날</span><b>${DAYS[alt.d].full.split(' (')[0]} ${span(alt.r.pick[0].hs)} →</b></button>`:''}
+    <div class="foot">시안 · 예시 데이터</div>
+  </div>`;
+}
+
+document.getElementById('home').innerHTML=`
+  <div class="bar"><div class="logo">${LOGO}UrbanPulse</div><div class="lang"><b>KO</b> · EN</div></div>
+  <div class="body" style="gap:28px">
+    <h1 style="font-size:26px;line-height:34px;padding-top:12px">가고 싶은 곳,<br>언제 가면 좋을지<br>알려 드려요</h1>
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      장소나 역 이름</div>
+    <div class="sec"><h2>관심 장소</h2>
+      <button class="row"><span>성수카페거리</span><span class="pill"><span class="dot" style="background:${v('--lv1')}"></span>보통</span></button></div>
+    <div class="sec"><h2>지금 한산한 핫플</h2>
+      <button class="row"><span>익선동</span><span class="pill"><span class="dot" style="background:${v('--lv0')}"></span>여유</span></button>
+      <button class="row"><span>서촌</span><span class="pill"><span class="dot" style="background:${v('--lv0')}"></span>여유</span></button>
+      <button class="row"><span>망원한강공원</span><span class="pill"><span class="dot" style="background:${v('--lv0')}"></span>여유</span></button></div>
+    <div class="foot" style="margin-top:auto">시안 · 예시 데이터</div>
+  </div>`;
+
+// B tier: relative 3-level flow, no purpose, no headcount.
+const REL=[0,0,0,1,1,0,0,1,2,2,1,1,0,0];
+const RELN=['평소보다 한산','평소 수준','가장 붐비는 시간대'], RELC=['--rel0','--rel1','--rel2'];
+document.getElementById('station').innerHTML=`
+  <div class="bar"><button class="back" aria-label="뒤로">‹</button><div class="lang"><b>KO</b> · EN</div></div>
+  <div class="body">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1>상도역 주변<span class="est">추정</span></h1>
+      <span class="pill">실시간 데이터 없이 평소 흐름으로 추정했어요</span></div>
+    <div class="tabs">${DAYS.map((x,i)=>`<button class="tab${i===0?' on':''}"><span class="w">${x.w}</span><span class="d">${x.d}</span><span class="h${x.hol?'':' none'}"></span></button>`).join('')}</div>
+    <div class="seg"><button>한적하게</button><button class="on">적당히</button><button>붐벼도 OK</button></div>
+    <div class="hero"><div class="k"><span>추천 시간</span></div><div class="t">14~16시</div>
+      <div class="r">평소보다 한산</div><div class="more">가장 붐비는 시간 17~19시</div></div>
+    <div><div class="strip-h"><span>9월 29일 (화)</span><span class="badge">참고용</span></div>
+      ${strip(REL.concat([0]).slice(0,14),RELC,[5,6],false)}
+      <div class="legend">${RELN.map((n,i)=>`<span><span class="dot" style="background:${v(RELC[i])}"></span>${n}</span>`).join('')}</div></div>
+    <div class="foot" style="margin-top:auto">시안 · 예시 데이터</div>
+  </div>`;
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Only the engine (and later models/) enter the build context; the repo root holds 6 GB of analysis/data.
+*
+!app/engine/
+!models/
+app/engine/tests/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/

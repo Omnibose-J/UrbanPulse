@@ -1,0 +1,32 @@
+[project]
+name = "urbanpulse-engine"
+version = "0.0.1"
+description = "UrbanPulse engine: scheduled jobs that collect Seoul city data, forecast, and precompute recommendations"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+package-dir = { "" = "app" }
+packages = ["engine", "engine.jobs"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["app/engine/requirements.txt"] }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["app"]
+testpaths = ["app/engine/tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["analysis", "app/web", "app/supabase"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["engine"]

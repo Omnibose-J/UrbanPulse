@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanPulse 시안 v2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+/* v2 direction: week-first list (crowd-calendar style) + one "good to go" rating per hour (surf-forecast style).
+   Crowd level and shop activity are merged into a single 3-step rating; details appear only on tap. */
+:root{
+  --bg:#FFFFFF; --bg-subtle:#F4F5F7; --border:#E3E6EB;
+  --text:#14171F; --text-sub:#5A6272; --text-off:#6B7383;
+  --brand:#4F46E5; --brand-soft:#EEEDFD;
+  --good:#16895C; --ok:#A9DDC4; --bad:#E4E7EC;
+  --canvas:#E9EBF0;
+  --font:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);font-family:var(--font);color:var(--text);word-break:keep-all}
+.wrap{display:flex;flex-wrap:wrap;gap:40px;justify-content:center;padding:32px 16px 48px}
+.col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.cap{font-size:13px;color:var(--text-sub)}
+.phone{width:390px;height:844px;background:var(--bg);border-radius:28px;overflow:hidden;box-shadow:0 12px 32px rgb(20 23 31/14%);display:flex;flex-direction:column}
+.bar{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.lang{font-size:13px;color:var(--text-sub)} .lang b{color:var(--text)}
+.back{background:none;border:0;padding:8px 8px 8px 0;cursor:pointer;color:var(--text);font:inherit;font-size:15px;display:flex;align-items:center;gap:2px}
+.body{flex:1;overflow-y:auto;padding:4px 16px 24px;display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:24px;line-height:32px;font-weight:700;letter-spacing:-.4px}
+.sub{font-size:13px;color:var(--text-sub);display:flex;align-items:center;gap:6px}
+.est{font-size:11px;font-weight:600;color:#4B5363;background:#F1F2F5;border-radius:999px;padding:3px 8px;vertical-align:middle;margin-left:6px}
+.badge{font-size:11px;font-weight:600;color:#4B5363;background:#F1F2F5;border-radius:999px;padding:3px 8px;white-space:nowrap}
+.cond{display:flex;justify-content:space-between;align-items:center;background:var(--bg-subtle);border:0;border-radius:12px;padding:12px 14px;font:inherit;font-size:15px;cursor:pointer;color:var(--text);width:100%}
+.cond b{font-weight:600}
+.cond span.c{font-size:13px;color:var(--brand);font-weight:600}
+.panel{display:flex;flex-direction:column;gap:8px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--bg-subtle);border-radius:12px;padding:4px}
+.seg button{height:38px;border:0;border-radius:9px;background:none;font:inherit;font-size:14px;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}
+.seg button.on{background:var(--bg);color:var(--brand);font-weight:600;box-shadow:0 1px 2px rgb(20 23 31/10%)}
+.seg button.off{color:var(--text-off);cursor:not-allowed}
+.notice{font-size:12px;color:var(--text-sub)}
+.list{display:flex;flex-direction:column}
+.list h2{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--text-sub);display:flex;justify-content:space-between}
+.day{display:grid;grid-template-columns:62px minmax(0,1fr) 74px;gap:12px;align-items:center;padding:11px 8px;border:0;border-radius:12px;background:none;font:inherit;color:var(--text);cursor:pointer;text-align:left;width:100%}
+.day.best{background:var(--brand-soft)}
+.day .dl{display:flex;flex-direction:column;line-height:1.2}
+.day .dl b{font-size:15px;font-weight:600}
+.day .dl small{font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day .dl small.hol{color:#B4235A}
+.day .t{font-size:15px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.day .t.none{font-size:13px;font-weight:500;color:var(--text-sub)}
+.mini{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:2px}
+.mini i{height:14px;border-radius:3px;display:block}
+.besttag{font-size:11px;font-weight:600;color:var(--brand)}
+.hero{display:flex;flex-direction:column;gap:4px;padding:6px 0 2px}
+.hero .t{font-size:44px;line-height:50px;font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.hero .g{font-size:17px;font-weight:600;color:var(--good)}
+.hero .r{font-size:14px;color:var(--text-sub)}
+.hero .none{font-size:20px;font-weight:600;line-height:28px}
+.link{border:0;background:var(--brand-soft);color:var(--brand);font:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:12px;text-align:left;cursor:pointer}
+.strip{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px}
+.cell{height:44px;border:0;border-radius:5px;padding:0;cursor:pointer}
+.cell.sel{outline:2px solid var(--text);outline-offset:1px}
+.hours{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px;font-size:11px;color:var(--text-sub);margin-top:5px;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text-sub);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.readout{min-height:44px;border-radius:10px;background:var(--bg-subtle);padding:12px;font-size:14px;margin-top:12px}
+.readout.empty{color:var(--text-sub)}
+.more{font-size:14px;color:var(--text-sub)}
+.more b{color:var(--text);font-weight:600}
+.foot{font-size:11px;color:var(--text-sub);text-align:center;margin-top:auto;padding-top:8px}
+button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="col"><div class="phone" id="p1"></div><div class="cap">① 장소 첫 화면 · 이번 주 (눌러 보세요)</div></div>
+  <div class="col"><div class="phone" id="p2"></div><div class="cap">② 하루 상세 · 칸을 눌러 보세요</div></div>
+  <div class="col"><div class="phone" id="p3"></div><div class="cap">③ 역세권 (B, 추정)</div></div>
+</div>
+<script>
+// ---- Example data (mockup only) ----
+const HOURS=[9,10,11,12,13,14,15,16,17,18,19,20,21,22,23];
+const DAYS=[{w:'화',md:'9/29',full:'9월 29일 (화)',k:'weekday',today:1},{w:'수',md:'9/30',full:'9월 30일 (수)',k:'weekday'},
+  {w:'목',md:'10/1',full:'10월 1일 (목)',k:'weekday'},{w:'금',md:'10/2',full:'10월 2일 (금)',k:'fri'},
+  {w:'토',md:'10/3',full:'10월 3일 (토)',k:'busyHol',hol:'개천절'},{w:'일',md:'10/4',full:'10월 4일 (일)',k:'weekend'},
+  {w:'월',md:'10/5',full:'10월 5일 (월)',k:'weekend',hol:'대체공휴일'},{w:'화',md:'10/6',full:'10월 6일 (화)',k:'weekday'}];
+const A1={name:'성수카페거리',tier:'A1',now:'지금은 사람이 적당해요 · 14:30 기준',
+  LV:{weekday:[0,0,0,1,1,1,1,1,1,2,2,1,1,0,0],fri:[0,0,0,1,1,1,1,1,2,2,2,2,1,1,0],
+      weekend:[0,0,1,1,2,3,3,3,2,2,2,1,1,0,0],busyHol:[0,1,2,2,3,3,3,3,3,2,2,2,2,1,0]},
+  ACT:{sight:[.1,.2,.4,.7,.8,.8,.8,.8,.7,.8,.8,.7,.5,.4,.2],food:[.1,.2,.5,.9,.8,.5,.4,.4,.6,.9,.9,.7,.5,.3,.1],
+       shop:[.1,.2,.4,.6,.7,.8,.8,.8,.7,.6,.5,.4,.2,.1,0]}};
+const B={name:'상도역 주변',tier:'B',
+  LV:{weekday:[1,2,1,1,1,1,1,1,2,2,1,1,1,0,0],fri:[1,2,1,1,1,1,1,1,2,2,2,2,1,1,0],
+      weekend:[0,0,1,1,1,1,1,1,1,1,1,0,0,0,0],busyHol:[0,0,1,1,1,1,1,1,1,1,0,0,0,0,0]}};
+const CROWD={A1:['여유','보통','약간 붐빔','붐빔'],B:['평소보다 한산해요','평소와 비슷해요','평소보다 붐비는 시간이에요']};
+const CLAUSE=['사람이 적고','사람은 적당하고','조금 붐비지만','꽤 붐비지만'];
+const ACTS={sight:['거리도 활기차요','거리는 조금 한산해요'],food:['음식점도 활기차요','음식점은 조금 한산해요'],shop:['매장도 활기차요','매장은 조금 한산해요']};
+const whyA1=(l,a,p)=>`${CLAUSE[l]} ${ACTS[p][a>=.5?0:1]}`;
+const PURP=[['sight','구경·산책'],['food','맛집'],['shop','쇼핑']];
+const TOL=[['calm','한적하게'],['moderate','적당히'],['busy','붐벼도 돼요']];
+const RATE=[['bad','피하세요','var(--bad)'],['ok','괜찮아요','var(--ok)'],['good','좋아요','var(--good)']];
+const CLOCK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+
+// On/off table (구현설계서 4.4), non-foreign A1; B is on for every tolerance.
+function flag(pl,p,t){ if(pl.tier==='B')return'on';
+  if(t==='calm'&&(p==='food'||p==='shop'))return'off';
+  if((t==='calm'&&p==='sight')||(t==='moderate'&&p==='shop'))return'ref'; return'on'; }
+
+// Score per hour (구현설계서 4.4) and a 3-step rating relative to the best hour of the week.
+function scoreDay(pl,d,p,t){
+  const L=pl.LV[DAYS[d].k], A=pl.tier==='B'?L.map(()=>1):pl.ACT[p], th=p==='shop'?.6:.5;
+  return L.map((l,i)=>{ const a=A[i];
+    const s=t==='calm'?a-.6*l:t==='moderate'?a-.5*Math.abs(l-1):a-.2*Math.max(l-2,0);
+    const closed=pl.tier!=='B'&&a<th, tooBusy=(t==='calm'&&l>=2)||(t==='moderate'&&l===3);
+    return {l,a,s,closed,tooBusy,ok:!closed&&!tooBusy}; });
+}
+function week(pl,p,t){
+  const days=DAYS.map((_,d)=>scoreDay(pl,d,p,t));
+  const top=Math.max(...days.flat().filter(h=>h.ok).map(h=>h.s));
+  return days.map(hs=>{
+    const rated=hs.map(h=>({...h,r:!h.ok?0:(h.s>=top-.25&&h.s>0?2:1)}));
+    // best window: 1-2 consecutive ok hours, score = worst hour
+    let best=null;
+    for(let i=0;i<15;i++){ if(!rated[i].ok)continue;
+      const c=[{hs:[i],s:rated[i].s}]; if(i<14&&rated[i+1].ok)c.push({hs:[i,i+1],s:Math.min(rated[i].s,rated[i+1].s)});
+      for(const w of c) if(!best||w.s>best.s||(w.s===best.s&&w.hs.length>best.hs.length))best=w; }
+    const others=[]; if(best){ const used=new Set(best.hs);
+      for(let i=0;i<15&&others.length<2;i++){ if(rated[i].r===2&&!used.has(i)&&!used.has(i-1)&&!used.has(i+1)){
+        const w=rated[i+1]&&rated[i+1].r===2?[i,i+1]:[i]; w.forEach(x=>used.add(x)); others.push(w);} } }
+    return {h:rated,best,good:best&&rated[best.hs[0]].r===2,others};
+  });
+}
+const span=hs=>`${HOURS[hs[0]]}~${HOURS[hs[hs.length-1]]+1}시`;
+const dayLabel=d=>DAYS[d].today?'오늘':DAYS[d].w;
+
+// ---- One app instance per phone ----
+function App(el,pl,init){
+  const S=Object.assign({view:'week',day:0,p:pl.tier==='B'?null:'sight',t:'moderate',open:false,notice:'',hour:null},init);
+  const set=o=>{Object.assign(S,o);draw();};
+  window[el+'_']={set,
+    p:k=>{ const n={p:k,notice:''}; if(flag(pl,k,S.t)==='off'){n.t='moderate';n.notice=`${PURP.find(x=>x[0]===k)[1]}은 '한적하게'를 아직 준비하고 있어서 '적당히'로 바꿔 드렸어요.`;} set(n); },
+    t:k=>{ if(flag(pl,S.p,k)!=='off')set({t:k,notice:''}); }};
+  const me=el+'_';
+
+  function condition(){
+    const pn=S.p?PURP.find(x=>x[0]===S.p)[1]+' · ':'', tn=TOL.find(x=>x[0]===S.t)[1];
+    let h=`<button class="cond" onclick="${me}.set({open:${!S.open}})"><span><b>${pn}${tn}</b></span><span class="c">${S.open?'닫기':'조건 바꾸기'}</span></button>`;
+    if(S.open){
+      const segP=S.p?`<div class="seg">${PURP.map(([k,n])=>`<button class="${k===S.p?'on':''}" onclick="${me}.p('${k}')">${n}</button>`).join('')}</div>`:'';
+      const segT=`<div class="seg">${TOL.map(([k,n])=>{const off=flag(pl,S.p,k)==='off';
+        return `<button class="${k===S.t?'on':''}${off?' off':''}" ${off?'aria-disabled="true" title="준비 중"':''} onclick="${me}.t('${k}')">${off?CLOCK:''}${n}</button>`;}).join('')}</div>`;
+      h+=`<div class="panel">${segP}${segT}</div>`;
+    }
+    if(S.notice)h+=`<div class="notice">${S.notice}</div>`;
+    return h;
+  }
+  function header(){
+    return `<div style="display:flex;flex-direction:column;gap:6px"><h1>${pl.name}${pl.tier==='B'?'<span class="est">추정</span>':''}</h1>
+      <span class="sub">${pl.tier==='B'?'실시간 데이터가 없어서 평소 흐름으로 추정했어요':pl.now}</span></div>`;
+  }
+  function drawWeek(W){
+    const f=flag(pl,S.p,S.t);
+    let bestD=-1,bs=-9; W.forEach((x,d)=>{ if(x.best&&x.best.s>bs){bs=x.best.s;bestD=d;} });
+    const rows=W.map((x,d)=>`<button class="day${d===bestD?' best':''}" onclick="${me}.set({view:'day',day:${d},hour:null})">
+        <span class="dl"><b>${dayLabel(d)} ${DAYS[d].md.split('/')[1]}</b>${DAYS[d].hol?`<small class="hol">${DAYS[d].hol}</small>`:d===bestD?'<small class="besttag">추천</small>':'<small>&nbsp;</small>'}</span>
+        <span class="mini">${x.h.map(h=>`<i style="background:${RATE[h.r][2]}"></i>`).join('')}</span>
+        <span class="t${x.best?'':' none'}">${x.best?span(x.best.hs):'추천 없음'}</span></button>`).join('');
+    return `${header()}<div style="display:flex;flex-direction:column;gap:8px">${condition()}</div>
+      <div class="list"><h2><span>이번 주, 언제 가면 좋을까요</span>${f==='ref'||pl.tier==='B'?'<span class="badge">참고용</span>':''}</h2>${rows}
+      <div class="legend" style="padding-left:8px">${RATE.slice().reverse().map(r=>`<span><span class="sw" style="background:${r[2]}"></span>${r[1]}</span>`).join('')}</div></div>
+      <div class="foot">시안 · 예시 데이터</div>`;
+  }
+  function drawDay(W){
+    const x=W[S.day], f=flag(pl,S.p,S.t), dd=DAYS[S.day];
+    let hero;
+    if(!x.best){
+      let alt=-1,as=-9; W.forEach((y,d)=>{ if(d!==S.day&&y.best&&y.best.s>as){as=y.best.s;alt=d;} });
+      hero=`<div class="hero"><div class="none">이날은 추천할 시간이 없어요</div></div>
+        ${alt>=0?`<button class="link" onclick="${me}.set({day:${alt},hour:null})">${dayLabel(alt)}(${DAYS[alt].md}) ${span(W[alt].best.hs)}가 더 나아요 →</button>`:''}`;
+    } else {
+      const w=x.best.hs, L=Math.max(...w.map(i=>x.h[i].l)), a=Math.min(...w.map(i=>x.h[i].a));
+      const why=pl.tier==='B'?CROWD.B[L]:whyA1(L,a,S.p);
+      hero=`<div class="hero"><div class="t">${span(w)}</div><div class="g">${x.good?'가기 좋아요':'이날 중에는 가장 나아요'}</div><div class="r">${why}</div></div>
+        ${x.others.length?`<div class="more">이 시간도 괜찮아요 <b>${x.others.map(span).join(' · ')}</b></div>`:''}`;
+    }
+    let read='<div class="readout empty">칸을 누르면 그 시간이 어떤지 알려 드려요</div>';
+    if(S.hour!==null){ const h=x.h[S.hour];
+      const why=h.closed?'아직 문을 연 가게가 거의 없어요.':h.tooBusy?(pl.tier==='B'?'하루 중 가장 붐비는 시간이에요.':'사람이 너무 많아요.'):
+        (pl.tier==='B'?CROWD.B[h.l]+'.':whyA1(h.l,h.a,S.p)+'.');
+      const verdict=['피하는 게 좋아요','괜찮아요','가기 좋아요'][h.r];
+      read=`<div class="readout"><b>${HOURS[S.hour]}시는 ${verdict}.</b> ${why}</div>`; }
+    const tags=dd.hol?'<span class="badge">연휴라 참고용</span>':(f==='ref'||pl.tier==='B'?'<span class="badge">참고용</span>':'');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1 style="font-size:20px;line-height:28px">${dd.full}${dd.hol?' '+dd.hol:''}</h1><span style="display:flex;gap:4px">${tags}</span></div>
+      <div class="sub" style="margin-top:-10px">${pl.name} · ${S.p?PURP.find(q=>q[0]===S.p)[1]+' · ':''}${TOL.find(q=>q[0]===S.t)[1]}</div>
+      ${hero}
+      <div><div class="strip">${x.h.map((h,i)=>`<button class="cell${S.hour===i?' sel':''}" style="background:${RATE[h.r][2]}" onclick="${me}.set({hour:${S.hour===i?null:i}})" aria-label="${HOURS[i]}시 ${RATE[h.r][1]}"></button>`).join('')}</div>
+      <div class="hours">${HOURS.map((h,i)=>`<span>${i%3===0?h:''}</span>`).join('')}</div>
+      <div class="legend">${RATE.slice().reverse().map(r=>`<span><span class="sw" style="background:${r[2]}"></span>${r[1]}</span>`).join('')}</div>
+      ${read}</div>
+      <div class="foot">시안 · 예시 데이터</div>`;
+  }
+  function draw(){
+    const W=week(pl,S.p,S.t);
+    const top=S.view==='week'?`<div class="bar"><span></span><div class="lang"><b>KO</b> · EN</div></div>`:
+      `<div class="bar"><button class="back" onclick="${me}.set({view:'week',hour:null})">‹ 이번 주</button><div class="lang"><b>KO</b> · EN</div></div>`;
+    document.getElementById(el).innerHTML=top+`<div class="body">${S.view==='week'?drawWeek(W):drawDay(W)}</div>`;
+  }
+  draw();
+}
+App('p1',A1,{});
+App('p2',A1,{view:'day',day:5,hour:6});
+App('p3',B,{});
+</script>
+</body>
+</html>

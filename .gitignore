@@ -1,0 +1,30 @@
+# research data (6 GB) and runtime data
+analysis/data/
+data/
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# node / next
+node_modules/
+.next/
+.vercel/
+app/web/next-env.d.ts
+
+# supabase local
+app/supabase/.temp/
+app/supabase/.branches/
+
+# misc
+*.log
+.DS_Store
+Thumbs.db
