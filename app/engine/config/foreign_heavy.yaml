@@ -1,0 +1,8 @@
+# AREA_NM substrings for foreign-heavy places (build contract section 4.4).
+substrings:
+  - 명동
+  - 동대문
+  - 이태원
+  - 홍대
+  - 인사동
+  - 남대문

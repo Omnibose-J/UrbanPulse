@@ -1,0 +1,44 @@
+# Weekly viewing hours for A2 places whose category is 고궁·문화유산.
+# null = closed that weekday. Schedule in force on the checked date (October).
+# Holiday-shifted regular closures are not represented in this table.
+#
+# POI012 is the combined 창덕궁·종묘 hotspot. A weekday is open when at least one
+# site admits visitors. Monday is 종묘's timed-entry slot span (first 09:20, last
+# 16:20) because 창덕궁 is closed. Tuesday is 창덕궁 09:00-18:00 because 종묘 is
+# closed. Wednesday-Sunday follow 창덕궁's 09:00-18:00 gate.
+
+POI008:
+  hours:
+    mon: "09:00-18:00"
+    tue: null
+    wed: "09:00-18:00"
+    thu: "09:00-18:00"
+    fri: "09:00-18:00"
+    sat: "09:00-18:00"
+    sun: "09:00-18:00"
+  source: "https://royal.khs.go.kr/ROYAL/contents/R702000000.do"
+  checked: "2026-10-01"
+
+POI011:
+  hours:
+    mon: null
+    tue: "09:30-18:00"
+    wed: "09:30-18:00"
+    thu: "09:30-18:00"
+    fri: "09:30-18:00"
+    sat: "09:30-18:00"
+    sun: "09:30-18:00"
+  source: "https://www.gangdong.go.kr/web/culture/contents/gdc020_010_020"
+  checked: "2026-10-01"
+
+POI012:
+  hours:
+    mon: "09:20-16:20"
+    tue: "09:00-18:00"
+    wed: "09:00-18:00"
+    thu: "09:00-18:00"
+    fri: "09:00-18:00"
+    sat: "09:00-18:00"
+    sun: "09:00-18:00"
+  source: "https://royal.khs.go.kr/ROYAL/contents/R702000000.do"
+  checked: "2026-10-01"
