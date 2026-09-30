@@ -19,7 +19,7 @@ and writes precomputed rows to Postgres; a Next.js app only reads them. Nothing 
 | `UrbanPulse_PRD.md` | one-page summary (ko) | designer | For reviews; not a contract |
 | `design/UrbanPulse_시안_v6.html` | clickable mockup | designer | Visual reference for M4; example data only |
 | `AGENTS.md` | implementer rules | designer | Hard rules and report format for Cursor |
-| `docs/sow/` | statements of work | designer | `README.md` = milestones; `SOW-M0.md` = expanded; others are outlines until expanded |
+| `docs/sow/` | statements of work | designer | `README.md` = milestones; `SOW-M0.md` (done) and `SOW-M1.md` are expanded; others are outlines until expanded |
 | `docs/tracking/criteria-<m>.md` | acceptance evidence | implementer | Empty result cells created before work, filled after each run |
 | `docs/tracking/findings.md` | out-of-scope problems | implementer | Append-only |
 | `analysis/scripts/` | research code | frozen | Source of every number in the specs. Read-only; port into `app/engine` when a SOW says so; never import |
