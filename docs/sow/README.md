@@ -19,11 +19,12 @@ Build of UrbanPulse v1 (mobile web + PC map dashboard, ko/en, visitors only). Ar
 | [SOW-M2](SOW-M2.md) | W3 hardening, W5, W6, W7 | Part A: task runs on battery · raw before database · `ingest_raw` · eight commerce categories · holidays filtered by `isHoliday`. Part B: `ratio_v1` ported and proven against the research figures · registration gate · `level_thresholds`, `lively_profile` · daily `forecast` job · places refreshed from live data | M1 |
 | [SOW-M3](SOW-M3.md) | W8 | `recommendation_log` migration · flag file · recommendations with `hours`, alternatives · similar places · today's rows refreshed by `collect` | M2 |
 | [SOW-M4](SOW-M4.md) | W10, W11, W13 | read-only API · screens `/`, `/search`, `/p/[id]`, `/p/[id]/[date]`, `/map` (MapLibre), `/about` per the design spec · ko/en · Playwright checks D1-D12 · all on `next dev` against the local DB | M3 |
+| [SOW-M4.1](SOW-M4.1.md) | W10, W11 fixes | screens rebuilt against mockup v6 with DOM-measured visual checks · map renders · today's windows only from hours still ahead · home "now" from the latest measured hour | M4 review |
 | [SOW-M5](SOW-M5.md) | W12 | `evaluate` (daily) · `rejudge` (prints, applies only with `--apply`) · `archive` (dry run only for now) · `/admin/eval` | M3, M4 |
 | [SOW-MB](SOW-MB.md) | W9 (cut down) | tier B station places, usual-flow profile, B recommendations; experimental, search and map toggle only. Holiday adjustment and `ratio_v1b` deferred | M3, M4 |
 | SOW-MC (outline) | W0 cloud half | GCP project, Artifact Registry image push, Cloud Run Jobs + Scheduler, GCS buckets (raw and archive move from `data/`), hosted Supabase (`db push`), Vercel deploy, map provider decision | everything above working locally; accounts and billing (user) |
 
-Run order: **M2 → M3 → M4 → M5 → MB**. SOW-MC is an outline and needs the user's cloud accounts; do not start it.
+Run order: **M2 → M3 → M4 → M5 → M4.1 → MB**. SOW-MC is an outline and needs the user's cloud accounts; do not start it.
 
 ## Unattended run
 
