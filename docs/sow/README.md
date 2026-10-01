@@ -16,6 +16,7 @@ Build of UrbanPulse v1 (mobile web + PC map dashboard, ko/en, visitors only). Ar
 |---|---|---|---|
 | [SOW-M0](SOW-M0.md) | W0, W1 | git repo · local Supabase schema + RLS with pgTAP tests · engine skeleton with `healthcheck` running locally · empty Next.js (`next dev`) reading the local DB. **No cloud** | Docker Desktop, `.env` (present) |
 | [SOW-M1](SOW-M1.md) | W2, W4, W3a, W3 | `places` loaded (tiers, English names, palace hours, foreign-heavy flag, serve state) · holidays 2023–2027 · backfill 5/11→ into the local DB · `collect` every 30 min via Windows Task Scheduler on the dev box, raw snapshots to `data/raw/` | M0 |
+| [SOW-M1.1](SOW-M1.1.md) | W3 hardening | task runs on battery · raw written before any database call · `ingest_raw` job · eight fixed commerce categories · database tests fail fast | M1 |
 | SOW-M2 (outline) | W5, W6, W7 | `ratio_v1`/`ratio_v1b` ported and reproduced · `level_thresholds`, `lively_profile` · `forecast` job | M1 |
 | SOW-M3 (outline) | W8, W9 | recommendations + flags + alternatives + similar places · `tier_b` job | M2 |
 | SOW-M4 (outline) | W10, W13 | mobile screens `/`, `/search`, `/p/[id]`, `/p/[id]/[date]`, `/map`, `/about` per the design spec · ko/en · all on `next dev` against the local DB | M0 (can start on mock rows), real data from M3 |
