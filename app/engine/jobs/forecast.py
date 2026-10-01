@@ -277,6 +277,7 @@ def _build(conn, started: datetime, today) -> dict:
         "passing_horizons": list(passing),
         "similar": similar,
         "reco": reco,
+        "levels_rule": "split",
     }
 
 def _write_profiles(conn, today) -> None:
