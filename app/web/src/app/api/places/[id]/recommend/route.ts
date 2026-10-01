@@ -1,4 +1,4 @@
-import { jsonFail, jsonOk, readDate, readPurpose, readTolerance } from "@/lib/http";
+import { jsonFail, jsonOk, logApiError, readDate, readPurpose, readTolerance } from "@/lib/http";
 import { kstNow } from "@/lib/kst";
 import { recommendPayload } from "@/lib/queries";
 
@@ -18,7 +18,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!body) return jsonFail(404, "unknown place");
     if (body === "gone") return jsonFail(410, "date has passed");
     return jsonOk(body);
-  } catch {
+  } catch (error) {
+    logApiError("places/recommend", error);
     return jsonFail(500, "unavailable");
   }
 }

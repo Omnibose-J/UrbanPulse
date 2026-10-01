@@ -1,4 +1,4 @@
-import { jsonFail, jsonOk, readPurpose, readTolerance } from "@/lib/http";
+import { jsonFail, jsonOk, logApiError, readPurpose, readTolerance } from "@/lib/http";
 import { weekPayload } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const body = await weekPayload(id, tolerance, purpose);
     if (!body) return jsonFail(404, "unknown place");
     return jsonOk(body);
-  } catch {
+  } catch (error) {
+    logApiError("places/week", error);
     return jsonFail(500, "unavailable");
   }
 }

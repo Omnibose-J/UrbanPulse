@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logApiError } from "@/lib/http";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,12 @@ export async function GET() {
       .from("places")
       .select("*", { count: "exact", head: true });
     if (error) throw error;
-    return NextResponse.json({ db: "ok", places: count ?? 0 }, { headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return NextResponse.json({ db: "error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    if (count === null) {
+      return NextResponse.json({ error: "unavailable" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    }
+    return NextResponse.json({ db: "ok", places: count }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    logApiError("health", error);
+    return NextResponse.json({ error: "unavailable" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

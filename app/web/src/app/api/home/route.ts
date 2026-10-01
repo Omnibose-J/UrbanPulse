@@ -1,4 +1,4 @@
-import { jsonFail, jsonOk, readPurpose, readTolerance } from "@/lib/http";
+import { jsonFail, jsonOk, logApiError, readPurpose, readTolerance } from "@/lib/http";
 import { homePayload } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   if (!tolerance || !purpose) return jsonFail(400, "invalid tolerance or purpose");
   try {
     return jsonOk(await homePayload(tolerance, purpose));
-  } catch {
+  } catch (error) {
+    logApiError("home", error);
     return jsonFail(500, "unavailable");
   }
 }

@@ -11,6 +11,11 @@ export function jsonFail(status: number, error: string) {
   return NextResponse.json({ error }, { status, headers: NO });
 }
 
+export function logApiError(route: string, error: unknown) {
+  const message = error instanceof Error ? error.message : "non-Error";
+  console.error(`[api] ${route}`, message);
+}
+
 const TOLERANCES = new Set(["calm", "moderate", "busy_ok"]);
 const PURPOSES = new Set(["sight", "food", "shop", "none"]);
 

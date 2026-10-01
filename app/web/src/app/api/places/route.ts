@@ -1,4 +1,4 @@
-import { jsonFail, jsonOk } from "@/lib/http";
+import { jsonFail, jsonOk, logApiError } from "@/lib/http";
 import { searchPlaces } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,8 @@ export async function GET(request: Request) {
   try {
     const places = await searchPlaces(q);
     return jsonOk({ places });
-  } catch {
+  } catch (error) {
+    logApiError("places", error);
     return jsonFail(500, "unavailable");
   }
 }

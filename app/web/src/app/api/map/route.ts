@@ -1,4 +1,4 @@
-import { jsonFail, jsonOk, readDate, readPurpose, readTolerance } from "@/lib/http";
+import { jsonFail, jsonOk, logApiError, readDate, readPurpose, readTolerance } from "@/lib/http";
 import { mapPayload, upcomingHolidays } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,8 @@ export async function GET(request: Request) {
     const places = await mapPayload(date, tolerance, purpose, stations === "1");
     const holidays = await upcomingHolidays();
     return jsonOk({ places, holidays });
-  } catch {
+  } catch (error) {
+    logApiError("map", error);
     return jsonFail(500, "unavailable");
   }
 }
