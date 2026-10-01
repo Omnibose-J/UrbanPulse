@@ -39,10 +39,7 @@ def profile_rows(
     if history.empty:
         return []
     history["day_type"] = history["day"].map(lambda day: day_type(day, kinds))
-    recent_start = today - timedelta(days=56)
-    recent = history[(history["day"] >= recent_start) & (history["day_type"] != "weekday")]
-    recent = recent[recent["hour"].dt.hour.between(9, 23)]
-    p90 = {purpose: _quantile(recent[purpose]) for purpose in PURPOSES}
+    p90 = _p90(history, today)
     out = []
     for dtype, part in history.groupby("day_type"):
         dates = int(part["day"].nunique())
@@ -65,6 +62,38 @@ def profile_rows(
                     row[column] = float((slot[purpose] / scale).mean())
             out.append(row)
     return out
+
+
+def p90_scales(hourly: pd.DataFrame, kinds: dict[date, str], today: date) -> dict[str, float | None]:
+    """The three normalisers profile_rows divides by. Empty history yields nulls."""
+    empty = {purpose: None for purpose in PURPOSES}
+    if hourly.empty:
+        return empty
+    history = hourly[hourly["day"] < today].copy()
+    if history.empty:
+        return empty
+    history["day_type"] = history["day"].map(lambda day: day_type(day, kinds))
+    return _p90(history, today)
+
+
+def measured_activity(value: float, p90: float | None) -> float | None:
+    if p90 is None or p90 == 0:
+        return None
+    return float(value) / float(p90)
+
+
+def activity_update(tier: str, has_commerce: bool, value: float, p90: float | None):
+    """None leaves the expected profile in place. A commerce hour returns (measured, mark actual)."""
+    if tier != "A1" or not has_commerce:
+        return None
+    return measured_activity(value, p90), True
+
+
+def _p90(history: pd.DataFrame, today: date) -> dict[str, float | None]:
+    recent_start = today - timedelta(days=56)
+    recent = history[(history["day"] >= recent_start) & (history["day_type"] != "weekday")]
+    recent = recent[recent["hour"].dt.hour.between(9, 23)]
+    return {purpose: _quantile(recent[purpose]) for purpose in PURPOSES}
 
 
 def _quantile(series: pd.Series) -> float | None:
