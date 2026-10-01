@@ -293,7 +293,7 @@ export function WeekList({
                 <span className="relative">
                   {day.off_reason === "myeongjeol" ? <MiniStrip hours={null} mode={null} hatch /> : <MiniStrip hours={day.hours} mode={day.strip_mode} />}
                 </span>
-                <span className={`relative w-[72px] overflow-hidden text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
+                <span data-week-time className={`relative w-[72px] overflow-hidden text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
                   {day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : time}
                 </span>
               </a>
