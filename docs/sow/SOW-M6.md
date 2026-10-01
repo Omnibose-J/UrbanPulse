@@ -11,7 +11,7 @@ Backtest E17 (`analysis/scripts/exp_e17_levels_norm.py`, 2026-10-01) found the c
 ## Files you may touch
 
 Create: `app/engine/train/evaluate_levels.py`, `docs/tracking/criteria-m6.md`.
-Edit: `app/engine/levels.py`, `app/engine/config/feature_flags.yaml` (one line), `app/engine/tests/test_levels.py` and other engine tests that pin threshold values, `app/web/messages/{ko,en}.json` (one key each), `docs/LLM_PROJECT_MAP.md`.
+Edit: `app/engine/levels.py`, `app/engine/config/feature_flags.yaml` (one line), `app/engine/tests/test_levels.py` and other engine tests that pin threshold values, `app/web/messages/{ko,en}.json` (one key each), `docs/LLM_PROJECT_MAP.md`; for Part B: `app/web/src/**`, `app/web/e2e/**`.
 Read-only: everything else, including `analysis/`.
 
 ## Steps
@@ -59,3 +59,25 @@ For every place with `serve_state = 'on'`: thresholds from `live_obs` rows with 
 - The evaluate_levels table.
 - Before / after counts of A3 and A4, and the first-pick hour distribution after the rebuild.
 - How many places changed `threshold-ready` (expected none).
+
+---
+
+# Part B — Remove fallbacks that hide a failure (web)
+
+The designer read every `??`, `||` default and `catch` in `app/web/src` (2026-10-01). AGENTS.md rule 3: fail loud, no fallback a SOW did not ask for. Fix these; add rows B1–B9 to `docs/tracking/criteria-m6.md`.
+
+| # | Where | What it hides | Fix | Check |
+|---|---|---|---|---|
+| B1 | `screens/map.tsx` fetch | No `response.ok` check; a 400/500 body has no `places`, `?? []` and `.catch(() => setPlaces([]))` turn it into an empty map with no message | Use the same loader as the other screens (`use-load`); on failure show the error box with retry, never an empty map | Playwright: `/api/map` mocked to 500 → error box visible, zero pins |
+| B2 | `screens/map.tsx` `styleFailed` branch and the `lon ?? 0` / `lat ?? 0` bounds | A silent plain-background mode when the map style fails (SOW-M4.1 allowed it; the designer withdraws that) | Remove the branch and the percent-positioned pins. Style or worker failure → the error box. Remove the dead `?? 0` after the null filter | Playwright: style URL blocked → error box |
+| B3 | `screens/day.tsx` `none = no_window \|\| state === 'off'` | A combination that is switched off (`failed`, `unverified`) reads as "이날은 추천할 시간이 없어요" with alternatives. Off means "준비 중", not "no time" | `off_reason` `failed` or `unverified` → the preparing box with a line naming the condition (new key `state.comboOff`: "이 조건은 아직 준비하고 있어요. 조건을 바꿔 보세요." / "This setting is not ready yet. Try another one.") and the condition field; no alternatives | Playwright: recommend mocked `state: off, off_reason: failed` → that text, no AltButton |
+| B4 | `lib/queries.ts` `ts: live?.ts ?? row.target_ts` | With no `live_obs` row the "기준" time is invented from the forecast hour | No live row → `now = null` (the screen then shows no now line) | unit test on the shaping function |
+| B5 | `screens/day.tsx` `alt.name ?? alt.place_id` | A raw id such as `POI045` shown to the visitor | The API drops an alt place whose name cannot be joined; the screen has no id fallback | unit test: unjoined alt is absent |
+| B6 | every route handler `catch { return jsonFail(500, …) }` | Any bug in a query or shaping function becomes "unavailable" with no trace | `console.error("[api] <route>", error.message)` before the 500 (message only; never the URL, key or row data) | test: a thrown error is logged once and the response is 500 `{"error":"unavailable"}` |
+| B7 | `lib/storage.ts` `parsed.purpose ?? DEFAULTS.purpose` | A stored value outside the allowed set passes through, every API call returns 400, and the screen shows the error box until storage is cleared | Validate both values against the allowed sets; an invalid stored value is replaced by the default and rewritten | unit test |
+| B8 | defaults on values that cannot be missing: `foreign_heavy ?? false` (NOT NULL), `kst.ts` `?? ""` and `?? "0"` (Intl always returns the part; `"0"` would silently mean midnight), `event.error.message ?? ""`, `api/health` `count ?? 0` (reports `db: ok, places: 0` when the count failed) | Each one turns an impossible or failed state into a plausible value | Remove them; where the type allows undefined, throw with a message naming the field. `health`: null count → 500 | `tsc` green; health test |
+| B9 | `MiniStrip` / `DayStrip` `(hours ?? [])` | An off row draws an empty strip area | Callers pass `hours` only for on / reference rows; for off rows the list row shows its state text ("준비 중", "명절") with no strip, and the components take a non-null array | Playwright state screenshots unchanged in count; week list with an off day shows the text |
+
+Keep as they are (requested behaviour, not hidden failures): `localStorage` read/write `catch` (spec §2.4, §2.5), `combos … ?? "off"` and `strip_mode ?? "windows_only"` (invariants 7 and 11: unlisted means off), `searchParams … ?? ""` defaults, `holiday.name_en || holiday.name` (wrap the Korean fallback in `lang="ko"`), default date and hour on the map.
+
+Acceptance for Part B: each check above, plus `npm run lint; npm run build; npx playwright test` → exit 0.
