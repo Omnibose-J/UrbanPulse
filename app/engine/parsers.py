@@ -77,6 +77,7 @@ class CitySnapshot:
     live: dict[str, Any] | None
     commerce: dict[str, Any] | None
     forecasts: list[dict[str, Any]]
+    unknown_categories: tuple[str, ...] = ()
 
 
 def _dicts(node: Any) -> list[dict[str, Any]]:
@@ -139,33 +140,64 @@ def _forecast_rows(place_id: str, issued: Any, block: dict[str, Any]) -> list[di
     return rows
 
 
-def _category_counts(commerce: dict[str, Any]) -> dict[str, int]:
+COMMERCE_CATEGORIES = (
+    "음식·음료",
+    "유통",
+    "패션·뷰티",
+    "여가·오락",
+    "생활서비스",
+    "의료·건강",
+    "교육",
+    "숙박",
+)
+_COMMERCE_ALIAS = {"의료": "의료·건강"}
+
+
+def normalize_category_counts(raw: dict[str, int]) -> tuple[dict[str, int], list[str]]:
+    """Eight fixed keys, zero-filled. `의료` folds into `의료·건강`. Anything else sums into `기타`."""
+    totals = {name: 0 for name in COMMERCE_CATEGORIES}
+    unknown: list[str] = []
+    extra = 0
+    for name, count in raw.items():
+        key = _COMMERCE_ALIAS.get(name, name)
+        if key in totals:
+            totals[key] += count
+        else:
+            unknown.append(name)
+            extra += count
+    if unknown:
+        totals["기타"] = extra
+    return totals, unknown
+
+
+def _category_counts(commerce: dict[str, Any]) -> tuple[dict[str, int], list[str]]:
     node = commerce.get("CMRCL_RSB")
     # Research snapshots wrap the rows in {"CMRCL_RSB": [...]} or {"CMRCL_RSB": {...}}.
     # A live response sends the list directly. A single category object is one row.
     if isinstance(node, dict) and "CMRCL_RSB" in node and "RSB_LRG_CTGR" not in node:
         node = node["CMRCL_RSB"]
-    totals: dict[str, int] = {}
+    raw: dict[str, int] = {}
     for item in _dicts(node):
         name = item.get("RSB_LRG_CTGR")
         if not name:
             continue
         key = str(name)
-        totals[key] = totals.get(key, 0) + parse_int(item.get("RSB_SH_PAYMENT_CNT") or 0)
-    return totals
+        raw[key] = raw.get(key, 0) + parse_int(item.get("RSB_SH_PAYMENT_CNT") or 0)
+    return normalize_category_counts(raw)
 
 
-def _commerce_row(place_id: str, city: dict[str, Any]) -> dict[str, Any] | None:
+def _commerce_row(place_id: str, city: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
     node = city.get("LIVE_CMRCL_STTS")
     if not isinstance(node, dict) or not node.get("CMRCL_TIME"):
-        return None
+        return None, []
+    counts, unknown = _category_counts(node)
     return {
         "place_id": place_id,
         "ts": parse_timestamp(str(node["CMRCL_TIME"])),
         "level": parse_commerce_level(str(node["AREA_CMRCL_LVL"])),
         "pay_cnt": parse_int(node["AREA_SH_PAYMENT_CNT"]),
-        "cat_counts": _category_counts(node),
-    }
+        "cat_counts": counts,
+    }, unknown
 
 
 def parse_citydata(place_id: str, body: dict[str, Any]) -> CitySnapshot:
@@ -187,4 +219,5 @@ def parse_citydata(place_id: str, body: dict[str, Any]) -> CitySnapshot:
         "age_rates": _age_rates(block),
         "male_rate": None if male in (None, "") else float(male),
     }
-    return CitySnapshot(live, _commerce_row(place_id, city), _forecast_rows(place_id, issued, block))
+    commerce, unknown = _commerce_row(place_id, city)
+    return CitySnapshot(live, commerce, _forecast_rows(place_id, issued, block), tuple(unknown))

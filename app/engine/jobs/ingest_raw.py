@@ -36,6 +36,7 @@ def run(date: str | None = None) -> int:
     commerce = []
     forecasts = []
     files = 0
+    unknowns: list[tuple[str, ...]] = []
     for folder in folders:
         for path in sorted(folder.glob("*.json.gz")):
             place_id = path.name.removesuffix(".json.gz")
@@ -48,6 +49,8 @@ def run(date: str | None = None) -> int:
             if snapshot.commerce is not None:
                 commerce.append(snapshot.commerce)
             forecasts.extend(snapshot.forecasts)
+            if snapshot.unknown_categories:
+                unknowns.append(snapshot.unknown_categories)
     log(JOB, "start", date=day.isoformat(), folders=len(folders), files=files)
     try:
         with _ledger(env["DATABASE_URL"], JOB) as ctx:
@@ -57,6 +60,9 @@ def run(date: str | None = None) -> int:
                 "files": files,
                 "live": len(live),
                 "commerce": len(commerce),
+                "unknown_categories": sorted(
+                    {name for snapshot_unknown in unknowns for name in snapshot_unknown}
+                ),
             }
             ctx["status"] = "ok"
     except Exception as exc:

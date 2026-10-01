@@ -334,6 +334,14 @@ def run(
                     "no_data": no_data,
                     "failed": failed,
                     "raw_dir": raw_rel,
+                    "unknown_categories": sorted(
+                        {
+                            name
+                            for result in results
+                            if result["outcome"] == "ok"
+                            for name in result["snapshot"].unknown_categories
+                        }
+                    ),
                 }
                 ctx["detail"] = detail
                 ctx["status"] = status

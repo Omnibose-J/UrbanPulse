@@ -6,11 +6,13 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from engine.parsers import (
+    COMMERCE_CATEGORIES,
     COMMERCE_LEVELS,
     COMMERCE_TIME_FMT,
     LIVE_LEVELS,
     LIVE_TIME_FMT,
     kst,
+    normalize_category_counts,
     parse_commerce_level,
     parse_live_level,
 )
@@ -44,3 +46,14 @@ def test_kst_timestamp_is_seoul():
 def test_cmrcl_time_parses():
     parsed = kst("20260515 2300", COMMERCE_TIME_FMT)
     assert parsed == datetime(2026, 5, 15, 23, 0, tzinfo=KST)
+
+
+def test_commerce_categories_zero_fill_alias_and_other():
+    counts, unknown = normalize_category_counts({"의료": 3, "음식·음료": 2, "놀이": 4})
+    assert list(counts)[:8] == list(COMMERCE_CATEGORIES)
+    assert counts["의료·건강"] == 3
+    assert counts["음식·음료"] == 2
+    assert counts["유통"] == 0
+    assert counts["기타"] == 4
+    assert unknown == ["놀이"]
+    assert "의료" not in counts
