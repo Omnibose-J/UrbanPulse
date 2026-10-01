@@ -120,8 +120,8 @@ def _age_rates(block: dict[str, Any]) -> dict[str, float]:
 
 def _forecast_rows(place_id: str, issued: Any, block: dict[str, Any]) -> list[dict[str, Any]]:
     node = block.get("FCST_PPLTN")
-    if isinstance(node, dict):
-        node = node.get("FCST_PPLTN")
+    if isinstance(node, dict) and "FCST_PPLTN" in node and "FCST_TIME" not in node:
+        node = node["FCST_PPLTN"]
     rows: list[dict[str, Any]] = []
     for item in _dicts(node):
         if not item.get("FCST_TIME"):
@@ -141,8 +141,10 @@ def _forecast_rows(place_id: str, issued: Any, block: dict[str, Any]) -> list[di
 
 def _category_counts(commerce: dict[str, Any]) -> dict[str, int]:
     node = commerce.get("CMRCL_RSB")
-    if isinstance(node, dict):
-        node = node.get("CMRCL_RSB")
+    # Research snapshots wrap the rows in {"CMRCL_RSB": [...]} or {"CMRCL_RSB": {...}}.
+    # A live response sends the list directly. A single category object is one row.
+    if isinstance(node, dict) and "CMRCL_RSB" in node and "RSB_LRG_CTGR" not in node:
+        node = node["CMRCL_RSB"]
     totals: dict[str, int] = {}
     for item in _dicts(node):
         name = item.get("RSB_LRG_CTGR")
