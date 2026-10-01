@@ -14,21 +14,44 @@ def level_of(pop: float, t1: float, t2: float, t3: float) -> int:
     return int(pop >= t1) + int(pop >= t2) + int(pop >= t3)
 
 
-def thresholds_for(frame: pd.DataFrame) -> tuple[float, float, float, int, bool]:
+def thresholds_for(frame: pd.DataFrame, rule: str = "split") -> tuple[float, float, float, int, bool]:
     """`frame` has columns value and level for one place.
 
     Returns t1, t2, t3, based_on_days, ready. A missing level's threshold is infinity.
     Ready when at least three of the four levels 0..3 occur.
+    `rule="min"` is the old lowest-value cut. `rule="split"` is the error-minimising cut
+    and the only rule forecast uses.
     """
+    if rule not in ("split", "min"):
+        raise ValueError(f"unknown threshold rule: {rule}")
     if frame.empty:
         return float("inf"), float("inf"), float("inf"), 0, False
     days = int(pd.to_datetime(frame["ts"]).dt.date.nunique())
     ready = frame["level"].nunique() >= 3
-    cuts = []
-    for level in (1, 2, 3):
-        chosen = frame.loc[frame["level"] >= level, "value"]
-        cuts.append(float(chosen.min()) if not chosen.empty else float("inf"))
+    cuts = [_cut(frame, level, rule) for level in (1, 2, 3)]
+    if rule == "split":
+        cuts[1] = max(cuts[1], cuts[0])
+        cuts[2] = max(cuts[2], cuts[1])
     return cuts[0], cuts[1], cuts[2], days, ready
+
+
+def _cut(frame: pd.DataFrame, level: int, rule: str) -> float:
+    hi = frame.loc[frame["level"] >= level, "value"]
+    if hi.empty:
+        return float("inf")
+    if rule == "min":
+        return float(hi.min())
+    lo = frame.loc[frame["level"] < level, "value"]
+    if lo.empty:
+        return float(hi.min())
+    best_value = None
+    best_errors = None
+    for candidate in sorted(set(hi).union(set(lo))):
+        errors = int((hi < candidate).sum() + (lo >= candidate).sum())
+        if best_errors is None or errors < best_errors:
+            best_errors = errors
+            best_value = float(candidate)
+    return float(best_value)
 
 
 def window_start(today: date) -> date:
