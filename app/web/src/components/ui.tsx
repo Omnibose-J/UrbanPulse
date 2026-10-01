@@ -223,11 +223,10 @@ export function AnswerCard({
   return body;
 }
 
-export function MiniStrip({ hours, mode, hatch }: { hours: HourCell[] | null; mode: string | null; hatch?: boolean }) {
-  if (hatch) return <div className="hatch h-[18px] flex-1 rounded-[3px]" />;
+export function MiniStrip({ hours, mode }: { hours: HourCell[]; mode: string | null }) {
   return (
     <div data-mini-strip className="flex h-[18px] w-full gap-px">
-      {(hours ?? []).map((cell) => (
+      {hours.map((cell) => (
         <span key={cell.h} className="h-full flex-1" style={{ background: toneColor(cellTone(cell, mode)) }} />
       ))}
     </div>
@@ -296,7 +295,11 @@ export function WeekList({
                   </span>
                 </span>
                 <span className="relative">
-                  {day.off_reason === "myeongjeol" ? <MiniStrip hours={null} mode={null} hatch /> : <MiniStrip hours={day.hours} mode={day.strip_mode} />}
+                  {day.state === "off" ? (
+                    <span className="caption text-text-3">{day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("about.preparing")}</span>
+                  ) : day.hours ? (
+                    <MiniStrip hours={day.hours} mode={day.strip_mode} />
+                  ) : null}
                 </span>
                 <span data-week-time className={`relative min-w-0 text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
                   {day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : time}
@@ -317,7 +320,7 @@ export function DayStrip({
   selected,
   onPick,
 }: {
-  hours: HourCell[] | null;
+  hours: HourCell[];
   mode: string | null;
   hidden?: boolean;
   selected?: number | null;
@@ -331,7 +334,7 @@ export function DayStrip({
     <section>
       <h2 className="section mb-2">{t("day.byHour")}</h2>
       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
-        {(hours ?? []).map((cell) => {
+        {hours.map((cell) => {
           const tone = cellTone(cell, mode);
           const verdict = cell.in_window ? t("reason.window") : cell.rating === 1 && mode === "two_step" ? t("reason.ok") : t("reason.avoid");
           const on = selected === cell.h;
@@ -351,7 +354,7 @@ export function DayStrip({
         })}
       </div>
       <div className="mt-1.5 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px] text-[11px] text-text-3">
-        {(hours ?? []).map((cell, index) => (
+        {hours.map((cell, index) => (
           <span key={cell.h} data-axis-label={index % 3 === 0 ? "1" : undefined}>
             {index % 3 === 0 ? cell.h : ""}
           </span>
@@ -359,7 +362,7 @@ export function DayStrip({
       </div>
       <table className="sr-only">
         <tbody>
-          {(hours ?? []).map((cell) => (
+          {hours.map((cell) => (
             <tr key={cell.h}>
               <td>{cell.h}</td>
               <td>{cell.reason}</td>

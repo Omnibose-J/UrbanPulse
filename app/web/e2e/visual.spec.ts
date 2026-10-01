@@ -29,7 +29,8 @@ function startHour(text: string): number | null {
   if (!en) return null;
   let hour = Number(en[1]);
   let period = (en[2] || en[4] || "").toUpperCase();
-  if (!en[2] && Number(en[1]) > Number(en[3])) period = en[4].toUpperCase() === "PM" ? "AM" : "PM";
+  if (!en[2] && Number(en[1]) === 12) period = en[4].toUpperCase();
+  else if (!en[2] && Number(en[1]) > Number(en[3])) period = en[4].toUpperCase() === "PM" ? "AM" : "PM";
   if (period === "PM" && hour < 12) hour += 12;
   if (period === "AM" && hour === 12) hour = 0;
   return hour;
@@ -170,7 +171,7 @@ test("day card, axis, and back label", async ({ page, request }) => {
   test.setTimeout(90000);
   const errors = watch(page);
   const listed = await (await request.get("/api/places?q=")).json();
-  const places = (listed.places as Place[]).filter((item) => item.tier === "A1").slice(0, 12);
+  const places = (listed.places as Place[]).filter((item) => item.tier === "A1");
   let withWindow: { place: Place; date: string } | null = null;
   let without: { place: Place; date: string } | null = null;
   for (const place of places) {

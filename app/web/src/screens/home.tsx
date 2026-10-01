@@ -110,7 +110,7 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
                 {t("home.todayLabel")}
                 <b className="ml-1 text-[20px] font-extrabold text-text">{range || t("week.none")}</b>
               </span>
-              <MiniStrip hours={row.hours} mode={row.strip_mode} />
+              {row.hours ? <MiniStrip hours={row.hours} mode={row.strip_mode} /> : null}
             </a>
             );
           })}
