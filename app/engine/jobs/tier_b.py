@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 import pandas as pd
 
@@ -99,5 +97,6 @@ def check() -> int:
 def run(check_only: bool = False) -> int:
     if check_only:
         return check()
-    print("tier_b: station load is not in this step", file=sys.stderr)
-    return 2
+    from engine.tierb.stations import load_stations
+
+    return load_stations()
