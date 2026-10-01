@@ -1,0 +1,53 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
+
+import { AppBar, Phone, PlaceName, StateBox } from "@/components/ui";
+import { useLoad } from "@/lib/use-load";
+
+type Place = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
+
+export function SearchScreen() {
+  const t = useTranslations();
+  const locale = useLocale();
+  const [q, setQ] = useState("");
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(q.trim()), 200);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+  const loaded = useLoad<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(debounced)}`);
+  return (
+    <Phone>
+      <header className="flex h-14 items-center gap-2">
+        <AppBar backHref={`/${locale}`} />
+      </header>
+      <input
+        autoFocus
+        value={q}
+        onChange={(event) => setQ(event.target.value)}
+        placeholder={t("home.search")}
+        className="press body w-full rounded-[12px] bg-bg-soft px-0"
+        aria-label={t("home.search")}
+      />
+      {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
+      {loaded.loading ? <StateBox kind="skeleton" /> : null}
+      {!q && loaded.data ? <h2 className="section mb-2 mt-4">{t("home.popular")}</h2> : null}
+      {q && loaded.data && loaded.data.places.length === 0 ? <p className="body mt-4">{t("search.empty")}</p> : null}
+      <ul>
+        {(loaded.data?.places ?? []).map((place) => (
+          <li key={place.id}>
+            <a href={`/${locale}/p/${place.id}`} data-row className="row flex items-center justify-between">
+              <span>
+                <span className="body block font-semibold"><PlaceName name={place.name} nameEn={place.name_en} /></span>
+                <span className="caption text-text-3" lang="ko">{place.gu}</span>
+              </span>
+              {place.tier === "B" ? <span className="label">{t("badge.experimental")}</span> : null}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </Phone>
+  );
+}
