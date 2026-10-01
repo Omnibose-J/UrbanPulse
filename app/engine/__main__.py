@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from engine.jobs import healthcheck, load_places
+from engine.jobs import healthcheck, load_places, sync_holidays
 
 NOT_YET = {
     "backfill": "W3a",
@@ -23,6 +23,7 @@ NOT_YET = {
 JOBS = {
     "healthcheck": healthcheck.run,
     "load_places": load_places.run,
+    "sync_holidays": sync_holidays.run,
 }
 
 
