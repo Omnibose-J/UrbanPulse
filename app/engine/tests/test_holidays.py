@@ -32,6 +32,16 @@ def test_2026_kind_mapping():
     assert all(kind_of(row["name"]) == _expected_kind(row["name"]) for row in rows)
 
 
+def test_day_off_drops_is_holiday_n():
+    from engine.jobs.sync_holidays import day_off_rows
+
+    rows = [
+        {"name": "노동절", "is_holiday": "N"},
+        {"name": "어린이날", "is_holiday": "Y"},
+    ]
+    assert [row["name"] for row in day_off_rows(rows)] == ["어린이날"]
+
+
 def test_every_returned_name_has_english():
     names = json.loads((FIXTURES / "kasi_names.json").read_text(encoding="utf-8"))
     table = load_english_names()

@@ -122,7 +122,14 @@ def parse_month(payload: dict[str, Any], year: int, month: int) -> list[dict[str
         day = date(int(loc[:4]), int(loc[4:6]), int(loc[6:8]))
         if day.year != year or day.month != month:
             raise HolidayError(f"kasi {label}: locdate {loc} is outside the month")
-        rows.append({"date": day, "name": name, "kind": kind_of(name)})
+        rows.append(
+            {
+                "date": day,
+                "name": name,
+                "kind": kind_of(name),
+                "is_holiday": str(item.get("isHoliday", "")).strip(),
+            }
+        )
     return rows
 
 
@@ -140,6 +147,11 @@ def _fetch_month(client: httpx.Client, key: str, year: int, month: int) -> list[
     except ValueError:
         raise HolidayError(f"kasi {label}: invalid JSON") from None
     return parse_month(payload, year, month)
+
+
+def day_off_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep API items the calendar marks as a day off (`isHoliday` = Y)."""
+    return [row for row in rows if row.get("is_holiday") == "Y"]
 
 
 def _with_english(rows: list[dict[str, Any]], table: dict[str, str]) -> list[dict[str, Any]]:
@@ -192,9 +204,27 @@ def run(client: httpx.Client | None = None, pause_s: float = PAUSE_S) -> int:
                     time.sleep(pause_s)
                 index += 1
                 collected.extend(_fetch_month(client, env["KASI_API_KEY"], year, month))
-        rows = _with_english(collected, table)
+        watched = {
+            row["date"].isoformat(): {"name": row["name"], "isHoliday": row["is_holiday"]}
+            for row in collected
+            if row["date"] in {date(2026, 5, 1), date(2026, 7, 17)}
+        }
+        rows = _with_english(day_off_rows(collected), table)
+        if not rows:
+            raise HolidayError("kasi returned no days off")
         with db.connect(env["DATABASE_URL"]) as conn:
             with conn.cursor() as cur:
+                cur.execute("set time zone 'Asia/Seoul'")
+                kept_dates = [row["date"] for row in rows]
+                cur.execute(
+                    """
+                    delete from holidays
+                    where date between '2023-01-01' and '2027-12-31'
+                      and not (date = any(%s))
+                    """,
+                    (kept_dates,),
+                )
+                deleted = cur.rowcount
                 cur.executemany(_UPSERT, rows)
                 written = cur.rowcount
             conn.commit()
@@ -206,5 +236,14 @@ def run(client: httpx.Client | None = None, pause_s: float = PAUSE_S) -> int:
             client.close()
     names = sorted({row["name"] for row in rows})
     shared = [f"{row['date'].isoformat()} {row['name']}" for row in rows if " · " in row["name"]]
-    log(JOB, "done", rows=len(rows), written=written, names=names, shared_dates=shared)
+    log(
+        JOB,
+        "done",
+        rows=len(rows),
+        written=written,
+        deleted=deleted,
+        watched=watched,
+        names=names,
+        shared_dates=shared,
+    )
     return 0
