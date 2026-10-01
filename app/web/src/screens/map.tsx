@@ -5,7 +5,8 @@ import { AttributionControl, LngLatBounds, Map, Marker, setWorkerUrl } from "map
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
-import { AppBar } from "@/components/ui";
+import { AppBar, StateBox } from "@/components/ui";
+import { useLoad } from "@/lib/use-load";
 import { formatShortDate, formatShortWeekday, formatStoredWindows, kstParts } from "@/lib/format";
 import { addDays, kstNow } from "@/lib/kst";
 import { cellTone, toneColor, type HourCell } from "@/lib/strip";
@@ -39,10 +40,8 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const [clock, setClock] = useState(Number(hour || kstNow().hour));
   const [stations, setStations] = useState(false);
   const [cond, setCond] = useState({ purpose: "sight" as Purpose, tolerance: "moderate" as Tolerance });
-  const [places, setPlaces] = useState<Pin[]>([]);
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [styleFailed, setStyleFailed] = useState(false);
+  const [mapError, setMapError] = useState(false);
   const [mounted, setMounted] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
@@ -58,27 +57,20 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const loaded = useLoad<{ places: Pin[]; holidays?: Holiday[] }>(
+    `/api/map?date=${day}&tolerance=${cond.tolerance}&purpose=${cond.purpose}&stations=${stations ? 1 : 0}`,
+  );
+  const places = loaded.data ? loaded.data.places : [];
+  const holidays = loaded.data?.holidays ?? [];
   useEffect(() => {
-    let cancel = false;
-    fetch(`/api/map?date=${day}&tolerance=${cond.tolerance}&purpose=${cond.purpose}&stations=${stations ? 1 : 0}`)
-      .then((response) => response.json())
-      .then((body: { places: Pin[]; holidays?: Holiday[] }) => {
-        if (cancel) return;
-        setPlaces(body.places ?? []);
-        setHolidays(body.holidays ?? []);
-        setSelected((current) => current ?? body.places?.[0]?.id ?? null);
-      })
-      .catch(() => {
-        if (!cancel) setPlaces([]);
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [day, cond.purpose, cond.tolerance, stations]);
+    const first = loaded.data?.places[0]?.id;
+    if (!first) return;
+    setSelected((current) => current ?? first);
+  }, [loaded.data]);
 
   useEffect(() => {
     const node = box.current;
-    if (!node || styleFailed) return;
+    if (!node || mapError) return;
     setWorkerUrl(new URL("/vendor/maplibre/maplibre-gl-worker.mjs", window.location.origin).href);
     const map = new Map({
       container: node,
@@ -97,8 +89,12 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       }
     };
     const onError = (event: { error: { message: string } }) => {
-      const message = event.error.message ?? "";
-      if (!map.loaded() && /Worker failed to load|Failed to load style/i.test(message)) setStyleFailed(true);
+      if (map.loaded()) return;
+      if (!event.error.message) {
+        setMapError(true);
+        return;
+      }
+      setMapError(true);
     };
     map.on("load", onLoad);
     map.on("error", onError);
@@ -109,11 +105,11 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       map.remove();
       mapRef.current = null;
     };
-  }, [styleFailed]);
+  }, [mapError]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mounted || styleFailed) return;
+    if (!map || !mounted || mapError) return;
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
     const bounds = new LngLatBounds();
@@ -174,19 +170,12 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     return () => {
       map.off("zoom", onZoom);
     };
-  }, [places, clock, selected, mounted, styleFailed]);
+  }, [places, clock, selected, mounted, mapError]);
 
   const current = places.find((place) => place.id === selected) ?? places[0];
   const days = Array.from({ length: 8 }, (_, index) => addDays(today, index));
   const weekdays = t.raw("time.weekdays") as string[];
   const suffix = t("time.hour");
-  const coords = places.filter((place) => place.lon != null && place.lat != null);
-  const minLon = Math.min(...coords.map((place) => place.lon ?? 0));
-  const maxLon = Math.max(...coords.map((place) => place.lon ?? 0));
-  const minLat = Math.min(...coords.map((place) => place.lat ?? 0));
-  const maxLat = Math.max(...coords.map((place) => place.lat ?? 0));
-  const spanLon = Math.max(maxLon - minLon, 0.05);
-  const spanLat = Math.max(maxLat - minLat, 0.05);
   const tone = current ? placeTone(current, clock) : "bad";
   const verdict = tone === "go" ? t("reason.window") : tone === "ok" ? t("reason.ok") : t("reason.avoid");
   const pick = current ? formatStoredWindows(current.windows, locale, suffix)[0] : "";
@@ -240,7 +229,10 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
             <input data-hour className="min-w-0 flex-1" type="range" min={9} max={23} value={Math.min(23, Math.max(9, clock))} onChange={(event) => setClock(Number(event.target.value))} />
           </label>
         </div>
-        <div ref={box} data-map className="relative min-h-[420px] flex-1" style={{ height: "calc(100dvh - 220px)", background: "var(--map-land)" }}>
+        {loaded.error || mapError ? (
+          <StateBox kind="error" onRetry={() => { setMapError(false); loaded.retry(); }} />
+        ) : null}
+        <div ref={box} data-map className="relative min-h-[420px] flex-1" style={{ height: "calc(100dvh - 220px)", background: "var(--map-land)", display: loaded.error || mapError ? "none" : undefined }}>
           <div className="absolute left-4 top-3 z-10 flex items-center gap-2 rounded-[var(--r-pill)] bg-bg px-3 py-1.5 text-[11px] font-semibold text-text-2 shadow-[var(--shadow-card)]">
             {(["win", "1", "0"] as const).map((key) => (
               <span key={key} className="inline-flex items-center gap-1">
@@ -260,26 +252,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
               {t("map.includeStations")}
             </label>
           </div>
-          {styleFailed
-            ? places.map((place) => {
-                if (place.lon == null || place.lat == null) return null;
-                const pinTone = placeTone(place, clock);
-                const left = 12 + ((place.lon - minLon) / spanLon) * 76;
-                const top = 8 + ((maxLat - place.lat) / spanLat) * 58;
-                return (
-                  <button
-                    key={place.id}
-                    type="button"
-                    data-pin
-                    data-tone={pinTone}
-                    className="absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px]"
-                    style={{ background: toneColor(pinTone, true), borderColor: "var(--on-ink)", left: `${left}%`, top: `${top}%` }}
-                    onClick={() => setSelected(place.id)}
-                  />
-                );
-              })
-            : null}
-          {card}
+          {loaded.error || mapError ? null : card}
         </div>
       </div>
       <aside className="hidden min-[1024px]:block">
