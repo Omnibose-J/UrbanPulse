@@ -325,10 +325,18 @@ def run(
                     forecasts.extend(snapshot.forecasts)
                 store(live, commerce, forecasts)
                 if from_file:
-                    from engine.jobs.forecast import apply_overlay
+                    from engine.jobs.forecast import apply_overlay, refresh_recommendations
 
+                    stored_ids = [row["id"] for row in results if row["outcome"] == "ok"]
                     with _connect(env["DATABASE_URL"]) as overlay_conn:
                         apply_overlay(overlay_conn, run_ts)
+                        refresh_recommendations(
+                            overlay_conn,
+                            run_ts,
+                            run_ts.date(),
+                            place_ids=stored_ids,
+                            only_today=True,
+                        )
                         overlay_conn.commit()
                 ok = sum(1 for row in results if row["outcome"] == "ok")
                 no_data = sum(1 for row in results if row["outcome"] == "no_data")

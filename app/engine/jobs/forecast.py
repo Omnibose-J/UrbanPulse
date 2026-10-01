@@ -14,12 +14,15 @@ from psycopg.types.json import Jsonb
 
 from engine import db, settings
 from engine.calendar_feats import day_type
+from engine.flags import load as load_flags
 from engine.hourly import baseline, hourly_frame
 from engine.levels import level_of, thresholds_for
-from engine.lively import hourly_commerce, profile_rows
+from engine.lively import activity_update, hourly_commerce, p90_scales, profile_rows
 from engine.log import log
 from engine.parsers import KST
 from engine.ratio_model import load
+from engine.reco import build_row, fill_alternatives, log_candidates, purposes_for
+from engine.similar import replace_similar
 
 JOB = "forecast"
 
@@ -107,6 +110,7 @@ def apply_overlay(conn, now: datetime) -> None:
                     """,
                     (float(pop), int(level), place_id, target),
                 )
+    _measure_activity(conn, now)
 
 
 def _active_model(conn):
@@ -263,8 +267,16 @@ def _build(conn, started: datetime, today) -> dict:
             where target_ts < (date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')
             """
         )
+    similar = replace_similar(conn, today)
+    reco = refresh_recommendations(conn, started, today)
     conn.commit()
-    return {"transitions": transitions, "places": len(places), "passing_horizons": list(passing)}
+    return {
+        "transitions": transitions,
+        "places": len(places),
+        "passing_horizons": list(passing),
+        "similar": similar,
+        "reco": reco,
+    }
 
 def _write_profiles(conn, today) -> None:
     with conn.cursor() as cur:
@@ -285,8 +297,14 @@ def _write_profiles(conn, today) -> None:
         frame = pd.DataFrame(cur.fetchall(), columns=["place_id", "ts", "pay_cnt", "food", "shop"])
     hourly = hourly_commerce(frame)
     cur_rows = []
+    norm_rows = []
     for place_id, part in hourly.groupby("place_id"):
-        for row in profile_rows(part, kinds, today):
+        profiles = list(profile_rows(part, kinds, today))
+        if not profiles:
+            continue
+        scales = p90_scales(part, kinds, today)
+        norm_rows.append((place_id, scales["all"], scales["food"], scales["shop"]))
+        for row in profiles:
             cur_rows.append(
                 (
                     place_id,
@@ -306,6 +324,14 @@ def _write_profiles(conn, today) -> None:
             values (%s, %s, %s, %s, %s, %s, %s)
             """,
             cur_rows,
+        )
+        cur.execute("delete from lively_norm")
+        cur.executemany(
+            """
+            insert into lively_norm (place_id, p90_all, p90_food, p90_shop)
+            values (%s, %s, %s, %s)
+            """,
+            norm_rows,
         )
     conn.commit()
 
@@ -404,9 +430,11 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
     with conn.cursor() as cur:
         cur.executemany(
             """
-            insert into forecast_hourly
-              (place_id, target_ts, issued_ts, source, pop, level, a_all, a_food, a_shop, stale, ready)
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            insert into forecast_hourly (
+              place_id, target_ts, issued_ts, source, pop, level,
+              a_all, a_food, a_shop, stale, ready, a_actual
+            )
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false)
             on conflict (place_id, target_ts) do update set
               issued_ts = excluded.issued_ts,
               source = excluded.source,
@@ -416,7 +444,8 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
               a_food = excluded.a_food,
               a_shop = excluded.a_shop,
               stale = excluded.stale,
-              ready = excluded.ready
+              ready = excluded.ready,
+              a_actual = false
             """,
             forecast_rows,
         )
@@ -435,3 +464,238 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
 
 def _threshold_ready_flag(place_id, ready_ids: set) -> bool:
     return place_id in ready_ids
+
+
+_P90_KEY = {"sight": 0, "food": 1, "shop": 2}
+
+
+def _measure_activity(conn, now: datetime) -> None:
+    """A1 hours with commerce today take measured activity and a_actual."""
+    today = _today(now)
+    start = datetime.combine(today, datetime.min.time()).replace(tzinfo=KST)
+    end = start + timedelta(days=1)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select c.place_id,
+                   date_trunc('hour', c.ts at time zone 'Asia/Seoul'),
+                   avg(c.pay_cnt)::float8,
+                   avg(coalesce((c.cat_counts->>'음식·음료')::float8, 0)),
+                   avg(coalesce((c.cat_counts->>'유통')::float8, 0)
+                     + coalesce((c.cat_counts->>'패션·뷰티')::float8, 0))
+            from commerce_obs c
+            join places p on p.id = c.place_id and p.tier = 'A1'
+            where c.ts >= %s and c.ts < %s
+            group by 1, 2
+            """,
+            (start, end),
+        )
+        measured = cur.fetchall()
+        cur.execute("select place_id, p90_all, p90_food, p90_shop from lively_norm")
+        norms = {row[0]: row[1:] for row in cur.fetchall()}
+    updates = []
+    for place_id, hour, pay, food, shop in measured:
+        scales = norms.get(place_id, (None, None, None))
+        stamp = hour.replace(tzinfo=KST) if hour.tzinfo is None else hour.astimezone(KST)
+        values = []
+        for value, scale in ((pay, scales[0]), (food, scales[1]), (shop, scales[2])):
+            updated = activity_update("A1", True, float(value or 0), None if scale is None else float(scale))
+            values.append(None if updated is None else updated[0])
+        updates.append((values[0], values[1], values[2], place_id, stamp))
+    if not updates:
+        return
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            update forecast_hourly
+            set a_all = %s, a_food = %s, a_shop = %s, a_actual = true
+            where place_id = %s and target_ts = %s
+            """,
+            updates,
+        )
+
+
+def refresh_recommendations(conn, started: datetime, today, place_ids=None, only_today: bool = False) -> dict:
+    """Upsert recommendation rows. The full forecast also logs today+3 and drops past dates."""
+    flags = load_flags()
+    dates = [today] if only_today else [today + timedelta(days=offset) for offset in range(8)]
+    start = datetime.combine(dates[0], datetime.min.time()).replace(tzinfo=KST)
+    end = datetime.combine(dates[-1] + timedelta(days=1), datetime.min.time()).replace(tzinfo=KST)
+    with conn.cursor() as cur:
+        cur.execute("set time zone 'Asia/Seoul'")
+        cur.execute(
+            """
+            select id, tier, foreign_heavy, serve_state, open_hours, lat, lon
+            from places
+            where tier in ('A1', 'A2') and serve_state <> 'off' and serve_state <> 'experimental'
+            """
+        )
+        places = [
+            {
+                "id": row[0],
+                "tier": row[1],
+                "foreign_heavy": row[2],
+                "serve_state": row[3],
+                "open_hours": row[4],
+                "lat": row[5],
+                "lon": row[6],
+            }
+            for row in cur.fetchall()
+        ]
+        if place_ids is not None:
+            wanted = set(place_ids)
+            places = [place for place in places if place["id"] in wanted]
+        cur.execute("select date, kind from holidays")
+        kinds = {row[0]: row[1] for row in cur.fetchall()}
+        cur.execute(
+            """
+            select place_id, target_ts, level, a_all, a_food, a_shop, ready
+            from forecast_hourly
+            where target_ts >= %s and target_ts < %s
+            """,
+            (start, end),
+        )
+        hourly_rows = cur.fetchall()
+        cur.execute("select place_id, other_id from similar_places order by place_id, rank")
+        neighbours: dict[str, list[str]] = {}
+        for place_id, other_id in cur.fetchall():
+            neighbours.setdefault(place_id, []).append(other_id)
+        cur.execute("select id, lat, lon from places")
+        coords = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+        cur.execute("select place_id, p90_all, p90_food, p90_shop from lively_norm")
+        norms = {row[0]: row[1:] for row in cur.fetchall()}
+        stored = []
+        if only_today and places:
+            cur.execute(
+                """
+                select r.place_id, r.date, r.tolerance, r.purpose, r.state, r.windows, p.tier
+                from recommendations r
+                join places p on p.id = r.place_id
+                where r.place_id = any(%s) and r.date > %s and r.date <= %s
+                """,
+                ([place["id"] for place in places], today, today + timedelta(days=7)),
+            )
+            stored = [
+                {
+                    "place_id": row[0],
+                    "date": row[1],
+                    "tolerance": row[2],
+                    "purpose": row[3],
+                    "state": row[4],
+                    "windows": row[5],
+                    "tier": row[6],
+                }
+                for row in cur.fetchall()
+            ]
+    hourly = {}
+    for place_id, target, level, a_all, a_food, a_shop, ready in hourly_rows:
+        local = target.astimezone(KST)
+        hourly.setdefault((place_id, local.date()), {})[local.hour] = {
+            "level": level,
+            "a_all": a_all,
+            "a_food": a_food,
+            "a_shop": a_shop,
+            "ready": ready,
+        }
+    built = []
+    for place in places:
+        for day in dates:
+            kind = day_type(day, kinds)
+            slots = hourly.get((place["id"], day), {})
+            for purpose in purposes_for(place["tier"]):
+                for tolerance in ("calm", "moderate", "busy_ok"):
+                    row = build_row(place, day, tolerance, purpose, slots, flags, kind)
+                    scales = norms.get(place["id"])
+                    if place["tier"] == "A1" and scales is not None and purpose in _P90_KEY:
+                        row["p90"] = scales[_P90_KEY[purpose]]
+                    built.append(row)
+    fill_alternatives(built, built + stored, neighbours, coords)
+    payload = [_recommendation_tuple(row, started) for row in built]
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into recommendations (
+              place_id, date, tolerance, purpose, state, off_reason, windows, no_window, hours,
+              strip_mode, alt_dates, alt_places, generated_at
+            ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            on conflict (place_id, date, tolerance, purpose) do update set
+              state = excluded.state,
+              off_reason = excluded.off_reason,
+              windows = excluded.windows,
+              no_window = excluded.no_window,
+              hours = excluded.hours,
+              strip_mode = excluded.strip_mode,
+              alt_dates = excluded.alt_dates,
+              alt_places = excluded.alt_places,
+              generated_at = excluded.generated_at
+            """,
+            payload,
+        )
+        logged = 0
+        if not only_today:
+            cur.execute("select count(*) from recommendation_log")
+            before = cur.fetchone()[0]
+            cur.executemany(
+                """
+                insert into recommendation_log (
+                  place_id, issued_date, date, tolerance, purpose, state, windows, hours, p90, lively_min
+                ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                on conflict do nothing
+                """,
+                [_log_tuple(row, today) for row in log_candidates(built, today)],
+            )
+            cur.execute("select count(*) from recommendation_log")
+            logged = cur.fetchone()[0] - before
+            cur.execute("delete from recommendations where date < %s", (today,))
+    off_by: dict[str, int] = {}
+    on = reference = no_window = 0
+    for row in built:
+        if row["state"] == "on":
+            on += 1
+        elif row["state"] == "reference":
+            reference += 1
+        else:
+            off_by[row["off_reason"]] = off_by.get(row["off_reason"], 0) + 1
+        if row["no_window"]:
+            no_window += 1
+    return {
+        "rows": len(built),
+        "on": on,
+        "reference": reference,
+        "off_by_reason": off_by,
+        "no_window": no_window,
+        "logged": logged,
+    }
+
+
+def _recommendation_tuple(row: dict, started: datetime):
+    return (
+        row["place_id"],
+        row["date"],
+        row["tolerance"],
+        row["purpose"],
+        row["state"],
+        row["off_reason"],
+        None if row["windows"] is None else Jsonb(row["windows"]),
+        row["no_window"],
+        None if row["hours"] is None else Jsonb(row["hours"]),
+        row["strip_mode"],
+        None if row["alt_dates"] is None else Jsonb(row["alt_dates"]),
+        None if row["alt_places"] is None else Jsonb(row["alt_places"]),
+        started,
+    )
+
+
+def _log_tuple(row: dict, issued):
+    return (
+        row["place_id"],
+        issued,
+        row["date"],
+        row["tolerance"],
+        row["purpose"],
+        row["state"],
+        Jsonb(row["windows"] or []),
+        Jsonb(row["hours"]),
+        row["p90"],
+        row["lively_min"],
+    )
