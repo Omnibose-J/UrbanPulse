@@ -13,7 +13,9 @@ import {
   StateBox,
   WeekList,
 } from "@/components/ui";
-import { formatClock, formatLongDate, formatStoredWindows } from "@/lib/format";
+import { formatClock, formatShortWeekday, formatStoredWindows } from "@/lib/format";
+import { kstNow } from "@/lib/kst";
+import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
 import { readConditions, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
 import { useLoad } from "@/lib/use-load";
@@ -22,11 +24,11 @@ type DayRow = {
   date: string;
   state: string;
   off_reason: string | null;
-  windows: { hours: number[]; score: number; crowd: number; act: string | null; act_level: string | null }[] | null;
+  windows: { hours: number[]; score: number; crowd?: number; act?: string | null; act_level?: string | null }[] | null;
   no_window: boolean | null;
   hours: HourCell[] | null;
   strip_mode: string | null;
-  holiday: { name: string; kind: string } | null;
+  holiday: { name: string; name_en?: string | null; kind: string } | null;
 };
 
 type Body = {
@@ -60,9 +62,17 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
   ranked.sort((a, b) => (b.windows![0].score - a.windows![0].score) || a.date.localeCompare(b.date));
   const best = ranked[0];
   const suffix = t("time.hour");
-  const marks = { month: t("time.month"), day: t("time.day"), weekdays: t.raw("time.weekdays") as string[] };
+  const weekdays = t.raw("time.weekdays") as string[];
+  const today = kstNow().date;
   const now = loaded.data?.now;
-  const nowText = now && now.level !== null ? `${t(`now.l${now.level}`)} · ${t("now.asOf", { time: formatClock(now.ts) })}` : null;
+  const nowText = place?.tier === "B"
+    ? t("state.tierb")
+    : now && now.level !== null
+      ? `${t(`now.l${now.level}`)} · ${t("now.asOf", { time: formatClock(now.ts) })}`
+      : null;
+  const range = best ? formatStoredWindows(best.windows, locale, suffix)[0] : undefined;
+  const weekday = best ? formatShortWeekday(best.date, weekdays, t("time.today"), today) : undefined;
+  const reason = place && best ? reasonMessageIds(place.tier, best.windows?.[0]).map((id) => t(id)).join(" ") : undefined;
   return (
     <Phone>
       {notice ? <p className="label py-2">{t("state.past")}</p> : null}
@@ -83,23 +93,29 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
           variant="week"
           name={place.name}
           nameEn={place.name_en}
-          when={`${formatLongDate(best.date, locale, marks)} ${formatStoredWindows(best.windows, locale, suffix).join(", ")}`}
+          weekday={weekday}
+          range={range}
+          reason={reason}
           href={`/${locale}/p/${id}/${best.date}`}
           nowText={nowText}
+          nowLevel={place.tier === "B" || now?.stale ? null : now?.level}
           staleText={now?.stale ? t("state.stale", { time: formatClock(now.ts) }) : null}
           badge={place.tier === "B" ? "experimental" : best.state === "reference" ? "reference" : null}
         />
       ) : null}
       {place && !preparing && !best && loaded.data ? (
-        <AnswerCard variant="none" name={place.name} nameEn={place.name_en} when={t("state.weekNone")} reason={t("state.weekNoneHint")} />
+        <AnswerCard variant="none" name={place.name} nameEn={place.name_en} />
       ) : null}
-      {place && place.tier === "A1" && !days.some((day) => day.off_reason === "myeongjeol" && days.every((item) => item.off_reason === "myeongjeol")) ? (
-        <ConditionField label={`${t(`purpose.${purpose}`)} · ${t(`tol.${cond.tolerance}`)}`} onClick={() => setOpen(true)} />
+      {place && place.tier !== "B" && !days.every((day) => day.off_reason === "myeongjeol") ? (
+        <ConditionField
+          label={place.tier === "A1" ? `${t(`purpose.${purpose}`)} · ${t(`tol.${cond.tolerance}`)}` : t(`tol.${cond.tolerance}`)}
+          onClick={() => setOpen(true)}
+        />
       ) : null}
       {loaded.data ? (
         <>
           <div className={now?.stale ? "opacity-50" : undefined}>
-            <WeekList days={days} locale={locale} today={days[0]?.date ?? ""} bestDate={best?.date} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
+            <WeekList days={days} locale={locale} today={today} bestDate={best?.date} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
           </div>
           <Legend mode={days.find((day) => day.strip_mode)?.strip_mode ?? "windows_only"} />
         </>

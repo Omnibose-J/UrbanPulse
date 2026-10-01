@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, Legend, Phone, StateBox } from "@/components/ui";
 import { formatLongDate, formatShortDate, formatStoredWindows } from "@/lib/format";
+import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
 import { readConditions, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
 import { useLoad } from "@/lib/use-load";
@@ -13,13 +14,13 @@ type Rec = {
   recommendation: {
     state: string;
     off_reason: string | null;
-    windows: { hours: number[]; score: number }[] | null;
+    windows: { hours: number[]; score: number; crowd?: number; act?: string | null; act_level?: string | null }[] | null;
     no_window: boolean | null;
     hours: HourCell[] | null;
     strip_mode: string | null;
   } | null;
   place: { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
-  holiday: { name: string; kind: string } | null;
+  holiday: { name: string; name_en?: string | null; kind: string } | null;
   combos: { purpose: string; tolerance: string; state: string }[];
   alt_dates: { date: string; hours: number[]; score: number }[];
   alt_places: { place_id: string; hours: number[]; name: string | null; name_en: string | null }[];
@@ -57,6 +58,11 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   const myeongjeol = rec?.off_reason === "myeongjeol";
   const preparing = place?.serve_state === "preparing" || rec?.off_reason === "preparing";
   const ranges = formatStoredWindows(rec?.windows, locale, suffix);
+  const holiday = loaded.data?.holiday;
+  const holidayName = holiday ? (locale === "en" ? holiday.name_en || holiday.name : holiday.name) : null;
+  const dateLine = holidayName ? `${formatLongDate(date, locale, marks)} · ${holidayName}` : formatLongDate(date, locale, marks);
+  const reason = place && rec?.windows?.[0] ? reasonMessageIds(place.tier, rec.windows[0]).map((id) => t(id)).join(" ") : undefined;
+  const condLabel = place?.tier === "A1" ? `${t(`purpose.${cond.purpose}`)} · ${t(`tol.${cond.tolerance}`)}` : t(`tol.${cond.tolerance}`);
   return (
     <Phone>
       <AppBar
@@ -72,17 +78,19 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
       {loaded.loading ? <StateBox kind="skeleton" /> : null}
       {place && preparing ? <StateBox kind="preparing" /> : null}
-      {place && myeongjeol ? <AnswerCard variant="myeongjeol" name={place.name} nameEn={place.name_en} when={formatLongDate(date, locale, marks)} /> : null}
+      {place && myeongjeol ? <AnswerCard variant="myeongjeol" name={place.name} nameEn={place.name_en} dateLine={dateLine} /> : null}
       {place && !preparing && !myeongjeol && none ? (
-        <AnswerCard variant="none" name={place.name} nameEn={place.name_en} when={formatLongDate(date, locale, marks)} />
+        <AnswerCard variant="none" name={place.name} nameEn={place.name_en} dateLine={dateLine} />
       ) : null}
       {place && !preparing && !myeongjeol && !none && ranges.length > 0 ? (
         <AnswerCard
           variant="day"
           name={place.name}
           nameEn={place.name_en}
-          when={ranges[0]}
-          badge={rec?.state === "reference" ? "reference" : loaded.data?.holiday ? "holidayRef" : null}
+          dateLine={dateLine}
+          range={ranges[0]}
+          reason={reason}
+          badge={rec?.state === "reference" ? "reference" : holiday ? "holidayRef" : null}
           extra={ranges.length > 1 ? `${t("day.alsoRec")} ${ranges.slice(1).join(", ")}` : undefined}
         />
       ) : null}
@@ -96,12 +104,12 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
             <AltButton key={alt.place_id} href={`/${locale}/p/${alt.place_id}/${date}`} label={t("alt.similar", { place: alt.name ?? alt.place_id, time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
           ))
         : null}
-      {place && !myeongjeol ? (
-        <ConditionField label={`${t(`purpose.${cond.purpose}`)} · ${t(`tol.${cond.tolerance}`)}`} onClick={() => setOpen(true)} />
+      {place && !myeongjeol && place.tier !== "B" ? (
+        <ConditionField label={condLabel} onClick={() => setOpen(true)} />
       ) : null}
       {rec?.hours ? (
-        <div className={false ? "opacity-50" : undefined}>
-          <DayStrip hours={rec.hours} mode={rec.strip_mode} onPick={setPicked} />
+        <div>
+          <DayStrip hours={rec.hours} mode={rec.strip_mode} selected={picked?.h} onPick={setPicked} />
           <Legend mode={rec.strip_mode} />
           <p className="body mt-4 min-h-12 rounded-[12px] bg-bg-soft p-3">{picked ? t("reason.cell", { hour: String(picked.h), verdict: picked.in_window ? t("reason.window") : t("reason.avoid"), why: t(`reason.${picked.reason === "too_busy" ? "tooBusy" : picked.reason === "closed" ? "closed" : picked.reason === "outside_hours" ? "outsideHours" : "ok"}`) }) : t("day.tapHint")}</p>
         </div>

@@ -17,18 +17,20 @@ export function PlaceName({ name, nameEn }: { name: string; nameEn?: string | nu
 }
 
 export function Phone({ children }: { children: React.ReactNode }) {
-  return <div className="phone-shell px-4 pb-8">{children}</div>;
+  return <div className="phone-shell px-4 pb-16">{children}</div>;
 }
 
 export function AppBar({
   backHref,
   backLabel,
+  title,
   star,
   onStar,
   mapHref,
 }: {
   backHref?: string;
   backLabel?: string;
+  title?: string;
   star?: boolean;
   onStar?: () => void;
   mapHref?: string;
@@ -44,10 +46,13 @@ export function AppBar({
     <header className="flex h-14 items-center justify-between">
       <div className="flex items-center gap-1">
         {backHref ? (
-          <a href={backHref} className="icon-hit -ml-2.5 flex items-center gap-1 text-[15px] font-semibold">
-            <ChevronLeft aria-hidden />
-            {backLabel ? <span>{backLabel}</span> : null}
-          </a>
+          <>
+            <a href={backHref} className="icon-hit -ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold">
+              <ChevronLeft aria-hidden />
+              {backLabel ? <span className="whitespace-nowrap">{backLabel}</span> : null}
+            </a>
+            {title ? <span className="text-[17px] font-extrabold tracking-tight">{title}</span> : null}
+          </>
         ) : (
           <span className="flex items-center gap-2 font-extrabold tracking-tight">
             <span className="inline-block h-6 w-6 rounded-[6px] bg-ink" aria-hidden>
@@ -122,59 +127,90 @@ function marks(t: ReturnType<typeof useTranslations>) {
   };
 }
 
+export function LevelDot({ level, onDark = false }: { level: number; onDark?: boolean }) {
+  const colors = ["var(--go)", "var(--ok)", "var(--star)", "var(--hol)"];
+  const background = onDark && level === 0 ? "var(--go-bright)" : colors[level] ?? "var(--bad-pin)";
+  return <i data-status-dot className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background }} />;
+}
+
 export function AnswerCard({
   variant,
   name,
   nameEn,
-  when,
+  dateLine,
+  weekday,
+  range,
   reason,
   href,
   badge,
   extra,
   staleText,
   nowText,
+  nowLevel,
 }: {
   variant: "week" | "day" | "none" | "myeongjeol";
   name: string;
   nameEn?: string | null;
-  when?: string;
+  dateLine?: string;
+  weekday?: string;
+  range?: string;
   reason?: string;
   href?: string;
   badge?: "reference" | "holidayRef" | "experimental" | null;
   extra?: string;
   staleText?: string | null;
   nowText?: string | null;
+  nowLevel?: number | null;
 }) {
   const t = useTranslations();
+  const weekNone = variant === "none" && !dateLine;
+  const nameClass = variant === "week" || weekNone ? "title" : "label text-on-ink-2";
   const body = (
-    <div data-answer-card className="relative overflow-hidden rounded-[20px] bg-ink p-5 text-on-ink">
-      <span className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full" style={{ background: "rgb(18 160 102 / 22%)" }} />
-      {badge ? (
-        <span className="absolute right-4 top-4">
-          <Badge kind={badge} />
-        </span>
+    <div data-answer-card className="relative flex flex-col gap-4 overflow-hidden rounded-[20px] bg-ink p-5 text-on-ink">
+      <span className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full" style={{ background: "radial-gradient(circle, rgb(70 224 160 / 22%), transparent 70%)" }} />
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          {dateLine ? <p className="label font-semibold text-on-ink-3">{dateLine}</p> : null}
+          <p className={nameClass}>
+            <PlaceName name={name} nameEn={nameEn} />
+          </p>
+          {variant === "week" && (staleText || nowText) ? (
+            <p className="label mt-1 flex items-center gap-1.5 text-on-ink-2">
+              {staleText || nowLevel === null || nowLevel === undefined ? null : <LevelDot level={nowLevel} onDark />}
+              {staleText ?? nowText}
+            </p>
+          ) : null}
+        </div>
+        {badge ? <Badge kind={badge} /> : null}
+      </div>
+      {variant === "week" && range ? <hr className="h-px border-0" style={{ background: "var(--on-ink-12)" }} /> : null}
+      {variant === "week" && range ? (
+        <div className="flex flex-col gap-1">
+          <p className="label font-semibold text-on-ink-3">{t("week.bestWhen")}</p>
+          {weekday ? <p className="text-[20px] font-bold leading-6 text-on-ink">{weekday}</p> : null}
+          <p className="answer-time text-go-bright" data-range>
+            {range}
+          </p>
+        </div>
       ) : null}
-      {variant === "day" || variant === "none" || variant === "myeongjeol" ? <p className="caption text-on-ink-3">{when}</p> : null}
-      <p className="title">
-        <PlaceName name={name} nameEn={nameEn} />
-      </p>
-      {variant === "week" && nowText ? <p className="label mt-1 text-on-ink-2">{staleText ?? nowText}</p> : null}
-      {variant === "week" ? <hr className="my-3 border-on-ink-12" /> : null}
-      {variant === "week" ? <p className="label text-on-ink-3">{t("week.bestWhen")}</p> : null}
-      {variant === "myeongjeol" ? <p className="body mt-3 text-on-ink-2">{t("state.myeongjeol")}</p> : null}
+      {variant === "day" && range ? (
+        <div className="flex flex-col items-start gap-2">
+          <p className="answer-time text-go-bright" data-range>
+            {range}
+          </p>
+          <span className="label inline-flex h-7 items-center rounded-[var(--r-pill)] bg-go-bright px-3 font-bold text-ink">{t("day.goodToGo")}</span>
+        </div>
+      ) : null}
+      {variant === "myeongjeol" ? <p className="body text-on-ink-2">{t("state.myeongjeol")}</p> : null}
       {variant === "none" ? (
         <>
-          <p className="heading mt-3">{t("day.noPick")}</p>
-          <p className="body text-on-ink-2">{t("day.tryThis")}</p>
+          <p className="text-[22px] font-extrabold leading-[30px]">{weekNone ? t("state.weekNone") : t("day.noPick")}</p>
+          <p className="body text-on-ink-2">{weekNone ? t("state.weekNoneHint") : t("day.tryThis")}</p>
         </>
       ) : null}
-      {variant === "week" || variant === "day" ? (
-        <p className="answer-time mt-1 text-go-bright">{when}</p>
-      ) : null}
-      {variant === "day" ? <span className="label mt-2 inline-flex h-6 items-center rounded-[var(--r-pill)] bg-go-bright px-2 text-ink">{t("day.goodToGo")}</span> : null}
-      {reason ? <p className="body mt-2 text-on-ink-2">{reason}</p> : null}
-      {extra ? <p className="label mt-2 text-on-ink-2">{extra}</p> : null}
-      {variant === "week" && href ? <p className="label mt-3 text-go-bright">{t("week.seeDay")}</p> : null}
+      {reason ? <p className="body text-on-ink-2">{reason}</p> : null}
+      {extra ? <p className="label text-on-ink-3">{extra}</p> : null}
+      {variant === "week" && href ? <p className="label font-semibold text-go-bright">{t("week.seeDay")} ›</p> : null}
     </div>
   );
   if (href) {
@@ -190,7 +226,7 @@ export function AnswerCard({
 export function MiniStrip({ hours, mode, hatch }: { hours: HourCell[] | null; mode: string | null; hatch?: boolean }) {
   if (hatch) return <div className="hatch h-[18px] flex-1 rounded-[3px]" />;
   return (
-    <div className="flex h-[18px] flex-1 gap-px">
+    <div data-mini-strip className="flex h-[18px] w-full gap-px">
       {(hours ?? []).map((cell) => (
         <span key={cell.h} className="h-full flex-1" style={{ background: toneColor(cellTone(cell, mode)) }} />
       ))}
@@ -221,7 +257,7 @@ export function WeekList({
   bestDate,
   hrefFor,
 }: {
-  days: { date: string; state: string; off_reason: string | null; windows: { hours: number[]; score: number }[] | null; hours: HourCell[] | null; strip_mode: string | null; holiday: { name: string; kind: string } | null }[];
+  days: { date: string; state: string; off_reason: string | null; windows: { hours: number[]; score: number }[] | null; hours: HourCell[] | null; strip_mode: string | null; holiday: { name: string; name_en?: string | null; kind: string } | null }[];
   locale: "ko" | "en";
   today: string;
   bestDate?: string | null;
@@ -235,19 +271,31 @@ export function WeekList({
       <ul>
         {days.map((day) => {
           const best = day.state !== "off" && day.windows && day.windows.length > 0;
-          const time = best ? formatStoredWindows(day.windows, locale, mark.suffix).join(", ") : t("week.none");
-          const holiday = day.holiday?.name;
+          const time = best ? formatStoredWindows(day.windows, locale, mark.suffix)[0] : t("week.none");
+          const holiday = day.holiday
+            ? locale === "en"
+              ? day.holiday.name_en || day.holiday.name
+              : day.holiday.name
+            : null;
+          const recommended = Boolean(best) && day.date === bestDate;
+          const lower = holiday ?? (recommended ? t("week.recommended") : formatShortDate(day.date));
+          const lowerColor = holiday ? "var(--hol)" : recommended ? "var(--go-text)" : "var(--text-3)";
           return (
             <li key={day.date}>
-              <a href={hrefFor(day.date)} className="row grid grid-cols-[56px_1fr_72px] items-center" style={{ background: day.date === bestDate ? "var(--go-soft)" : undefined }} data-row>
-                <span className="caption">
-                  <span className="block">{formatShortWeekday(day.date, mark.weekdays, t("time.today"), today)}</span>
-                  <span className="block" style={{ color: holiday ? "var(--hol)" : undefined }} lang={holiday && locale === "en" ? "ko" : undefined}>
-                    {holiday ?? formatShortDate(day.date)}
+              <a href={hrefFor(day.date)} className="row relative grid h-14 grid-cols-[56px_minmax(0,1fr)_72px] items-center gap-3" data-row>
+                {recommended ? <span className="absolute inset-y-0 -left-2 -right-2 rounded-[12px]" style={{ background: "var(--go-soft)" }} /> : null}
+                <span className="relative caption">
+                  <span className="block text-[15px] font-bold">{formatShortWeekday(day.date, mark.weekdays, t("time.today"), today)}</span>
+                  <span className="block truncate text-[11px] font-medium" style={{ color: lowerColor }} lang={holiday && locale === "en" && !day.holiday?.name_en ? "ko" : undefined}>
+                    {lower}
                   </span>
                 </span>
-                {day.off_reason === "myeongjeol" ? <MiniStrip hours={null} mode={null} hatch /> : <MiniStrip hours={day.hours} mode={day.strip_mode} />}
-                <span className="caption text-right">{day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : time}</span>
+                <span className="relative">
+                  {day.off_reason === "myeongjeol" ? <MiniStrip hours={null} mode={null} hatch /> : <MiniStrip hours={day.hours} mode={day.strip_mode} />}
+                </span>
+                <span className={`relative w-[72px] overflow-hidden text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
+                  {day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : time}
+                </span>
               </a>
             </li>
           );
@@ -261,11 +309,13 @@ export function DayStrip({
   hours,
   mode,
   hidden,
+  selected,
   onPick,
 }: {
   hours: HourCell[] | null;
   mode: string | null;
   hidden?: boolean;
+  selected?: number | null;
   onPick: (cell: HourCell | null) => void;
 }) {
   const t = useTranslations();
@@ -275,27 +325,32 @@ export function DayStrip({
   return (
     <section>
       <h2 className="section mb-2">{t("day.byHour")}</h2>
-      <div className="flex gap-[3px]" role="list">
+      <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
         {(hours ?? []).map((cell) => {
           const tone = cellTone(cell, mode);
           const verdict = cell.in_window ? t("reason.window") : cell.rating === 1 && mode === "two_step" ? t("reason.ok") : t("reason.avoid");
+          const on = selected === cell.h;
           return (
             <button
               key={cell.h}
               type="button"
               data-cell
               data-tone={tone}
-              className="h-12 flex-1 rounded-[6px]"
-              style={{ background: toneColor(tone) }}
+              className="h-12 rounded-[6px]"
+              style={{ background: toneColor(tone), outline: on ? "2px solid var(--ink)" : undefined, outlineOffset: on ? "2px" : undefined }}
               aria-label={t("reason.cell", { hour: formatHourRange(cell.h, cell.h, locale, suffix), verdict, why: "" })}
-              onClick={(event) => {
-                const selected = event.currentTarget.getAttribute("aria-pressed") === "true";
-                onPick(selected ? null : cell);
-              }}
-              aria-pressed="false"
+              onClick={() => onPick(on ? null : cell)}
+              aria-pressed={on}
             />
           );
         })}
+      </div>
+      <div className="mt-1.5 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px] text-[11px] text-text-3">
+        {(hours ?? []).map((cell, index) => (
+          <span key={cell.h} data-axis-label={index % 3 === 0 ? "1" : undefined}>
+            {index % 3 === 0 ? cell.h : ""}
+          </span>
+        ))}
       </div>
       <table className="sr-only">
         <tbody>

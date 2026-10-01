@@ -7,6 +7,8 @@
     "openQuiet": "Open and quiet right now",
     "openQuietEmpty": "Nothing open and quiet right now",
     "noPickToday": "No pick today",
+    "todayLabel": "Today",
+    "busyTopEmpty": "Nothing is busy right now",
     "favorites": "Saved places",
     "popular": "Often visited"
   },

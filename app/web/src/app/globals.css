@@ -110,6 +110,42 @@ h1, h2, .balance {
   );
 }
 
+input[type="range"] {
+  appearance: none;
+  height: 28px;
+  background: transparent;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--line);
+  border-radius: var(--r-pill);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: var(--line);
+  border-radius: var(--r-pill);
+  border: 0;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade, .sheet-in {
     animation: none;

@@ -229,6 +229,14 @@ export async function mapPayload(date: string, tolerance: string, purpose: strin
     }));
 }
 
+export async function upcomingHolidays() {
+  const { date } = kstNow();
+  const end = addDays(date, 7);
+  return must(
+    supabaseServer().from("holidays").select("date, name, name_en").gte("date", date).lte("date", end),
+  );
+}
+
 export async function flagCounts() {
   const { date } = kstNow();
   const rows = await must(

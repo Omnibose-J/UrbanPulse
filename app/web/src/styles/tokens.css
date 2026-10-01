@@ -36,6 +36,9 @@
 
 @theme inline {
   --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-on-ink-2: var(--on-ink-2);
+  --color-on-ink-3: var(--on-ink-3);
   --color-bg: var(--bg);
   --color-bg-soft: var(--bg-soft);
   --color-line: var(--line);

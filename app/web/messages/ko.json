@@ -7,6 +7,8 @@
     "openQuiet": "지금 열려 있고 한산한 곳",
     "openQuietEmpty": "지금은 열려 있고 한산한 곳이 없어요",
     "noPickToday": "오늘은 추천 없음",
+    "todayLabel": "오늘 추천",
+    "busyTopEmpty": "지금은 붐비는 곳이 없어요",
     "favorites": "관심 장소",
     "popular": "많이 찾는 곳"
   },
