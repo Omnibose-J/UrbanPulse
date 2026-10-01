@@ -9,16 +9,28 @@ from __future__ import annotations
 import argparse
 import sys
 
-from engine.jobs import backfill, collect, forecast, healthcheck, ingest_raw, load_places, sync_holidays
+from engine.jobs import (
+    archive,
+    backfill,
+    collect,
+    evaluate,
+    forecast,
+    healthcheck,
+    ingest_raw,
+    load_places,
+    rejudge,
+    sync_holidays,
+)
 
 NOT_YET = {
     "tier_b": "W9",
-    "evaluate": "W12",
-    "archive": "W12",
 }
 
 JOBS = {
+    "archive": archive.run,
+    "evaluate": evaluate.run,
     "forecast": forecast.run,
+    "rejudge": rejudge.run,
     "healthcheck": healthcheck.run,
     "backfill": backfill.run,
     "collect": collect.run,
@@ -33,14 +45,27 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="job", required=True)
     for name in [*NOT_YET, *JOBS]:
         command = sub.add_parser(name)
-        if name == "ingest_raw":
+        if name in ("ingest_raw", "evaluate"):
             command.add_argument("--date", default=None)
+        if name == "rejudge":
+            command.add_argument("--apply", action="store_true")
+        if name == "archive":
+            command.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     if args.job in NOT_YET:
         print(f"{args.job}: not implemented until {NOT_YET[args.job]}", file=sys.stderr)
         return 2
     if args.job == "ingest_raw":
         return ingest_raw.run(date=args.date)
+    if args.job == "evaluate":
+        from datetime import date
+
+        day = date.fromisoformat(args.date) if args.date else None
+        return evaluate.run(day)
+    if args.job == "rejudge":
+        return rejudge.run(apply=args.apply)
+    if args.job == "archive":
+        return archive.run(dry_run=args.dry_run)
     return JOBS[args.job]()
 
 
