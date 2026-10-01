@@ -260,6 +260,7 @@ def _build(conn, started: datetime, today) -> dict:
     conn.commit()
     _write_profiles(conn, today)
     _write_forecasts(conn, started, today, model, set(passing), version, ready_ids)
+    _write_tier_b_forecasts(conn, started, today)
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -515,6 +516,74 @@ def _measure_activity(conn, now: datetime) -> None:
         )
 
 
+def level_from_rel(rel: float) -> int:
+    if rel < 0.5:
+        return 0
+    if rel < 0.9:
+        return 1
+    return 2
+
+
+def _write_tier_b_forecasts(conn, started, today) -> None:
+    """Profile-only hours for tier B. No forecast_log rows."""
+    with conn.cursor() as cur:
+        cur.execute("select place_id, day_type, hour, rel from tier_b_profile")
+        profiles = {(row[0], row[1], row[2]): float(row[3]) for row in cur.fetchall()}
+    rows = []
+    for place_id in {key[0] for key in profiles}:
+        for offset in range(8):
+            day = today + timedelta(days=offset)
+            if day.weekday() == 6:
+                dtype = "sun"
+            elif day.weekday() == 5:
+                dtype = "sat"
+            else:
+                dtype = "weekday"
+            for hour in range(24):
+                rel = profiles.get((place_id, dtype, hour))
+                if rel is None:
+                    continue
+                target = datetime.combine(day, datetime.min.time()).replace(tzinfo=KST)
+                target = target + timedelta(hours=hour)
+                rows.append(
+                    (
+                        place_id,
+                        target,
+                        started,
+                        "profile",
+                        None,
+                        level_from_rel(rel),
+                        None,
+                        None,
+                        None,
+                        False,
+                        True,
+                    )
+                )
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into forecast_hourly (
+              place_id, target_ts, issued_ts, source, pop, level,
+              a_all, a_food, a_shop, stale, ready, a_actual
+            )
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false)
+            on conflict (place_id, target_ts) do update set
+              issued_ts = excluded.issued_ts,
+              source = excluded.source,
+              pop = excluded.pop,
+              level = excluded.level,
+              a_all = excluded.a_all,
+              a_food = excluded.a_food,
+              a_shop = excluded.a_shop,
+              stale = excluded.stale,
+              ready = excluded.ready,
+              a_actual = false
+            """,
+            rows,
+        )
+
+
 def refresh_recommendations(conn, started: datetime, today, place_ids=None, only_today: bool = False) -> dict:
     """Upsert recommendation rows. The full forecast also logs today+3 and drops past dates."""
     flags = load_flags()
@@ -527,7 +596,11 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
             """
             select id, tier, foreign_heavy, serve_state, open_hours, lat, lon
             from places
-            where tier in ('A1', 'A2') and serve_state <> 'off' and serve_state <> 'experimental'
+            where (
+              tier in ('A1', 'A2') and serve_state <> 'off' and serve_state <> 'experimental'
+            ) or (
+              tier = 'B' and exists (select 1 from tier_b_profile t where t.place_id = places.id)
+            )
             """
         )
         places = [

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-GROUPS = frozenset({"a1", "a1_foreign", "a2"})
+GROUPS = frozenset({"a1", "a1_foreign", "a2", "b"})
 PURPOSES = frozenset({"sight", "food", "shop", "none"})
 TOLERANCES = frozenset({"calm", "moderate", "busy_ok"})
 STATES = frozenset({"on", "reference", "off"})

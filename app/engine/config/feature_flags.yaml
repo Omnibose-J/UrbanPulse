@@ -23,3 +23,6 @@ combos:
   - {group: a2, purpose: none, tolerance: calm, state: on, strip: windows_only}
   - {group: a2, purpose: none, tolerance: moderate, state: on, strip: windows_only}
   - {group: a2, purpose: none, tolerance: busy_ok, state: on, strip: windows_only}
+  - {group: b, purpose: none, tolerance: calm, state: on, strip: windows_only}
+  - {group: b, purpose: none, tolerance: moderate, state: on, strip: windows_only}
+  - {group: b, purpose: none, tolerance: busy_ok, state: on, strip: windows_only}

@@ -15,10 +15,12 @@ STRIP_HOURS = tuple(range(9, 24))
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 ALLOWED_LEVEL = {"calm": 1, "moderate": 2, "busy_ok": 3}
 ACTIVITY_COLUMN = {"sight": "a_all", "food": "a_food", "shop": "a_shop"}
-PURPOSES = {"A1": ("sight", "food", "shop"), "A2": ("none",)}
+PURPOSES = {"A1": ("sight", "food", "shop"), "A2": ("none",), "B": ("none",)}
 
 
 def group_of(tier: str, foreign_heavy: bool) -> str:
+    if tier == "B":
+        return "b"
     if tier == "A2":
         return "a2"
     if foreign_heavy:
@@ -32,7 +34,12 @@ def purposes_for(tier: str) -> tuple[str, ...]:
 
 def open_hours_for(tier: str, open_hours: dict | None, day: date) -> set[int]:
     """Hours whose whole clock hour sits inside the place's open range."""
-    base = set(range(9, 24)) if tier == "A1" else set(range(9, 21))
+    if tier == "A1":
+        base = set(range(9, 24))
+    elif tier == "B":
+        base = set(range(9, 23))
+    else:
+        base = set(range(9, 21))
     if not open_hours:
         return base
     span = (open_hours.get("hours") or {}).get(WEEKDAYS[day.weekday()])
@@ -123,7 +130,7 @@ def fill_alternatives(
         if row["state"] == "off":
             continue
         row["alt_dates"] = _alt_dates(row, pool)
-        if row["tier"] == "A2":
+        if row["tier"] in ("A2", "B"):
             row["alt_places"] = []
             continue
         row["alt_places"] = _alt_places(row, index, similar.get(row["place_id"], []), coords)
@@ -134,7 +141,11 @@ def log_candidates(rows: list[dict], issued: date) -> list[dict]:
     return [
         row
         for row in rows
-        if row["date"].toordinal() == target and row["state"] in ("on", "reference")
+        if (
+            row.get("tier") != "B"
+            and row["date"].toordinal() == target
+            and row["state"] in ("on", "reference")
+        )
     ]
 
 
@@ -148,6 +159,8 @@ def _state(place, day, tolerance, purpose, hourly, flags: FlagFile, day_kind: st
         return "off", "preparing", None
     if place["tier"] == "A1" and day_kind == "myeongjeol":
         return "off", "myeongjeol", None
+    if place["tier"] == "B" and day_kind in ("holiday", "myeongjeol"):
+        return "off", "unverified", None
     group = group_of(place["tier"], bool(place["foreign_heavy"]))
     state, strip = flags.lookup(group, purpose, tolerance)
     if state == "off":
@@ -224,7 +237,7 @@ def _score(tolerance: str, activity: float, level: int) -> float:
 
 
 def _activity(tier: str, purpose: str, slot: dict) -> float | None:
-    if tier == "A2":
+    if tier in ("A2", "B"):
         return 1.0
     value = slot.get(ACTIVITY_COLUMN[purpose])
     if value is None:
