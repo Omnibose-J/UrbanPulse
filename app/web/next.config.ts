@@ -5,6 +5,12 @@ import type { NextConfig } from "next";
 
 loadEnv({ path: path.resolve(process.cwd(), "../../.env"), override: false });
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: {
+      "next-intl/config": "./src/i18n/request.ts",
+    },
+  },
+};
 
 export default nextConfig;

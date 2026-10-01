@@ -87,7 +87,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
           href={`/${locale}/p/${id}/${best.date}`}
           nowText={nowText}
           staleText={now?.stale ? t("state.stale", { time: formatClock(now.ts) }) : null}
-          badge={best.state === "reference" ? "reference" : null}
+          badge={place.tier === "B" ? "experimental" : best.state === "reference" ? "reference" : null}
         />
       ) : null}
       {place && !preparing && !best && loaded.data ? (
