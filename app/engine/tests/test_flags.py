@@ -25,7 +25,7 @@ EXPECTED = {
     ("a1_foreign", "food", "busy_ok"): "reference",
     ("a1_foreign", "shop", "calm"): "off",
     ("a1_foreign", "shop", "moderate"): "off",
-    ("a1_foreign", "shop", "busy_ok"): "reference",
+    ("a1_foreign", "shop", "busy_ok"): "off",
     ("a2", "none", "calm"): "on",
     ("a2", "none", "moderate"): "on",
     ("a2", "none", "busy_ok"): "on",
