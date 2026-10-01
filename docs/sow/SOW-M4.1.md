@@ -68,3 +68,20 @@ Add `e2e/visual.spec.ts`: at 390 × 844, live data, `ko` and `en`, save full-pag
 - The map error and its cause.
 - Every place where the mockup and the spec disagreed and which one you followed.
 - New message keys with both texts.
+
+---
+
+## Review round 2 (2026-10-01 23:00 KST) — do these before continuing SOW-MB
+
+The designer opened the twelve live screenshots and the home API. The structure now matches the design. These remain; add rows R1–R8 to `docs/tracking/criteria-m4.1.md` and fill them after running.
+
+| # | Defect seen | Fix | Check |
+|---|---|---|---|
+| R1 | At 23:00 "지금 가장 붐비는 곳" listed five places that are all level 0 | `busy_top` contains only places whose "now" level is 2 or 3. Fewer than five → show what there is; none → `home.busyTopEmpty` | fixture test: levels 3, 2, 1, 0 → two rows; all ≤ 1 → the empty sentence |
+| R2 | `ko-home.png` and `en-home.png` show two bare headings: the screenshot was taken before the data arrived, and the home screen draws nothing while loading | Home shows skeleton rows while loading (§5.10). The visual test waits for a list row or an empty sentence before the screenshot | the saved home screenshots show rows or the empty sentence |
+| R3 | `ConditionField` and `AltButton` text touches the box edge (no inner padding); the field has no leading icon | 16 px inner padding left and right; the sliders icon before the label (§5.3) | DOM: label x ≥ box x + 16 on ③, ⑤, ⑥ |
+| R4 | ⑥ alt button reads "10/5(10/5) 11~12시가 더 나아요" | `{day}` is the weekday ("월"; "오늘" for today), `{date}` is `10/5` (§5.9) | DOM: the button text matches `^(오늘|[월화수목금토일])\(\d+/\d+\) ` on ko |
+| R5 | `/en` week rows cut the range ("11 AM to 1") | On `en` the right column is 104 px and the strip takes the rest; the text never clips | DOM: `scrollWidth <= clientWidth` for every right-column cell, ko and en |
+| R6 | The "For reference" badge wraps to two lines and collides with the place name | Badges never wrap (`white-space: nowrap`); the place name truncates with an ellipsis before the badge | DOM: badge height 24 on ③ and ⑤, ko and en |
+| R7 | On the map every pin carries a name label; at city zoom they overlap into noise | Labels show only for the selected pin, and for all pins from zoom 13 up. (This replaces "이름표를 항상 붙입니다" in §5.11; the designer updates the spec.) | DOM at the initial view: exactly one visible label |
+| R8 | ⑤ back control shows "이번 주" without the chevron | "‹ 이번 주" on one line (§5.1) | DOM: the control contains the chevron icon and is one line |
