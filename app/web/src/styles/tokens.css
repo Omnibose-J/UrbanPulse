@@ -1,0 +1,57 @@
+:root {
+  --ink: #0f1822;
+  --on-ink: #ffffff;
+  --on-ink-2: #bcbec1;
+  --on-ink-3: #8c9095;
+  --bg: #ffffff;
+  --bg-soft: #f3f5f4;
+  --line: #e6e9ec;
+  --text: #101820;
+  --text-2: #56606b;
+  --text-3: #6b7480;
+  --go: #12a066;
+  --go-bright: #46e0a0;
+  --go-text: #087a4b;
+  --go-soft: #e8f7f0;
+  --ok: #bce9d3;
+  --bad: #e7eaee;
+  --bad-pin: #aeb5be;
+  --map-land: #eef1ee;
+  --map-park: #dcebdd;
+  --map-water: #cfe2f1;
+  --hol: #c93a63;
+  --star: #f2b705;
+  --error-fg: #b42318;
+  --stale-fg: #8a6d1f;
+  --r-card: 20px;
+  --r-place: 16px;
+  --r: 12px;
+  --r-cell: 6px;
+  --r-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(15 24 34 / 6%), 0 6px 16px rgb(15 24 34 / 6%);
+  --shadow-sheet: 0 -8px 32px rgb(15 24 34 / 18%);
+  --ink-48: rgb(15 24 34 / 48%);
+  --on-ink-12: rgb(255 255 255 / 12%);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-go: var(--go);
+  --color-go-bright: var(--go-bright);
+  --color-go-text: var(--go-text);
+  --color-go-soft: var(--go-soft);
+  --color-ok: var(--ok);
+  --color-bad: var(--bad);
+  --color-bad-pin: var(--bad-pin);
+  --color-hol: var(--hol);
+  --color-star: var(--star);
+  --color-error-fg: var(--error-fg);
+  --color-stale-fg: var(--stale-fg);
+  --font-sans: var(--font-pretendard), sans-serif;
+}

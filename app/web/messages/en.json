@@ -1,0 +1,148 @@
+{
+  "home": {
+    "title": "Pick a place. We'll tell you when to go.",
+    "subtitle": "Tonight or next weekend",
+    "search": "Search a place or station",
+    "busyTop": "Busiest right now",
+    "openQuiet": "Open and quiet right now",
+    "openQuietEmpty": "Nothing open and quiet right now",
+    "noPickToday": "No pick today",
+    "favorites": "Saved places",
+    "popular": "Often visited"
+  },
+  "week": {
+    "bestWhen": "Best time this week",
+    "seeDay": "See this day",
+    "glance": "This week at a glance",
+    "recommended": "Best",
+    "none": "No pick",
+    "back": "This week"
+  },
+  "day": {
+    "goodToGo": "Good time to go",
+    "alsoRec": "Also recommended",
+    "byHour": "By hour",
+    "tapHint": "Tap an hour to see why",
+    "noPick": "No good time on this day",
+    "tryThis": "Nothing fits your settings. Try one of these."
+  },
+  "alt": {
+    "betterDay": "{day} {time} looks better",
+    "similar": "How about {place} at {time}?"
+  },
+  "rate": {
+    "win": "Best",
+    "1": "OK",
+    "0": "Avoid"
+  },
+  "map": {
+    "title": "Map",
+    "seePlace": "See this place",
+    "dayPick": "Best on {date}: {time}",
+    "includeStations": "Include station areas",
+    "hourNow": "{hour}",
+    "hourLine": "{hour}: {verdict}."
+  },
+  "cond": {
+    "change": "Change"
+  },
+  "sheet": {
+    "title": "Your settings",
+    "purpose": "What are you going for?",
+    "crowd": "How busy is OK?",
+    "apply": "Apply",
+    "preparing": "{purpose} with '{tolerance}' is not ready yet.",
+    "moved": "Switched to '{tolerance}'."
+  },
+  "purpose": {
+    "sight": "Look around",
+    "food": "Food",
+    "shop": "Shopping"
+  },
+  "tol": {
+    "calm": "Quiet",
+    "moderate": "A bit lively",
+    "busy_ok": "Busy is fine"
+  },
+  "badge": {
+    "reference": "For reference",
+    "holidayRef": "Holiday, for reference",
+    "estimate": "Estimate",
+    "experimental": "Estimate, experimental"
+  },
+  "reason": {
+    "outsideHours": "Outside opening hours.",
+    "crowd0": "It is quiet and",
+    "crowd1": "It is moderately busy and",
+    "crowd2": "It is a bit busy, but",
+    "crowd3": "It is quite busy, but",
+    "sightLively": "the street is lively too",
+    "sightQuiet": "the street is a little quiet",
+    "foodLively": "restaurants are lively too",
+    "foodQuiet": "restaurants are a little quiet",
+    "shopLively": "shops are lively too",
+    "shopQuiet": "shops are a little quiet",
+    "b0": "Quieter than usual",
+    "b1": "About the usual flow",
+    "b2": "Busier than usual",
+    "closed": "Almost no shops are open yet.",
+    "tooBusy": "It is too busy.",
+    "tooBusyB": "This is the busiest part of the day.",
+    "window": "This is a recommended time",
+    "ok": "OK to go",
+    "avoid": "Better to avoid",
+    "cell": "{hour}: {verdict}. {why}"
+  },
+  "now": {
+    "l0": "It is quiet right now",
+    "l1": "It is moderately busy right now",
+    "l2": "It is a bit busy right now",
+    "l3": "It is quite busy right now",
+    "asOf": "as of {time}"
+  },
+  "level": {
+    "l0": "Quiet",
+    "l1": "Moderate",
+    "l2": "A bit busy",
+    "l3": "Busy"
+  },
+  "state": {
+    "preparing": "We are still collecting data. It will be ready soon.",
+    "error": "Could not load this.",
+    "retry": "Try again",
+    "myeongjeol": "Many shops may be closed for the holiday. We are not recommending this day.",
+    "myeongjeolShort": "Holiday",
+    "foreignStrip": "Hour by hour view is not ready for this place yet",
+    "weekNone": "No good time this week",
+    "weekNoneHint": "Changing your settings might turn one up.",
+    "past": "That date has passed, so here is this week",
+    "stale": "Data is running late (last update {time})",
+    "tierb": "No live data, so this is the usual flow. This feature is experimental."
+  },
+  "search": {
+    "empty": "No place with that name. Try a nearby station."
+  },
+  "time": {
+    "today": "Today",
+    "month": "",
+    "day": "",
+    "hour": "",
+    "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "about": {
+    "title": "About",
+    "does": "Tell you when to visit a place you already chose, from today through seven days ahead.",
+    "how": "We start from the usual flow for that weekday and scale it with a calendar ratio. Recommended hours come from that forecast and from how active the place usually is.",
+    "flags": "What is on, and what is still in preparation",
+    "limits": "Live counts cover 121 places. We do not recommend holiday periods around Seollal and Chuseok. Station-area estimates are experimental.",
+    "sources": "Sources: Seoul real-time city data, and holiday dates from the Korea Astronomy and Space Science Institute. Public Nuri.",
+    "on": "On",
+    "reference": "Reference",
+    "preparing": "Preparing",
+    "off": "Off"
+  },
+  "nav": {
+    "logo": "UrbanPulse",
+    "language": "Language"
+  }
+}

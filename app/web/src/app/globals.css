@@ -1,26 +1,130 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-pretendard), sans-serif;
+  font-weight: 400;
+  word-break: keep-all;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+h1, h2, .balance {
+  text-wrap: balance;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+.answer-time {
+  font-size: 44px;
+  line-height: 48px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.display {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.title {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.heading {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.section {
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.body {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+}
+
+.label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.caption {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.press {
+  height: 48px;
+  min-height: 48px;
+}
+
+.icon-hit {
+  width: 44px;
+  height: 44px;
+}
+
+.row {
+  min-height: 56px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--go);
+  outline-offset: 2px;
+}
+
+.fade {
+  transition: background-color 150ms ease-out, color 150ms ease-out, opacity 150ms ease-out;
+}
+
+.sheet-in {
+  animation: sheet-up 220ms ease-out;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.hatch {
+  background-color: var(--bad);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--bad-pin),
+    var(--bad-pin) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade, .sheet-in {
+    animation: none;
+    transition: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (min-width: 1024px) {
+  body:has(.phone-shell) {
+    background: var(--bg-soft);
+  }
+  .phone-shell {
+    width: 440px;
+    margin-inline: auto;
+    min-height: 100vh;
+    background: var(--bg);
+  }
 }

@@ -1,0 +1,148 @@
+{
+  "home": {
+    "title": "가고 싶은 곳, 언제 가면 좋을까요?",
+    "subtitle": "오늘 저녁이든 다음 주말이든",
+    "search": "장소나 역 이름으로 찾기",
+    "busyTop": "지금 가장 붐비는 곳",
+    "openQuiet": "지금 열려 있고 한산한 곳",
+    "openQuietEmpty": "지금은 열려 있고 한산한 곳이 없어요",
+    "noPickToday": "오늘은 추천 없음",
+    "favorites": "관심 장소",
+    "popular": "많이 찾는 곳"
+  },
+  "week": {
+    "bestWhen": "이번 주 가장 좋은 때",
+    "seeDay": "이날 자세히 보기",
+    "glance": "이번 주 한눈에",
+    "recommended": "추천",
+    "none": "추천 없음",
+    "back": "이번 주"
+  },
+  "day": {
+    "goodToGo": "가기 좋아요",
+    "alsoRec": "이 시간도 추천해요",
+    "byHour": "시간대별",
+    "tapHint": "칸을 누르면 그 시간이 어떤지 알려 드려요",
+    "noPick": "이날은 추천할 시간이 없어요",
+    "tryThis": "조건에 맞는 시간이 없어요. 이렇게 해 보세요."
+  },
+  "alt": {
+    "betterDay": "{day}({date}) {time}가 더 나아요",
+    "similar": "같은 날 {place} {time}는 어때요"
+  },
+  "rate": {
+    "win": "추천",
+    "1": "괜찮아요",
+    "0": "피하세요"
+  },
+  "map": {
+    "title": "지도",
+    "seePlace": "이 장소 자세히 보기",
+    "dayPick": "{date} 추천 {time}",
+    "includeStations": "역세권 포함",
+    "hourNow": "{hour}시",
+    "hourLine": "{hour}시는 {verdict}."
+  },
+  "cond": {
+    "change": "바꾸기"
+  },
+  "sheet": {
+    "title": "조건 바꾸기",
+    "purpose": "무엇을 하러 가세요?",
+    "crowd": "사람은 어느 정도가 좋아요?",
+    "apply": "적용하기",
+    "preparing": "{purpose}는 '{tolerance}'를 아직 준비하고 있어요.",
+    "moved": "'{tolerance}'로 바꿨어요."
+  },
+  "purpose": {
+    "sight": "구경·산책",
+    "food": "맛집",
+    "shop": "쇼핑"
+  },
+  "tol": {
+    "calm": "한적하게",
+    "moderate": "적당히",
+    "busy_ok": "붐벼도 돼요"
+  },
+  "badge": {
+    "reference": "참고용",
+    "holidayRef": "연휴라 참고용",
+    "estimate": "추정",
+    "experimental": "추정 · 실험"
+  },
+  "reason": {
+    "outsideHours": "운영 시간이 아니에요.",
+    "crowd0": "사람이 적고",
+    "crowd1": "사람은 적당하고",
+    "crowd2": "조금 붐비지만",
+    "crowd3": "꽤 붐비지만",
+    "sightLively": "거리도 활기차요",
+    "sightQuiet": "거리는 조금 한산해요",
+    "foodLively": "음식점도 활기차요",
+    "foodQuiet": "음식점은 조금 한산해요",
+    "shopLively": "매장도 활기차요",
+    "shopQuiet": "매장은 조금 한산해요",
+    "b0": "평소보다 한산해요",
+    "b1": "평소와 비슷해요",
+    "b2": "평소보다 붐비는 시간이에요",
+    "closed": "아직 문을 연 가게가 거의 없어요.",
+    "tooBusy": "사람이 너무 많아요.",
+    "tooBusyB": "하루 중 가장 붐비는 시간이에요.",
+    "window": "추천 시간이에요",
+    "ok": "가도 괜찮아요",
+    "avoid": "피하는 게 좋아요",
+    "cell": "{hour}시는 {verdict}. {why}"
+  },
+  "now": {
+    "l0": "지금은 사람이 적어요",
+    "l1": "지금은 사람이 적당해요",
+    "l2": "지금은 조금 붐벼요",
+    "l3": "지금은 꽤 붐벼요",
+    "asOf": "{time} 기준"
+  },
+  "level": {
+    "l0": "한산해요",
+    "l1": "적당해요",
+    "l2": "약간 붐빔",
+    "l3": "붐빔"
+  },
+  "state": {
+    "preparing": "데이터를 모으는 중이에요. 곧 보여 드릴게요.",
+    "error": "불러오지 못했어요.",
+    "retry": "다시 시도",
+    "myeongjeol": "명절에는 문을 닫는 가게가 많을 수 있어요. 이날은 추천하지 않아요.",
+    "myeongjeolShort": "명절",
+    "foreignStrip": "이 장소는 시간별 표시를 준비하고 있어요",
+    "weekNone": "이번 주에는 추천할 시간이 없어요",
+    "weekNoneHint": "조건을 바꾸면 찾을 수 있을지도 몰라요.",
+    "past": "지난 날짜라 이번 주를 보여 드려요",
+    "stale": "데이터가 늦어지고 있어요 (마지막 {time})",
+    "tierb": "실시간 데이터가 없어서 평소 흐름으로 추정했어요. 실험 중인 기능이에요"
+  },
+  "search": {
+    "empty": "찾는 장소가 없어요. 가까운 지하철역 이름으로 찾아보세요."
+  },
+  "time": {
+    "today": "오늘",
+    "month": "월",
+    "day": "일",
+    "hour": "시",
+    "weekdays": ["일", "월", "화", "수", "목", "금", "토"]
+  },
+  "about": {
+    "title": "안내",
+    "does": "고른 장소에 언제 가면 좋은지, 오늘부터 7일까지 알려 드려요.",
+    "how": "평소 같은 요일의 흐름에, 달력으로 배운 비율을 곱해 혼잡을 예상해요. 추천 시간은 그 예상과 영업 활동으로 골라요.",
+    "flags": "켜진 기능과 준비 중인 기능",
+    "limits": "121곳의 실시간 인구만 봐요. 명절에는 추천하지 않아요. 역세권 추정은 실험이에요.",
+    "sources": "데이터 출처: 서울시 실시간 도시데이터, 한국천문연구원 특일 정보. 공공누리.",
+    "on": "켜짐",
+    "reference": "참고용",
+    "preparing": "준비 중",
+    "off": "꺼짐"
+  },
+  "nav": {
+    "logo": "UrbanPulse",
+    "language": "언어"
+  }
+}
