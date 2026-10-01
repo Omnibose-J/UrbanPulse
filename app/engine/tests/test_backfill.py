@@ -4,7 +4,10 @@ import csv
 import uuid
 from pathlib import Path
 
-from engine import db, settings
+import psycopg
+import pytest
+
+from engine import settings
 from engine.jobs.backfill import (
     _COMMERCE_UPSERT,
     _LIVE_UPSERT,
@@ -88,7 +91,11 @@ def test_loading_fixtures_twice_keeps_the_same_counts():
     settings.load_env()
     url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
     schema = "m1bf_" + uuid.uuid4().hex[:8]
-    with db.connect(url) as conn:
+    try:
+        conn = psycopg.connect(url, autocommit=False, connect_timeout=5)
+    except psycopg.OperationalError:
+        pytest.fail("local database not reachable (cd app; supabase start)")
+    with conn:
         with conn.cursor() as cur:
             cur.execute(f"create schema {schema}")
             cur.execute(f"create table {schema}.live_obs (like public.live_obs including all)")
