@@ -87,7 +87,7 @@
     "b0": "Quieter than usual",
     "b1": "About the usual flow",
     "b2": "Busier than usual",
-    "closed": "Almost no shops are open yet.",
+    "closed": "Shops are quiet at this hour.",
     "tooBusy": "It is too busy.",
     "tooBusyB": "This is the busiest part of the day.",
     "window": "This is a recommended time",
