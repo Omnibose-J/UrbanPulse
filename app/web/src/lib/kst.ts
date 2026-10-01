@@ -7,7 +7,11 @@ export function kstNow(now = new Date()): { date: string; hour: number } {
     hour: "2-digit",
     hourCycle: "h23",
   }).formatToParts(now);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const get = (type: string) => {
+    const value = parts.find((part) => part.type === type)?.value;
+    if (!value) throw new Error(`kst ${type}`);
+    return value;
+  };
   let hour = Number(get("hour"));
   if (hour === 24) hour = 0;
   return { date: `${get("year")}-${get("month")}-${get("day")}`, hour };
@@ -25,7 +29,9 @@ export function kstHour(iso: string): number {
     hour: "2-digit",
     hourCycle: "h23",
   }).formatToParts(new Date(iso));
-  let hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const hourText = parts.find((part) => part.type === "hour")?.value;
+  if (!hourText) throw new Error("kst hour");
+  let hour = Number(hourText);
   if (hour === 24) hour = 0;
   return hour;
 }
