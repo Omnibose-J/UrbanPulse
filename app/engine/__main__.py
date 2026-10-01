@@ -20,11 +20,10 @@ from engine.jobs import (
     load_places,
     rejudge,
     sync_holidays,
+    tier_b,
 )
 
-NOT_YET = {
-    "tier_b": "W9",
-}
+NOT_YET: dict[str, str] = {}
 
 JOBS = {
     "archive": archive.run,
@@ -37,6 +36,7 @@ JOBS = {
     "ingest_raw": ingest_raw.run,
     "load_places": load_places.run,
     "sync_holidays": sync_holidays.run,
+    "tier_b": tier_b.run,
 }
 
 
@@ -51,6 +51,8 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--apply", action="store_true")
         if name == "archive":
             command.add_argument("--dry-run", action="store_true")
+        if name == "tier_b":
+            command.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
     if args.job in NOT_YET:
         print(f"{args.job}: not implemented until {NOT_YET[args.job]}", file=sys.stderr)
@@ -66,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
         return rejudge.run(apply=args.apply)
     if args.job == "archive":
         return archive.run(dry_run=args.dry_run)
+    if args.job == "tier_b":
+        return tier_b.run(check_only=args.check)
     return JOBS[args.job]()
 
 

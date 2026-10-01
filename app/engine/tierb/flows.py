@@ -21,6 +21,21 @@ def data_root() -> Path:
     return settings.REPO_ROOT / "analysis" / "data"
 
 
+def station_groups() -> tuple[dict[str, list[str]], pd.DataFrame]:
+    """Live places whose name contains a station, and the mean coordinate of each station."""
+    names = pd.read_csv(data_root() / "fill_gap_by_place.csv", encoding="utf-8-sig", index_col=0).AREA_NM
+    stations = pd.read_csv(data_root() / "subway" / "stations.csv")
+    stations["n"] = stations.BLDN_NM.map(norm)
+    coords = stations.groupby("n")[["LAT", "LOT"]].mean()
+    groups: dict[str, list[str]] = {}
+    for poi, name in names.items():
+        parts = [norm(part) for part in re.split(r"[·,]", str(name)) if str(part).strip().endswith("역")]
+        parts = [part for part in parts if part in coords.index]
+        if parts:
+            groups[str(poi)] = parts
+    return groups, coords
+
+
 def norm(name: object) -> str:
     return re.sub(r"\(.*?\)|역$", "", str(name)).strip()
 
