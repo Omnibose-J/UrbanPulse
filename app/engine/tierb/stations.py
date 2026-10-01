@@ -108,7 +108,10 @@ def build_rows() -> tuple[list[dict[str, Any]], int]:
     numeric = grouped.assign(LAT=grouped.LAT.astype(float), LOT=grouped.LOT.astype(float))
     means = numeric.groupby("key")[["LAT", "LOT"]].mean()
     codes = grouped.groupby("key")["BLDN_ID"].agg(lambda values: sorted(set(values)))
-    names = grouped.groupby("key")["BLDN_NM"].agg(lambda values: display_name(str(values.name), list(values)))
+    names = {
+        str(key): display_name(str(key), [str(value) for value in frame["BLDN_NM"]])
+        for key, frame in grouped.groupby("key")
+    }
     circles_wgs = circles.set_index("station").to_crs(4326)
     dong = gpd.read_file(root / DONG)
     if dong.crs is None:
@@ -136,7 +139,7 @@ def build_rows() -> tuple[list[dict[str, Any]], int]:
         rows.append(
             {
                 "id": f"STN{index:03d}",
-                "name": names.loc[key],
+                "name": names[key],
                 "category": CATEGORY,
                 "gu": gu_text,
                 "lat": round(float(means.loc[key, "LAT"]), 6),

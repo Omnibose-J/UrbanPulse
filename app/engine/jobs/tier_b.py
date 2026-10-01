@@ -97,6 +97,10 @@ def check() -> int:
 def run(check_only: bool = False) -> int:
     if check_only:
         return check()
+    from engine.tierb.profile import build_profiles
     from engine.tierb.stations import load_stations
 
-    return load_stations()
+    code = load_stations()
+    if code != 0:
+        return code
+    return build_profiles()
