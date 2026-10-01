@@ -1,5 +1,5 @@
 version: 1
-judged_at: "2026-09-29"
+judged_at: "2026-10-01"
 lively_min: {sight: 0.5, food: 0.5, shop: 0.6}
 combos:
   - {group: a1, purpose: sight, tolerance: calm, state: off, strip: windows_only}
@@ -19,7 +19,7 @@ combos:
   - {group: a1_foreign, purpose: food, tolerance: busy_ok, state: reference, strip: windows_only}
   - {group: a1_foreign, purpose: shop, tolerance: calm, state: off, strip: windows_only}
   - {group: a1_foreign, purpose: shop, tolerance: moderate, state: off, strip: windows_only}
-  - {group: a1_foreign, purpose: shop, tolerance: busy_ok, state: reference, strip: windows_only}
+  - {group: a1_foreign, purpose: shop, tolerance: busy_ok, state: off, strip: windows_only}
   - {group: a2, purpose: none, tolerance: calm, state: on, strip: windows_only}
   - {group: a2, purpose: none, tolerance: moderate, state: on, strip: windows_only}
   - {group: a2, purpose: none, tolerance: busy_ok, state: on, strip: windows_only}
