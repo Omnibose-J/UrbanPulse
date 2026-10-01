@@ -10,16 +10,24 @@ const STATIONS = "urbanpulse.stations";
 export type Favorite = { id: string; name: string; nameEn: string | null; gu: string | null };
 
 const DEFAULTS = { purpose: "sight" as Purpose, tolerance: "moderate" as Tolerance };
+const PURPOSES = new Set<Purpose>(["sight", "food", "shop"]);
+const TOLERANCES = new Set<Tolerance>(["calm", "moderate", "busy_ok"]);
+
+export function normalizeConditions(parsed: { purpose?: string; tolerance?: string } | null) {
+  const purpose = parsed && PURPOSES.has(parsed.purpose as Purpose) ? (parsed.purpose as Purpose) : null;
+  const tolerance = parsed && TOLERANCES.has(parsed.tolerance as Tolerance) ? (parsed.tolerance as Tolerance) : null;
+  if (!purpose || !tolerance) return DEFAULTS;
+  return { purpose, tolerance };
+}
 
 export function readConditions(): { purpose: Purpose; tolerance: Tolerance } {
   try {
     const raw = localStorage.getItem(COND);
     if (!raw) return DEFAULTS;
-    const parsed = JSON.parse(raw) as { purpose?: Purpose; tolerance?: Tolerance };
-    return {
-      purpose: parsed.purpose ?? DEFAULTS.purpose,
-      tolerance: parsed.tolerance ?? DEFAULTS.tolerance,
-    };
+    const parsed = JSON.parse(raw) as { purpose?: string; tolerance?: string };
+    const next = normalizeConditions(parsed);
+    if (next.purpose !== parsed.purpose || next.tolerance !== parsed.tolerance) writeConditions(next);
+    return next;
   } catch {
     return DEFAULTS;
   }
