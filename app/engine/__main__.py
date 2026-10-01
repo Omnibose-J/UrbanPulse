@@ -9,16 +9,16 @@ from __future__ import annotations
 import argparse
 import sys
 
-from engine.jobs import backfill, collect, healthcheck, ingest_raw, load_places, sync_holidays
+from engine.jobs import backfill, collect, forecast, healthcheck, ingest_raw, load_places, sync_holidays
 
 NOT_YET = {
-    "forecast": "W7",
     "tier_b": "W9",
     "evaluate": "W12",
     "archive": "W12",
 }
 
 JOBS = {
+    "forecast": forecast.run,
     "healthcheck": healthcheck.run,
     "backfill": backfill.run,
     "collect": collect.run,

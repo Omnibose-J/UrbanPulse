@@ -1,8 +1,8 @@
 """Collect one Seoul citydata snapshot for every place. `python -m engine collect`.
 
 Raw bodies are written before parsing and are never rewritten. More than 20 failures among places
-whose serve_state is not off ends the run as fail. Overwriting today's forecast_hourly from the
-12-hour forecast waits for M2, when those rows have level thresholds.
+whose serve_state is not off ends the run as fail. After a successful store, today's forecast rows
+are overlaid from live observations and the city forecast.
 """
 
 from __future__ import annotations
@@ -324,6 +324,12 @@ def run(
                         commerce.append(snapshot.commerce)
                     forecasts.extend(snapshot.forecasts)
                 store(live, commerce, forecasts)
+                if from_file:
+                    from engine.jobs.forecast import apply_overlay
+
+                    with _connect(env["DATABASE_URL"]) as overlay_conn:
+                        apply_overlay(overlay_conn, run_ts)
+                        overlay_conn.commit()
                 ok = sum(1 for row in results if row["outcome"] == "ok")
                 no_data = sum(1 for row in results if row["outcome"] == "no_data")
                 failed = sum(1 for row in results if row["outcome"] == "failed")
