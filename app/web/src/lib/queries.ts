@@ -1,7 +1,7 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { addDays, dayBounds, hourBounds, kstNow } from "@/lib/kst";
+import { addDays, dayBounds, kstHour, kstNow } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
 
 type Place = {
@@ -79,43 +79,34 @@ export async function weekPayload(id: string, tolerance: string, purpose: string
       .lte("date", dates[7])
       .order("date"),
   );
-  const holidays = await must(
-    sb.from("holidays").select("date, name, kind").in("date", dates),
-  );
+  const holidays = await must(sb.from("holidays").select("date, name, name_en, kind").in("date", dates));
   const holidayByDate = new Map(holidays.map((row: { date: string }) => [row.date, row]));
   const combos = await must(
     sb.from("recommendations").select("purpose, tolerance, state").eq("place_id", id).eq("date", date),
   );
   let now: unknown = null;
   if (place.tier !== "B") {
-    const [start, end] = hourBounds(date, hour);
-    const { data: hourRows, error } = await sb
-      .from("forecast_hourly")
-      .select("level, source, stale")
-      .eq("place_id", id)
-      .gte("target_ts", start)
-      .lt("target_ts", end)
-      .limit(1);
-    if (error) throw new Error("unavailable");
-    const [dayStart] = dayBounds(date);
-    const { data: liveRows, error: liveError } = await sb
-      .from("live_obs")
-      .select("ts, pop_min, pop_max")
-      .eq("place_id", id)
-      .order("ts", { ascending: false })
-      .limit(1);
-    if (liveError) throw new Error("unavailable");
-    const hourRow = hourRows?.[0] ?? null;
-    const live = liveRows?.[0] ?? null;
-    now = {
-      level: hourRow?.level ?? null,
-      source: hourRow?.source ?? null,
-      stale: hourRow?.stale ?? false,
-      ts: live?.ts ?? null,
-      pop_min: live?.pop_min ?? null,
-      pop_max: live?.pop_max ?? null,
-      observed_after: dayStart,
-    };
+    const measured = await latestMeasured(date, hour, id);
+    const row = measured[0];
+    if (row) {
+      const { data: liveRows, error: liveError } = await sb
+        .from("live_obs")
+        .select("ts, pop_min, pop_max")
+        .eq("place_id", id)
+        .order("ts", { ascending: false })
+        .limit(1);
+      if (liveError) throw new Error("unavailable");
+      const live = liveRows?.[0] ?? null;
+      now = {
+        level: row.level,
+        source: "live",
+        stale: false,
+        ts: live?.ts ?? row.target_ts,
+        pop_min: live?.pop_min ?? null,
+        pop_max: live?.pop_max ?? null,
+        hour: row.hour,
+      };
+    }
   }
   return {
     place: {
@@ -148,7 +139,7 @@ export async function recommendPayload(id: string, date: string, tolerance: stri
     .eq("purpose", used)
     .maybeSingle();
   if (error) throw new Error("unavailable");
-  const holidayQuery = await sb.from("holidays").select("date, name, kind").eq("date", date).maybeSingle();
+  const holidayQuery = await sb.from("holidays").select("date, name, name_en, kind").eq("date", date).maybeSingle();
   if (holidayQuery.error) throw new Error("unavailable");
   const combos = await must(
     sb.from("recommendations").select("purpose, tolerance, state").eq("place_id", id).eq("date", date),
@@ -261,23 +252,15 @@ export async function flagCounts() {
 
 export async function homePayload(tolerance: string, purpose: string) {
   const { date, hour } = kstNow();
-  const [start, end] = hourBounds(date, hour);
   const sb = supabaseServer();
-  const current = await must(
-    sb
-      .from("forecast_hourly")
-      .select("place_id, level, source, places!inner(id, tier, name, name_en, gu, serve_state)")
-      .gte("target_ts", start)
-      .lt("target_ts", end)
-      .limit(300),
-  );
+  const measured = await latestMeasured(date, hour);
   const asOfQuery = await sb.from("live_obs").select("ts").order("ts", { ascending: false }).limit(1);
   if (asOfQuery.error) throw new Error("unavailable");
   const asOf = asOfQuery.data?.[0]?.ts ?? null;
   const stale = asOf ? Date.now() - new Date(asOf).getTime() > 90 * 60 * 1000 : true;
-  const liveNow = (current as { source: string; level: number | null; places: Place | Place[] }[])
-    .map((row) => ({ ...row, place: Array.isArray(row.places) ? row.places[0] : row.places }))
-    .filter((row) => row.source === "live" && (row.place.tier === "A1" || row.place.tier === "A2") && row.place.serve_state === "on");
+  const liveNow = measured.filter(
+    (row) => (row.place.tier === "A1" || row.place.tier === "A2") && row.place.serve_state === "on",
+  );
   const ids = liveNow.map((row) => row.place.id);
   const pops = new Map<string, { pop_min: number; pop_max: number }>();
   if (ids.length) {
@@ -296,13 +279,13 @@ export async function homePayload(tolerance: string, purpose: string) {
       name: row.place.name,
       name_en: row.place.name_en,
       gu: row.place.gu,
-      level: Number(row.level),
+      level: row.level,
       popMax: pops.get(row.place.id)?.pop_max ?? 0,
       pop_min: pops.get(row.place.id)?.pop_min ?? null,
       pop_max: pops.get(row.place.id)?.pop_max ?? null,
     })),
   );
-  const quiet = await quietPlaces(date, hour, current as { place_id: string; level: number; places: Place | Place[] }[]);
+  const quiet = await quietPlaces(date, liveNow);
   const windowIds = [...busy.map((row) => row.id), ...quiet.map((row) => row.id)];
   const windows = await todayWindows(date, tolerance, purpose, windowIds);
   return {
@@ -315,27 +298,31 @@ export async function homePayload(tolerance: string, purpose: string) {
 
 async function quietPlaces(
   date: string,
-  hour: number,
-  current: { place_id: string; level: number; places: Place | Place[] }[],
+  measured: { place: Place; level: number; hour: number }[],
 ) {
   const sb = supabaseServer();
-  const onNow = current
-    .map((row) => ({ ...row, place: Array.isArray(row.places) ? row.places[0] : row.places }))
-    .filter((row) => (row.place.tier === "A1" || row.place.tier === "A2") && row.place.serve_state === "on" && row.level <= 1);
-  const fromHour = Math.max(0, hour - 2);
-  const measured = await must(
-    sb
-      .from("forecast_hourly")
-      .select("place_id, target_ts, a_all")
-      .eq("a_actual", true)
-      .gte("target_ts", hourBounds(date, fromHour)[0])
-      .lt("target_ts", hourBounds(date, hour)[1])
-      .order("target_ts", { ascending: false })
-      .limit(2000),
-  );
+  const onNow = measured.filter((row) => row.level <= 1);
   const latest = new Map<string, number>();
-  for (const row of measured as { place_id: string; a_all: number | null }[]) {
-    if (!latest.has(row.place_id) && row.a_all !== null) latest.set(row.place_id, row.a_all);
+  if (onNow.length) {
+    const [dayStart, dayEnd] = dayBounds(date);
+    const rows = await must(
+      sb
+        .from("forecast_hourly")
+        .select("place_id, target_ts, a_all")
+        .eq("a_actual", true)
+        .in("place_id", onNow.map((row) => row.place.id))
+        .gte("target_ts", dayStart)
+        .lt("target_ts", dayEnd)
+        .order("target_ts", { ascending: false })
+        .limit(4000),
+    );
+    for (const row of rows as { place_id: string; target_ts: string; a_all: number | null }[]) {
+      if (latest.has(row.place_id) || row.a_all === null) continue;
+      const owner = onNow.find((item) => item.place.id === row.place_id);
+      if (!owner) continue;
+      if (kstHour(row.target_ts) < owner.hour - 2) continue;
+      latest.set(row.place_id, row.a_all);
+    }
   }
   const a2ids = onNow.filter((row) => row.place.tier === "A2").map((row) => row.place.id);
   const openA2 = new Set<string>();
@@ -350,7 +337,8 @@ async function quietPlaces(
         .in("place_id", a2ids),
     );
     for (const row of rows as { place_id: string; hours: { h: number; reason: string }[] | null }[]) {
-      const cell = row.hours?.find((item) => item.h === hour);
+      const owner = onNow.find((item) => item.place.id === row.place_id);
+      const cell = row.hours?.find((item) => item.h === owner?.hour);
       if (cell && cell.reason !== "outside_hours") openA2.add(row.place_id);
     }
   }
@@ -372,6 +360,34 @@ async function quietPlaces(
       activity: row.place.tier === "A1" ? latest.get(row.place.id) ?? null : null,
     }));
   return pickQuiet(candidates);
+}
+
+async function latestMeasured(date: string, clockHour: number, placeId?: string) {
+  const [dayStart, dayEnd] = dayBounds(date);
+  let query = supabaseServer()
+    .from("forecast_hourly")
+    .select("place_id, target_ts, level, places!inner(id, tier, name, name_en, gu, serve_state)")
+    .eq("source", "live")
+    .gte("target_ts", dayStart)
+    .lt("target_ts", dayEnd)
+    .order("target_ts", { ascending: false })
+    .limit(4000);
+  if (placeId) query = query.eq("place_id", placeId);
+  const rows = await must(query);
+  const seen = new Map<string, { place: Place; level: number; hour: number; target_ts: string }>();
+  for (const row of rows as {
+    place_id: string;
+    target_ts: string;
+    level: number | null;
+    places: Place | Place[];
+  }[]) {
+    if (seen.has(row.place_id) || row.level === null) continue;
+    const hour = kstHour(row.target_ts);
+    if (hour < clockHour - 1) continue;
+    const place = Array.isArray(row.places) ? row.places[0] : row.places;
+    seen.set(row.place_id, { place, level: row.level, hour, target_ts: row.target_ts });
+  }
+  return [...seen.values()];
 }
 
 async function todayWindows(date: string, tolerance: string, purpose: string, ids: string[]) {

@@ -19,6 +19,17 @@ export function addDays(iso: string, days: number): string {
   return utc.toISOString().slice(0, 10);
 }
 
+export function kstHour(iso: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  let hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  if (hour === 24) hour = 0;
+  return hour;
+}
+
 export function hourBounds(date: string, hour: number): [string, string] {
   const start = `${date}T${String(hour).padStart(2, "0")}:00:00+09:00`;
   const end =
