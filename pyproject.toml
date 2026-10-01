@@ -7,7 +7,7 @@ dynamic = ["dependencies"]
 
 [tool.setuptools]
 package-dir = { "" = "app" }
-packages = ["engine", "engine.jobs"]
+packages = ["engine", "engine.jobs", "engine.train"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["app/engine/requirements.txt"] }
