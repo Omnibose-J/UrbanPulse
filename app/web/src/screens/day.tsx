@@ -24,7 +24,7 @@ type Rec = {
   holiday: { name: string; name_en?: string | null; kind: string } | null;
   combos: { purpose: string; tolerance: string; state: string }[];
   alt_dates: { date: string; hours: number[]; score: number }[];
-  alt_places: { place_id: string; hours: number[]; name: string | null; name_en: string | null }[];
+  alt_places: { place_id: string; hours: number[]; name: string; name_en: string | null }[];
 };
 
 export function DayScreen({ id, date, fromMap, hour }: { id: string; date: string; fromMap?: boolean; hour?: string }) {
@@ -55,7 +55,8 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   const suffix = t("time.hour");
   const marks = { month: t("time.month"), day: t("time.day"), weekdays: t.raw("time.weekdays") as string[] };
   const back = fromMap ? `/${locale}/map?date=${date}&hour=${hour ?? "9"}` : `/${locale}/p/${id}`;
-  const none = rec?.no_window || rec?.state === "off";
+  const comboOff = rec?.state === "off" && (rec.off_reason === "failed" || rec.off_reason === "unverified");
+  const none = Boolean(rec?.no_window) && rec?.state !== "off";
   const myeongjeol = rec?.off_reason === "myeongjeol";
   const preparing = place?.serve_state === "preparing" || rec?.off_reason === "preparing";
   const ranges = formatStoredWindows(rec?.windows, locale, suffix);
@@ -82,6 +83,11 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
       {loaded.loading ? <StateBox kind="skeleton" /> : null}
       {place && preparing ? <StateBox kind="preparing" /> : null}
+      {place && comboOff ? (
+        <div data-state="preparing" className="flex items-start gap-3 rounded-[var(--r)] bg-bg-soft p-4">
+          <p className="body">{t("state.comboOff")}</p>
+        </div>
+      ) : null}
       {place && myeongjeol ? <AnswerCard variant="myeongjeol" name={place.name} nameEn={place.name_en} dateLine={dateLine} /> : null}
       {place && !preparing && !myeongjeol && none ? (
         <AnswerCard variant="none" name={place.name} nameEn={place.name_en} dateLine={dateLine} />
@@ -105,13 +111,13 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
         : null}
       {place && place.tier === "A1" && none && !myeongjeol
         ? (loaded.data?.alt_places ?? []).slice(0, 1).map((alt) => (
-            <AltButton key={alt.place_id} href={`/${locale}/p/${alt.place_id}/${date}`} label={t("alt.similar", { place: alt.name ?? alt.place_id, time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
+            <AltButton key={alt.place_id} href={`/${locale}/p/${alt.place_id}/${date}`} label={t("alt.similar", { place: alt.name, time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
           ))
         : null}
       {place && !myeongjeol && place.tier !== "B" ? (
         <ConditionField label={condLabel} onClick={() => setOpen(true)} />
       ) : null}
-      {rec?.hours ? (
+      {rec?.hours && rec.state !== "off" ? (
         <div>
           <DayStrip hours={rec.hours} mode={rec.strip_mode} selected={picked?.h} onPick={setPicked} />
           <Legend mode={rec.strip_mode} />

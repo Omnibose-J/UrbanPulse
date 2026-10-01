@@ -110,6 +110,7 @@
   },
   "state": {
     "preparing": "We are still collecting data. It will be ready soon.",
+    "comboOff": "This setting is not ready yet. Try another one.",
     "error": "Could not load this.",
     "retry": "Try again",
     "myeongjeol": "Many shops may be closed for the holiday. We are not recommending this day.",
