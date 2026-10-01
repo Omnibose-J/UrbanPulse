@@ -130,6 +130,14 @@ def _geom_json(geom: Any) -> dict[str, Any]:
     return json.loads(json.dumps(mapping(geom)))
 
 
+def _write_place_codes(codes: list[str]) -> Path:
+    """Tracked list of POI codes in shapefile order. A repeat writes the same bytes."""
+    path = Path(__file__).resolve().parents[1] / "config" / "place_codes.yaml"
+    body = "codes:\n" + "".join(f"  - {code}\n" for code in codes)
+    path.write_text(body, encoding="utf-8", newline="\n")
+    return path
+
+
 def run() -> int:
     settings.load_env()
     env = settings.require(("DATABASE_URL",))
@@ -241,6 +249,8 @@ def run() -> int:
             written = cur.rowcount
         conn.commit()
 
+    codes_path = _write_place_codes([row["id"] for row in rows])
+
     foreign_n = sum(1 for row in rows if row["foreign_heavy"])
     heritage = sorted(row["id"] for row in rows if row["open_hours"] is not None)
     log(
@@ -252,6 +262,7 @@ def run() -> int:
         gu_field=GU_FIELD,
         places=len(rows),
         written=written,
+        place_codes=str(codes_path.relative_to(settings.REPO_ROOT).as_posix()),
         foreign_heavy=foreign_n,
         outside_dong=outside_dong,
         outside_own_polygon=outside_own,

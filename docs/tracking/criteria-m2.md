@@ -5,7 +5,7 @@ Written 2026-10-01 before implementation. Result cells are filled only after run
 | # | Criterion | Command | Exit | Evidence (one line) |
 |---|---|---|---|---|
 | A1 | Task survives battery | run the script; `(Get-ScheduledTask 'UrbanPulse collect').Settings | Select DisallowStartIfOnBatteries, StopIfGoingOnBatteries, StartWhenAvailable` → `False, False, True`; one task | 0 | `DisallowStartIfOnBatteries False`, `StopIfGoingOnBatteries False`, `StartWhenAvailable True`; task count 1; next run 2026-10-01 14:00 |
-| A2 | Raw written with the database down | `cd app; supabase stop`; `python -m engine collect` → exit 1, log `database unavailable`; run folder has ≥ 100 `.json.gz` | | |
+| A2 | Raw written with the database down | `cd app; supabase stop`; `python -m engine collect` → exit 1, log `database unavailable`; run folder has ≥ 100 `.json.gz` | 1 | log `reason=database unavailable`, `raw_dir=data/raw/2026/10/01/1347`; that folder has 121 `.json.gz`; `supabase start` exit 0 afterwards |
 | A3 | Raw ingested afterwards | `supabase start`; `python -m engine ingest_raw` → exit 0; that run's `live_obs` rows ≥ 100; a second run changes 0 rows | | |
 | A4 | Categories normalized | `select count(*) from commerce_obs where (select count(*) from jsonb_object_keys(cat_counts)) not in (8, 9)` → 0; `select count(*) from commerce_obs where cat_counts ? '의료'` → 0 | | |
 | A5 | Holidays are days off | `python -m engine sync_holidays` → exit 0; paste `select date, name from holidays where date in ('2026-05-01','2026-07-17')` and the API's `isHoliday` for both | | |

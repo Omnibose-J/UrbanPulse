@@ -15,9 +15,11 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import psycopg
+import yaml
 from psycopg.types.json import Jsonb
 
-from engine import db, raw_store, settings
+from engine import raw_store, settings
 from engine.log import log
 from engine.parsers import KST, CitySnapshot, parse_citydata
 from engine.seoul_api import SeoulError, fetch
@@ -60,12 +62,31 @@ where city_fcst.issued_ts <= excluded.issued_ts
 
 Ledger = Callable[[str, str], AbstractContextManager[dict[str, Any]]]
 Store = Callable[[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]], None]
+_CODES = Path(__file__).resolve().parents[1] / "config" / "place_codes.yaml"
+
+
+def _connect(database_url: str) -> psycopg.Connection:
+    """Fail within 5 s. The caller must not log the exception: it can carry the database URL."""
+    return psycopg.connect(database_url, autocommit=False, connect_timeout=5)
+
+
+def load_place_codes(path: Path | None = None) -> list[str]:
+    path = path or _CODES
+    if not path.exists():
+        raise RuntimeError("missing place_codes.yaml; run load_places")
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    codes = data.get("codes") if isinstance(data, dict) else None
+    if not isinstance(codes, list) or not codes:
+        raise RuntimeError("place_codes.yaml has no codes")
+    if len(set(codes)) != len(codes):
+        raise RuntimeError("place_codes.yaml has duplicate codes")
+    return [str(code) for code in codes]
 
 
 @contextmanager
 def _ledger(database_url: str, job: str) -> Iterator[dict[str, Any]]:
     """job_runs row whose status comes from ctx['status'] (ok, warn, or fail)."""
-    conn = db.connect(database_url)
+    conn = _connect(database_url)
     try:
         with conn.cursor() as cur:
             cur.execute("set time zone 'Asia/Seoul'")
@@ -79,6 +100,11 @@ def _ledger(database_url: str, job: str) -> Iterator[dict[str, Any]]:
             yield ctx
             status = ctx.get("status") or "ok"
             detail = ctx["detail"]
+        except psycopg.OperationalError:
+            status = "fail"
+            detail = dict(ctx["detail"] or {})
+            detail["reason"] = "database unavailable"
+            raise
         except Exception as exc:
             status = "fail"
             detail = dict(ctx["detail"] or {})
@@ -113,7 +139,7 @@ def _relative(path: Path) -> str:
 
 
 def _load_places(database_url: str) -> list[dict[str, str]]:
-    with db.connect(database_url) as conn:
+    with _connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute("select id, serve_state from places order by id")
             return [{"id": row[0], "serve_state": row[1]} for row in cur.fetchall()]
@@ -159,24 +185,31 @@ def _json_ready(row: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
     return out
 
 
-def _store(
+def store_observations(
     database_url: str,
     live: list[dict[str, Any]],
     commerce: list[dict[str, Any]],
     forecasts: list[dict[str, Any]],
-) -> None:
+) -> int:
+    """Upsert parsed rows. Returns the number of statements that changed a row. Shared with ingest_raw."""
     live_rows = [_json_ready(row, ("age_rates",)) for row in live]
     commerce_rows = [_json_ready(row, ("cat_counts",)) for row in commerce]
-    with db.connect(database_url) as conn:
+    affected = 0
+    with _connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute("set time zone 'Asia/Seoul'")
-            if live_rows:
-                cur.executemany(_LIVE_UPSERT, live_rows)
-            if commerce_rows:
-                cur.executemany(_COMMERCE_UPSERT, commerce_rows)
-            if forecasts:
-                cur.executemany(_FCST_UPSERT, forecasts)
+            for statement, rows in (
+                (_LIVE_UPSERT, live_rows),
+                (_COMMERCE_UPSERT, commerce_rows),
+                (_FCST_UPSERT, forecasts),
+            ):
+                if not rows:
+                    continue
+                cur.executemany(statement, rows)
+                if cur.rowcount > 0:
+                    affected += cur.rowcount
         conn.commit()
+    return affected
 
 
 def _status(results: list[dict[str, Any]]) -> str:
@@ -217,51 +250,91 @@ def run(
             commerce: list[dict[str, Any]],
             forecasts: list[dict[str, Any]],
         ) -> None:
-            _store(database_url, live, commerce, forecasts)
+            store_observations(database_url, live, commerce, forecasts)
 
-    if places is None:
-        places = _load_places(env["DATABASE_URL"])
+    from_file = places is None
+    if from_file:
+        codes = load_place_codes()
+        places = [{"id": code, "serve_state": "preparing"} for code in codes]
+    else:
+        codes = [place["id"] for place in places]
     log(JOB, "start", called=len(places))
+    folder = raw_store.folder_for(run_ts, raw_dir)
+    raw_rel = _relative(folder)
     try:
-        with ledger(env["DATABASE_URL"], JOB) as ctx:
-            from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import ThreadPoolExecutor
 
-            def work(place: dict[str, str]) -> dict[str, Any]:
-                return _one(place, client, env["SEOUL_API_KEY"], run_ts, raw_dir)
+        def work(place: dict[str, str]) -> dict[str, Any]:
+            return _one(place, client, env["SEOUL_API_KEY"], run_ts, raw_dir)
 
-            with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-                results = list(pool.map(work, places))
-            live: list[dict[str, Any]] = []
-            commerce: list[dict[str, Any]] = []
-            forecasts: list[dict[str, Any]] = []
-            for result in results:
-                if result["outcome"] != "ok":
-                    continue
-                snapshot: CitySnapshot = result["snapshot"]
-                assert snapshot.live is not None
-                live.append(snapshot.live)
-                if snapshot.commerce is not None:
-                    commerce.append(snapshot.commerce)
-                forecasts.extend(snapshot.forecasts)
-            store(live, commerce, forecasts)
-            ok = sum(1 for row in results if row["outcome"] == "ok")
-            no_data = sum(1 for row in results if row["outcome"] == "no_data")
-            failed = sum(1 for row in results if row["outcome"] == "failed")
-            status = _status(results)
-            detail = {
-                "called": len(places),
-                "ok": ok,
-                "no_data": no_data,
-                "failed": failed,
-                "raw_dir": _relative(raw_store.folder_for(run_ts, raw_dir)),
-            }
-            ctx["detail"] = detail
-            ctx["status"] = status
-    except SeoulError as exc:
-        log(JOB, "fail", reason=str(exc))
-        return 1
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            results = list(pool.map(work, places))
     finally:
         if own_client:
             client.close()
+
+    exit_code = 0
+    only_file: list[str] = []
+    only_db: list[str] = []
+    try:
+        with ledger(env["DATABASE_URL"], JOB) as ctx:
+            if from_file:
+                db_rows = _load_places(env["DATABASE_URL"])
+                db_ids = {row["id"] for row in db_rows}
+                file_ids = set(codes)
+                only_file = sorted(file_ids - db_ids)
+                only_db = sorted(db_ids - file_ids)
+                if only_file or only_db:
+                    ctx["status"] = "fail"
+                    ctx["detail"] = {
+                        "only_in_file": only_file,
+                        "only_in_db": only_db,
+                        "raw_dir": raw_rel,
+                    }
+                    exit_code = 1
+                else:
+                    serve = {row["id"]: row["serve_state"] for row in db_rows}
+                    for result in results:
+                        result["serve_state"] = serve[result["id"]]
+            if exit_code == 0:
+                live: list[dict[str, Any]] = []
+                commerce: list[dict[str, Any]] = []
+                forecasts: list[dict[str, Any]] = []
+                for result in results:
+                    if result["outcome"] != "ok":
+                        continue
+                    snapshot: CitySnapshot = result["snapshot"]
+                    assert snapshot.live is not None
+                    live.append(snapshot.live)
+                    if snapshot.commerce is not None:
+                        commerce.append(snapshot.commerce)
+                    forecasts.extend(snapshot.forecasts)
+                store(live, commerce, forecasts)
+                ok = sum(1 for row in results if row["outcome"] == "ok")
+                no_data = sum(1 for row in results if row["outcome"] == "no_data")
+                failed = sum(1 for row in results if row["outcome"] == "failed")
+                status = _status(results)
+                detail = {
+                    "called": len(places),
+                    "ok": ok,
+                    "no_data": no_data,
+                    "failed": failed,
+                    "raw_dir": raw_rel,
+                }
+                ctx["detail"] = detail
+                ctx["status"] = status
+    except psycopg.OperationalError:
+        log(JOB, "fail", reason="database unavailable", raw_dir=raw_rel)
+        return 1
+    if exit_code == 1:
+        log(
+            JOB,
+            "fail",
+            reason="place code mismatch",
+            only_in_file=only_file,
+            only_in_db=only_db,
+            raw_dir=raw_rel,
+        )
+        return 1
     log(JOB, status, **detail)
     return 1 if status == "fail" else 0
