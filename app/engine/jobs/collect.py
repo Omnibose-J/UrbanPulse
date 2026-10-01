@@ -38,6 +38,11 @@ on conflict (place_id, ts) do update set
   level = excluded.level,
   age_rates = excluded.age_rates,
   male_rate = excluded.male_rate
+where live_obs.pop_min is distinct from excluded.pop_min
+   or live_obs.pop_max is distinct from excluded.pop_max
+   or live_obs.level is distinct from excluded.level
+   or live_obs.age_rates is distinct from excluded.age_rates
+   or live_obs.male_rate is distinct from excluded.male_rate
 """
 
 _COMMERCE_UPSERT = """
@@ -47,6 +52,9 @@ on conflict (place_id, ts) do update set
   level = excluded.level,
   pay_cnt = excluded.pay_cnt,
   cat_counts = excluded.cat_counts
+where commerce_obs.level is distinct from excluded.level
+   or commerce_obs.pay_cnt is distinct from excluded.pay_cnt
+   or commerce_obs.cat_counts is distinct from excluded.cat_counts
 """
 
 _FCST_UPSERT = """
@@ -58,6 +66,12 @@ on conflict (place_id, target_ts) do update set
   pop_max = excluded.pop_max,
   level = excluded.level
 where city_fcst.issued_ts <= excluded.issued_ts
+  and (
+    city_fcst.issued_ts is distinct from excluded.issued_ts
+    or city_fcst.pop_min is distinct from excluded.pop_min
+    or city_fcst.pop_max is distinct from excluded.pop_max
+    or city_fcst.level is distinct from excluded.level
+  )
 """
 
 Ledger = Callable[[str, str], AbstractContextManager[dict[str, Any]]]

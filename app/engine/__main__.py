@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from engine.jobs import backfill, collect, healthcheck, load_places, sync_holidays
+from engine.jobs import backfill, collect, healthcheck, ingest_raw, load_places, sync_holidays
 
 NOT_YET = {
     "forecast": "W7",
@@ -22,6 +22,7 @@ JOBS = {
     "healthcheck": healthcheck.run,
     "backfill": backfill.run,
     "collect": collect.run,
+    "ingest_raw": ingest_raw.run,
     "load_places": load_places.run,
     "sync_holidays": sync_holidays.run,
 }
@@ -31,11 +32,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="engine", description="UrbanPulse engine jobs")
     sub = parser.add_subparsers(dest="job", required=True)
     for name in [*NOT_YET, *JOBS]:
-        sub.add_parser(name)
+        command = sub.add_parser(name)
+        if name == "ingest_raw":
+            command.add_argument("--date", default=None)
     args = parser.parse_args(argv)
     if args.job in NOT_YET:
         print(f"{args.job}: not implemented until {NOT_YET[args.job]}", file=sys.stderr)
         return 2
+    if args.job == "ingest_raw":
+        return ingest_raw.run(date=args.date)
     return JOBS[args.job]()
 
 
