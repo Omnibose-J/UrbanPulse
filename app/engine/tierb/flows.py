@@ -36,6 +36,11 @@ def station_groups() -> tuple[dict[str, list[str]], pd.DataFrame]:
     return groups, coords
 
 
+def prefers_ridership(correlation: float) -> bool:
+    """Ridership replaces the tract flow only when the two weeks disagree."""
+    return correlation < 0.0
+
+
 def norm(name: object) -> str:
     return re.sub(r"\(.*?\)|역$", "", str(name)).strip()
 

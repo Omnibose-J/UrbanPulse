@@ -6,7 +6,7 @@ import pandas as pd
 
 from engine import db, settings
 from engine.log import log
-from engine.tierb.flows import norm, oa_flow, st_flow, weekly
+from engine.tierb.flows import norm, oa_flow, prefers_ridership, st_flow, weekly
 
 JOB = "tier_b"
 DAY_TYPE = {"wk": "weekday", "sat": "sat", "sun": "sun"}
@@ -39,7 +39,7 @@ def _choose(oa: pd.Series | None, ridership: pd.Series | None, holidays) -> tupl
     if ridership is None:
         return _relative(week_oa), False
     week_st = weekly(ridership.dropna(), holidays)
-    use_ridership = float(week_oa.corr(week_st)) < 0.0
+    use_ridership = prefers_ridership(float(week_oa.corr(week_st)))
     return _relative(week_st if use_ridership else week_oa), use_ridership
 
 
