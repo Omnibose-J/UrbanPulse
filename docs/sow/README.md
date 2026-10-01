@@ -17,12 +17,23 @@ Build of UrbanPulse v1 (mobile web + PC map dashboard, ko/en, visitors only). Ar
 | [SOW-M0](SOW-M0.md) | W0, W1 | git repo · local Supabase schema + RLS with pgTAP tests · engine skeleton with `healthcheck` running locally · empty Next.js (`next dev`) reading the local DB. **No cloud** | Docker Desktop, `.env` (present) |
 | [SOW-M1](SOW-M1.md) | W2, W4, W3a, W3 | `places` loaded (tiers, English names, palace hours, foreign-heavy flag, serve state) · holidays 2023–2027 · backfill 5/11→ into the local DB · `collect` every 30 min via Windows Task Scheduler on the dev box, raw snapshots to `data/raw/` | M0 |
 | [SOW-M2](SOW-M2.md) | W3 hardening, W5, W6, W7 | Part A: task runs on battery · raw before database · `ingest_raw` · eight commerce categories · holidays filtered by `isHoliday`. Part B: `ratio_v1` ported and proven against the research figures · registration gate · `level_thresholds`, `lively_profile` · daily `forecast` job · places refreshed from live data | M1 |
-| SOW-M3 (outline) | W8, W9 | recommendations + flags + alternatives + similar places · `tier_b` job | M2 |
-| SOW-M4 (outline) | W10, W13 | mobile screens `/`, `/search`, `/p/[id]`, `/p/[id]/[date]`, `/map`, `/about` per the design spec · ko/en · all on `next dev` against the local DB | M0 (can start on mock rows), real data from M3 |
-| SOW-MC (outline) | W0 cloud half | GCP project, Artifact Registry image push, Cloud Run Jobs + Scheduler for the six jobs, GCS buckets (raw archive moves from `data/raw/`), hosted Supabase (`db push`), Vercel deploy, Google Maps billing or MapLibre decision | M4 working locally; accounts and billing (user) |
-| SOW-M5 (outline) | W11, W12 | `evaluate` (incl. weekly re-judgement) and `archive` jobs · `/admin/eval` · E6 strip verification | MC |
+| [SOW-M3](SOW-M3.md) | W8 | `recommendation_log` migration · flag file · recommendations with `hours`, alternatives · similar places · today's rows refreshed by `collect` | M2 |
+| [SOW-M4](SOW-M4.md) | W10, W11, W13 | read-only API · screens `/`, `/search`, `/p/[id]`, `/p/[id]/[date]`, `/map` (MapLibre), `/about` per the design spec · ko/en · Playwright checks D1-D12 · all on `next dev` against the local DB | M3 |
+| [SOW-M5](SOW-M5.md) | W12 | `evaluate` (daily) · `rejudge` (prints, applies only with `--apply`) · `archive` (dry run only for now) · `/admin/eval` | M3, M4 |
+| [SOW-MB](SOW-MB.md) | W9 (cut down) | tier B station places, usual-flow profile, B recommendations; experimental, search and map toggle only. Holiday adjustment and `ratio_v1b` deferred | M3, M4 |
+| SOW-MC (outline) | W0 cloud half | GCP project, Artifact Registry image push, Cloud Run Jobs + Scheduler, GCS buckets (raw and archive move from `data/`), hosted Supabase (`db push`), Vercel deploy, map provider decision | everything above working locally; accounts and billing (user) |
 
-M3–MC–M5 are outlines (M0 and M1 are done; M2 is expanded). Claude expands each one when the previous milestone's evidence is in. Do not start a milestone from an outline; ask for the expanded SOW. Order is local first: nothing touches a cloud account before SOW-MC.
+Run order: **M2 → M3 → M4 → M5 → MB**. SOW-MC is an outline and needs the user's cloud accounts; do not start it.
+
+## Unattended run
+
+The implementer may run M2 → M3 → M4 → M5 → MB back to back without waiting for a review. The designer reviews all of it afterwards from the criteria files and the diff.
+
+- Finish a SOW (criteria file filled, report appended, commits made) before starting the next one.
+- A pre-registered check that misses (a reproduction tolerance, the registration gate, any bar) is **recorded, not fixed**: fill the row with the measured value and `FAIL`, write it under Open facts, change no number, seed, sample, threshold or test. Then continue with the consequence the SOW registers for that case (for example: no horizon passes the gate → every forecast uses the baseline). Where a SOW says "stop and report" for such a miss, read it as "stop that step, record, continue with the steps that do not depend on it".
+- A step that is blocked for another reason (missing input, tool failure you cannot resolve in three attempts, spec conflict): mark its rows `BLOCKED` with the reason, append to `docs/tracking/findings.md` when it is out of scope, skip only what depends on it, continue.
+- A later SOW that cannot work at all without a blocked earlier result (for example M4's live smoke test with no `recommendations` rows) still builds and tests everything it can on mocked data and marks the live rows `BLOCKED`.
+- Never, in any case: touch a cloud account, push, print a key, edit `analysis/`, run `supabase db reset`, weaken or delete a test, or fill a criteria cell without running its command.
 
 ## Definition of done (every milestone)
 
