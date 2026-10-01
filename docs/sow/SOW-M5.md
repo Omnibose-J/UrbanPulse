@@ -15,7 +15,7 @@ Read-only: migrations, `analysis/` (reference: `boot()` and `verdict()` in `anal
 ## Definitions
 
 - **Actual level** of an hour: the hourly level of `app/engine/hourly.py`. **Actual value**: the hourly live value.
-- **Actual activity** of an hour for a logged row: hourly commerce value of the row's purpose ÷ the row's `p90`. Lively when `>= lively_min` of the row.
+- **Actual activity** of an hour for a logged row: hourly commerce value of the row's purpose ÷ the row's `p90`. Lively when `>= 0.5` for every purpose: the truth threshold is the pre-registered 0.5; the row's `lively_min` (0.6 for `shop`) is only the prediction gate and is not used here.
 - **Scorable hour**: actual level exists, and for A1 the actual activity exists.
 - **Crowd kept**: actual level `<=` allowed level (`calm` 1, `moderate` 2). Not scored for `busy_ok`.
 

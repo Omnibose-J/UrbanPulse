@@ -8,7 +8,7 @@ SOW-M2 done: `forecast` writes `forecast_hourly`, `level_thresholds`, `lively_pr
 
 ## Files you may touch
 
-Create: `app/supabase/migrations/20261002000000_recommendation_log.sql`, `app/engine/config/feature_flags.yaml`, `app/engine/{flags,reco,similar,geo}.py`, `app/engine/tests/**`, `docs/tracking/criteria-m3.md`.
+Create: `app/supabase/migrations/20261002000000_recommendation_log.sql` (also holds `lively_norm` and the `a_actual` column), `app/engine/config/feature_flags.yaml`, `app/engine/{flags,reco,similar,geo}.py`, `app/engine/tests/**`, `docs/tracking/criteria-m3.md`.
 Edit: `app/engine/jobs/{forecast,collect}.py`, `app/engine/lively.py` (expose `p90` per place and purpose; no behaviour change), `app/supabase/tests/schema_test.sql` (add the new table), `docs/LLM_PROJECT_MAP.md`.
 Read-only: `analysis/` (reference: `windows()` in `analysis/scripts/exp_e3_e4_reco.py`), specs, `docs/sow/`, `AGENTS.md`, `app/web/`.
 
@@ -44,7 +44,19 @@ create table recommendation_log (
 );
 create index recommendation_log_date_idx on recommendation_log (date);
 alter table recommendation_log enable row level security;
+
+create table lively_norm (
+  place_id     text primary key references places (id),
+  p90_all      real,
+  p90_food     real,
+  p90_shop     real,
+  computed_at  timestamptz not null default now()
+);
+alter table lively_norm enable row level security;
+
+alter table forecast_hourly add column a_actual boolean not null default false;
 ```
+`lively_norm` holds the normalisers that `lively.py` already computes, so `collect` can turn a fresh payment count into an activity value without recomputing them. `a_actual` marks a `forecast_hourly` row whose `a_*` are measured, not expected.
 `p90` and `lively_min` are the purpose's normaliser and threshold at issue time (null for A2). Follow the RLS pattern of `20261001000100_rls.sql`. `cd app; supabase migration up` (never `db reset`: it would drop the collected data). Add the table to the pgTAP test.
 
 ### 2 Flag file — `app/engine/config/feature_flags.yaml`, loader `app/engine/flags.py`
@@ -54,14 +66,14 @@ version: 1
 judged_at: "2026-09-29"
 lively_min: {sight: 0.5, food: 0.5, shop: 0.6}
 combos:
-  - {group: a1, purpose: sight, tolerance: calm, state: reference, strip: windows_only}
+  - {group: a1, purpose: sight, tolerance: calm, state: off, strip: windows_only}
   - {group: a1, purpose: sight, tolerance: moderate, state: on, strip: windows_only}
   # … one line per row below
 ```
 
 | group | purpose | calm | moderate | busy_ok |
 |---|---|---|---|---|
-| a1 | sight | reference | on | on |
+| a1 | sight | off | on | on |
 | a1 | food | off | on | on |
 | a1 | shop | off | reference | on |
 | a1_foreign | sight | off | reference | reference |
@@ -69,7 +81,7 @@ combos:
 | a1_foreign | shop | off | off | reference |
 | a2 | none | on | on | on |
 
-Every `strip` is `windows_only`. `flags.lookup(group, purpose, tolerance)` → `(state, strip)`; a combination not in the file → `('off', 'windows_only')`. The loader rejects unknown groups, purposes, tolerances, states and duplicate lines (exit 1 naming the line). No table of states anywhere in Python code.
+`a1 / sight / calm` is `off`, not the build contract's `reference`: backtest E15 (`analysis/scripts/exp_e15_window_rule.py`, 2026-10-01) judged the window rule of step 3 and this one combination fell below the lively bar (84.4 %). Every other state was confirmed. Every `strip` is `windows_only`. `flags.lookup(group, purpose, tolerance)` → `(state, strip)`; a combination not in the file → `('off', 'windows_only')`. The loader rejects unknown groups, purposes, tolerances, states and duplicate lines (exit 1 naming the line). No table of states anywhere in Python code.
 
 ### 3 One row — `app/engine/reco.py`
 `build_row(place, date, tolerance, purpose, hourly, flags, day_type)` where `hourly` is the 15 `forecast_hourly` rows of that date (hours 9…23).
@@ -91,7 +103,7 @@ Off rows carry `windows, no_window, hours, strip_mode, alt_dates, alt_places` al
 - Cell shape: `{"h": 14, "rating": 1, "in_window": false, "reason": "fit", "crowd": 1, "act": "lively"}`.
 
 **Windows**: port `windows()` from `exp_e3_e4_reco.py` (1-hour and 2-consecutive-hour candidates, 2-hour score = mean, sort by score descending, greedy non-overlapping, at most 3). Allowed hours = the cells with `rating = 1`. Ties keep the candidate order of the research function (earlier hour first, 1-hour before 2-hour).
-  - This narrows the research rule (which allowed every lively hour and let the score penalise crowding) to the design spec's rule (§7.1: windows come from "가도 괜찮아요" hours). It can only remove over-tolerance hours from a window.
+  - This narrows the research rule (which allowed every lively hour and let the score penalise crowding) to the design spec's rule (§7.1: windows come from "가도 괜찮아요" hours). E15 re-judged every combination under this rule; the flag table in step 2 is its result.
 - `windows` = `[{"hours": [12, 13], "score": 0.71, "crowd": 1, "act": "food", "act_level": "lively"}, …]` in pick order. `crowd` = highest level in the window. `act` = the purpose for A1 (`sight`/`food`/`shop`), null for A2; `act_level` = `"lively"` for A1 (every window hour is lively by construction), null for A2. `score` rounded to 3 decimals.
 - `no_window` = `windows` is empty (then `windows = []`).
 - `strip_mode` = the flag's `strip`.
@@ -106,6 +118,8 @@ After `forecast_hourly` is written (SOW-M2 step B-6.5), in the same job run:
 6. `job_runs.detail.reco` = `{"rows", "on", "reference", "off_by_reason": {...}, "no_window", "logged"}`.
 
 ### 5 Today's rows after each collect
+`forecast` step 2 also replaces `lively_norm`. The overlay (SOW-M2 step B-6.5) gains one rule: for an A1 place and an hour of today that has `commerce_obs` rows, set `a_all`, `a_food`, `a_shop` = hourly commerce value ÷ the place's `p90_*` (null where the `p90` is null or zero) and `a_actual = true`. Rows written by `forecast` start with `a_actual = false`. Backtest E16 is the reason: choosing "open now" from the expected profile was right 84.2 % of the time, under the 85 % bar, so the home list must use the measured value.
+
 `collect`, after the overlay, rebuilds today's rows (steps 4.1–4.3 restricted to today and to the places it just stored; alternatives read the other dates' stored rows). No log write.
 
 ### 6 Similar places — `app/engine/similar.py`, run by `forecast` before step 4
@@ -122,6 +136,7 @@ Cosine similarity; for each place the top 10 others with `rank` 1…10. Replace 
 - `test_reco_state.py`: the five state rules in order; off rows have every computed column null; `strip_mode` mirrors the file (invariant 11); A1 myeongjeol → off for all nine combinations (invariant 7).
 - `test_reco_alts.py`: `alt_dates` only better dates, at most 2; with `no_window`, any date with a window; `alt_places` respects 5 km, crowd-lower rule, at most 3; A2 `alt_places = []`.
 - `test_reco_log.py`: second `forecast` the same day leaves `recommendation_log` unchanged; only `date = issued_date + 3`.
+- `test_overlay_activity.py`: an hour with commerce rows gets measured `a_*` and `a_actual`; an hour without keeps the profile values; zero `p90` → null; A2 rows never get `a_actual`.
 - `test_similar.py`: identical vectors → score 1, rank order, no self row, visitors block dropped when one place lacks 28 days.
 - Property test (random `hourly` inputs, 200 cases): invariants 8, 9, 10 hold for every on / reference row.
 
@@ -135,6 +150,7 @@ Cosine similarity; for each place the top 10 others with `rank` 1…10. Replace 
 | A4 | Stored invariants | each returns 0: rows with `state <> 'off'` and `jsonb_array_length(hours) <> 15`; cells with `in_window` and `rating = 0`; cells with `(rating = 0) = (reason = 'fit')`; A2 cells with non-null `act`; rows where the set of `in_window` hours differs from the union of `windows[*].hours` (write the five queries into the criteria file) |
 | A5 | Log is append-only | `forecast` twice → `select count(*), min(date - issued_date), max(date - issued_date) from recommendation_log` identical after the second run, both differences 3 |
 | A6 | Collect refreshes today | `python -m engine collect` → exit 0 or warn; `select max(generated_at) from recommendations where date = current_date` is later than the forecast run; rows of later dates keep the forecast's `generated_at` |
+| A6b | Measured activity on live hours | after that collect: `select count(*) from forecast_hourly where a_actual` > 0, all of them on today's date and A1 places; `select count(*) from lively_norm` = A1 places with a profile |
 | A7 | Similar places | `select count(*), count(distinct place_id), max(rank) from similar_places` pasted; no place has more than 10 rows |
 | A8 | Ten places by eye | for 10 `on` places (5 A1, 2 `a1_foreign`, 3 A2 including POI008), paste today+2's `windows` and the 15 `rating` digits for `moderate` and the default purpose. Do not judge them; the designer reads them |
 | A9 | Tests and lint | `python -m pytest app/engine/tests -q` → exit 0; `ruff check app/engine` → exit 0 |
