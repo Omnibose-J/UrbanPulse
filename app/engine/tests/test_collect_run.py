@@ -115,3 +115,23 @@ def test_five_failures_warn_and_exit_0(tmp_path, capsys):
     captured = capsys.readouterr()
     blob = captured.out + captured.err + json.dumps(row)
     assert SENTINEL not in blob
+
+
+def test_database_down_writes_raw_and_exits_1(tmp_path, monkeypatch, capsys):
+    import psycopg
+
+    monkeypatch.setattr(collect, "load_place_codes", lambda path=None: ["POI001", "POI002", "POI003"])
+
+    def down(database_url: str):
+        raise psycopg.OperationalError("down")
+
+    monkeypatch.setattr(collect, "_connect", down)
+    code = collect.run(
+        env=ENV,
+        client=_client(0),
+        raw_dir=tmp_path,
+        now=datetime(2026, 10, 1, 9, 20, tzinfo=KST),
+    )
+    assert code == 1
+    assert len(list(tmp_path.rglob("*.json.gz"))) == 3
+    assert "database unavailable" in capsys.readouterr().out
