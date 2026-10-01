@@ -72,6 +72,7 @@ def build_row(
     hourly: dict[int, dict],
     flags: FlagFile,
     day_kind: str,
+    now_hour: int | None = None,
 ) -> dict:
     state, off_reason, strip = _state(place, day, tolerance, purpose, hourly, flags, day_kind)
     base = {
@@ -96,7 +97,7 @@ def build_row(
             "lively_min": None,
         }
     lively_min = flags.lively_min.get(purpose) if place["tier"] == "A1" else None
-    cells, windows, no_window = _cells(place, day, tolerance, purpose, hourly, lively_min)
+    cells, windows, no_window = _cells(place, day, tolerance, purpose, hourly, lively_min, now_hour)
     return {
         **base,
         "windows": windows,
@@ -155,7 +156,7 @@ def _state(place, day, tolerance, purpose, hourly, flags: FlagFile, day_kind: st
     return state, None, strip
 
 
-def _cells(place, day, tolerance, purpose, hourly, lively_min):
+def _cells(place, day, tolerance, purpose, hourly, lively_min, now_hour: int | None):
     tier = place["tier"]
     open_hours = open_hours_for(tier, place.get("open_hours"), day)
     minimum = 0.0 if lively_min is None else lively_min
@@ -181,7 +182,7 @@ def _cells(place, day, tolerance, purpose, hourly, lively_min):
                 "act": act,
             }
         )
-        if rating == 1:
+        if rating == 1 and (now_hour is None or hour >= now_hour):
             allowed.add(hour)
             scores[hour] = _score(tolerance, float(activity), level)
     chosen = choose_windows(scores, allowed)

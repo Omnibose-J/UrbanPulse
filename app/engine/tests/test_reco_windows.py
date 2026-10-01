@@ -40,6 +40,25 @@ def test_windows_use_only_fit_hours_and_match_in_window():
         used.extend(window["hours"])
 
 
+def test_today_windows_skip_hours_already_over():
+    flags = load()
+    hourly = _ready()
+    for hour in range(9, 24):
+        hourly[hour]["a_all"] = 0.1
+        hourly[hour]["level"] = 2
+    hourly[9]["a_all"] = 1.0
+    hourly[9]["level"] = 1
+    hourly[18]["a_all"] = 1.0
+    hourly[18]["level"] = 1
+    late = build_row(_place("A1"), DAY, "moderate", "sight", hourly, flags, "weekday", now_hour=21)
+    assert late["no_window"] is True
+    assert all(not cell["in_window"] for cell in late["hours"])
+    assert late["hours"][0]["rating"] == 1
+    still = build_row(_place("A1"), DAY, "moderate", "sight", hourly, flags, "weekday", now_hour=18)
+    assert 18 in {hour for window in still["windows"] for hour in window["hours"]}
+    assert all(cell["h"] >= 18 or not cell["in_window"] for cell in still["hours"])
+
+
 def test_busy_ok_never_marks_too_busy():
     flags = load()
     hourly = _ready()

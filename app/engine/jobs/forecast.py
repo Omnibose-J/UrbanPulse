@@ -604,7 +604,8 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
             slots = hourly.get((place["id"], day), {})
             for purpose in purposes_for(place["tier"]):
                 for tolerance in ("calm", "moderate", "busy_ok"):
-                    row = build_row(place, day, tolerance, purpose, slots, flags, kind)
+                    now_hour = started.astimezone(KST).hour if day == today else None
+                    row = build_row(place, day, tolerance, purpose, slots, flags, kind, now_hour)
                     scales = norms.get(place["id"])
                     if place["tier"] == "A1" and scales is not None and purpose in _P90_KEY:
                         row["p90"] = scales[_P90_KEY[purpose]]
