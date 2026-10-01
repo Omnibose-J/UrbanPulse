@@ -9,6 +9,7 @@ function localeFrom(request: NextRequest, pathname: string): "ko" | "en" {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return NextResponse.next();
   const hasLocale = pathname === "/ko" || pathname.startsWith("/ko/") || pathname === "/en" || pathname.startsWith("/en/");
   if (!hasLocale) {
     const url = request.nextUrl.clone();

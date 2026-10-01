@@ -10,7 +10,7 @@ Written 2026-10-01 before implementation. Result cells are filled only after run
 | A4 | Archive dry run | `python -m engine archive --dry-run` → exit 0; candidate counts pasted; `select count(*) from live_obs` and `commerce_obs` unchanged; no file under `data/archive/` | 0 | `live_obs` 128863, `commerce_obs` 82369, `forecast_log` 0; table counts stayed 358102 and 227508; `data/archive` absent |
 | A5 | No archive task | `Get-ScheduledTask 'UrbanPulse archive' -ErrorAction SilentlyContinue` → nothing | 0 | no task |
 | A6 | Evaluate scheduled | `Get-ScheduledTask 'UrbanPulse evaluate'` → daily 06:00, battery settings as collect | 0 | start 2026-10-01T06:00:00+09:00; DisallowStartIfOnBatteries False; StopIfGoingOnBatteries False; StartWhenAvailable True |
-| A7 | Admin page guarded | `curl -s -o NUL -w "%{http_code}" http://localhost:3000/admin/eval` → 404; with the token (read from `.env` by the script, never echoed) → 200 | 404 | no token returns 404. BLOCKED: `ADMIN_TOKEN` is empty, so the 200 case cannot be run |
+| A7 | Admin page guarded | `curl -s -o NUL -w "%{http_code}" http://localhost:3000/admin/eval` → 404; with the token (read from `.env` by the script, never echoed) → 200 | 0 | no token 404; token present 200. Token value not printed |
 | A8 | Tests and lint | `python -m pytest app/engine/tests -q` → exit 0; `ruff check app/engine` → exit 0; `cd app/web; npm run lint; npm run build; npx playwright test` → exit 0 | 0 | engine 73 passed; ruff clean; web lint clean; build exit 0; playwright 11 passed |
 | A9 | No key | `git grep -I -n -e "eyJhbGci" -e "sb_secret_" -- . ':!docs'` → no match; the admin token value does not occur in `app/web/.next/static` (script prints `no match`) | 1 | `git grep` no match; static scan `no match` |
 

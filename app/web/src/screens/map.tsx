@@ -43,11 +43,12 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [styleFailed, setStyleFailed] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const fitted = useRef("");
+  const boundsRef = useRef<LngLatBounds | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -88,7 +89,13 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     });
     map.addControl(new AttributionControl({ compact: true }), "top-right");
     mapRef.current = map;
-    const onLoad = () => setReady(true);
+    setMounted(true);
+    const onLoad = () => {
+      const bounds = boundsRef.current;
+      if (bounds && !bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 13, duration: 0 });
+      }
+    };
     const onError = (event: { error: { message: string } }) => {
       const message = event.error.message ?? "";
       if (!map.loaded() && /Worker failed to load|Failed to load style/i.test(message)) setStyleFailed(true);
@@ -96,7 +103,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     map.on("load", onLoad);
     map.on("error", onError);
     return () => {
-      setReady(false);
+      setMounted(false);
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
       map.remove();
@@ -106,7 +113,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || styleFailed) return;
+    if (!map || !mounted || styleFailed) return;
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
     const bounds = new LngLatBounds();
@@ -148,12 +155,13 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       markersRef.current.push(marker);
       bounds.extend([place.lon, place.lat]);
     }
+    boundsRef.current = bounds;
     const key = places.map((place) => `${place.id}:${place.lon}:${place.lat}`).join(",");
-    if (key && key !== fitted.current && !bounds.isEmpty()) {
+    if (map.loaded() && key && key !== fitted.current && !bounds.isEmpty()) {
       map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 13, duration: 0 });
       fitted.current = key;
     }
-  }, [places, clock, selected, ready, styleFailed]);
+  }, [places, clock, selected, mounted, styleFailed]);
 
   const current = places.find((place) => place.id === selected) ?? places[0];
   const days = Array.from({ length: 8 }, (_, index) => addDays(today, index));
