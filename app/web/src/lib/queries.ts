@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/supabase-server";
 import { addDays, dayBounds, kstHour, kstNow } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
+import { measuredNow, namedAltPlaces } from "@/lib/shape";
 
 type Place = {
   id: string;
@@ -97,15 +98,7 @@ export async function weekPayload(id: string, tolerance: string, purpose: string
         .limit(1);
       if (liveError) throw new Error("unavailable");
       const live = liveRows?.[0] ?? null;
-      now = {
-        level: row.level,
-        source: "live",
-        stale: false,
-        ts: live?.ts ?? row.target_ts,
-        pop_min: live?.pop_min ?? null,
-        pop_max: live?.pop_max ?? null,
-        hour: row.hour,
-      };
+      now = measuredNow(row, live);
     }
   }
   return {
@@ -116,7 +109,7 @@ export async function weekPayload(id: string, tolerance: string, purpose: string
       name_en: place.name_en,
       gu: place.gu,
       serve_state: place.serve_state,
-      foreign_heavy: place.foreign_heavy ?? false,
+      foreign_heavy: place.foreign_heavy,
     },
     now,
     days: days.map((row: { date: string }) => ({ ...row, holiday: holidayByDate.get(row.date) ?? null })),
@@ -160,15 +153,11 @@ export async function recommendPayload(id: string, date: string, tolerance: stri
       name_en: place.name_en,
       gu: place.gu,
       serve_state: place.serve_state,
-      foreign_heavy: place.foreign_heavy ?? false,
+      foreign_heavy: place.foreign_heavy,
     },
     holiday: holidayQuery.data,
     combos,
-    alt_places: alts.map((item: { place_id: string; hours: number[]; crowd: number }) => ({
-      ...item,
-      name: names.get(item.place_id)?.name ?? null,
-      name_en: names.get(item.place_id)?.name_en ?? null,
-    })),
+    alt_places: namedAltPlaces(alts, names),
     alt_dates: data?.alt_dates ?? [],
   };
 }
