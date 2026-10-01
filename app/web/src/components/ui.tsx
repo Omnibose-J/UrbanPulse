@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Clock, Map, Star, X } from "lucide-react";
+import { ChevronLeft, Clock, Map, SlidersHorizontal, Star, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -47,7 +47,7 @@ export function AppBar({
       <div className="flex items-center gap-1">
         {backHref ? (
           <>
-            <a href={backHref} className="icon-hit -ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold">
+            <a href={backHref} className={`-ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold ${backLabel ? "h-11 pr-2" : "icon-hit"}`}>
               <ChevronLeft aria-hidden />
               {backLabel ? <span className="whitespace-nowrap">{backLabel}</span> : null}
             </a>
@@ -112,7 +112,7 @@ export function Badge({ kind }: { kind: "reference" | "holidayRef" | "experiment
   const t = useTranslations();
   const label = kind === "reference" ? t("badge.reference") : kind === "holidayRef" ? t("badge.holidayRef") : t("badge.experimental");
   return (
-    <span className="label inline-flex h-6 items-center rounded-[var(--r-pill)] px-2" style={{ background: "var(--on-ink-12)", color: "var(--on-ink)" }}>
+    <span data-badge className="label inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-[var(--r-pill)] px-2" style={{ background: "var(--on-ink-12)", color: "var(--on-ink)" }}>
       {label}
     </span>
   );
@@ -169,9 +169,9 @@ export function AnswerCard({
     <div data-answer-card className="relative flex flex-col gap-4 overflow-hidden rounded-[20px] bg-ink p-5 text-on-ink">
       <span className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full" style={{ background: "radial-gradient(circle, rgb(70 224 160 / 22%), transparent 70%)" }} />
       <div className="flex items-start justify-between gap-2">
-        <div>
-          {dateLine ? <p className="label font-semibold text-on-ink-3">{dateLine}</p> : null}
-          <p className={nameClass}>
+        <div className="min-w-0 flex-1">
+          {dateLine ? <p className="label truncate font-semibold text-on-ink-3">{dateLine}</p> : null}
+          <p className={`${nameClass} truncate`}>
             <PlaceName name={name} nameEn={nameEn} />
           </p>
           {variant === "week" && (staleText || nowText) ? (
@@ -282,7 +282,12 @@ export function WeekList({
           const lowerColor = holiday ? "var(--hol)" : recommended ? "var(--go-text)" : "var(--text-3)";
           return (
             <li key={day.date}>
-              <a href={hrefFor(day.date)} className="row relative grid h-14 grid-cols-[56px_minmax(0,1fr)_72px] items-center gap-3" data-row>
+              <a
+                href={hrefFor(day.date)}
+                className="row relative grid h-14 items-center gap-3"
+                style={{ gridTemplateColumns: locale === "en" ? "56px minmax(0,1fr) 104px" : "56px minmax(0,1fr) 72px" }}
+                data-row
+              >
                 {recommended ? <span className="absolute inset-y-0 -left-2 -right-2 rounded-[12px]" style={{ background: "var(--go-soft)" }} /> : null}
                 <span className="relative caption">
                   <span className="block text-[15px] font-bold">{formatShortWeekday(day.date, mark.weekdays, t("time.today"), today)}</span>
@@ -293,7 +298,7 @@ export function WeekList({
                 <span className="relative">
                   {day.off_reason === "myeongjeol" ? <MiniStrip hours={null} mode={null} hatch /> : <MiniStrip hours={day.hours} mode={day.strip_mode} />}
                 </span>
-                <span data-week-time className={`relative w-[72px] overflow-hidden text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
+                <span data-week-time className={`relative min-w-0 text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
                   {day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : time}
                 </span>
               </a>
@@ -369,8 +374,11 @@ export function DayStrip({
 export function ConditionField({ label, onClick }: { label: string; onClick: () => void }) {
   const t = useTranslations();
   return (
-    <button type="button" data-press className="press fade mt-4 flex w-full items-center justify-between rounded-[12px] bg-bg-soft px-0" onClick={onClick}>
-      <span className="body font-semibold">{label}</span>
+    <button type="button" data-press className="press fade mt-4 flex w-full items-center justify-between gap-3 rounded-[12px] bg-bg-soft px-4" onClick={onClick}>
+      <span className="body flex min-w-0 items-center gap-2 font-semibold">
+        <SlidersHorizontal size={16} aria-hidden />
+        <span data-field-label className="truncate">{label}</span>
+      </span>
       <span className="body font-semibold" style={{ color: "var(--go-text)" }}>
         {t("cond.change")}
       </span>
@@ -380,8 +388,8 @@ export function ConditionField({ label, onClick }: { label: string; onClick: () 
 
 export function AltButton({ href, label }: { href: string; label: string }) {
   return (
-    <a href={href} data-press className="press body mt-2 flex items-center justify-between rounded-[12px] px-0 font-semibold" style={{ background: "var(--go-soft)", color: "var(--go-text)" }}>
-      <span>{label}</span>
+    <a href={href} data-press className="press body mt-2 flex items-center justify-between gap-3 rounded-[12px] px-4 font-semibold" style={{ background: "var(--go-soft)", color: "var(--go-text)" }}>
+      <span data-field-label className="truncate">{label}</span>
       <span aria-hidden>›</span>
     </a>
   );

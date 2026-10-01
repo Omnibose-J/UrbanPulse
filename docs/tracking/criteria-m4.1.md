@@ -12,6 +12,14 @@ Written 2026-10-01 before implementation. Result cells are filled only after run
 | A6 | Map renders | paste the console message that was the cause and the fix; pin bounding box size from the test | 0 | Worker failed to load; after the worker URL fix, visual spec pin box 294x240 |
 | A7 | Admin guarded and reachable | M5 row A7 filled: no token 404, token 200 | 0 | no token 404; token 200. criteria-m5 A7 updated |
 | A8 | No literal copy, no hex, no key | the three `git grep` commands of SOW-M4 rows A5, A6 and SOW-M3 row A10 → no match | 1 | Hangul, hex, dash, and key greps exit 1 (no match). error-fg only in ui.tsx and tokens.css |
+| R1 | Busy list is levels 2 and 3 only | fixture: levels 3, 2, 1, 0 → two rows; all ≤ 1 → empty | 0 | `node --experimental-strip-types --test src/lib/home-rules.test.ts` 2 passed |
+| R2 | Home screenshot waits for content | `npx playwright test e2e/visual.spec.ts` home shots show a row or the empty sentence | 0 | 4 passed. ko-home and en-home show the empty sentence plus quiet cards |
+| R3 | Field and alt button have 16 px inner padding and a sliders icon | DOM: label x ≥ box x + 16 on ③, ⑤, ⑥ | 0 | visual week and day tests, fieldInset passed |
+| R4 | Alt day is the weekday | DOM: ko button matches `^(오늘\|[월화수목금토일])\(\d+/\d+\) ` | 0 | visual day test passed; shot shows 월(10/5) |
+| R5 | English week time does not clip | DOM: `scrollWidth <= clientWidth` on every right-column cell, ko and en; en column 104 px | 0 | visual week test passed; en shot shows 11 AM to 12 PM |
+| R6 | Badge stays one line | DOM: badge height 24 on ③ and ⑤, ko and en | 0 | visual week and day badge height 24 |
+| R7 | Map labels only for the selection at city zoom | DOM at the initial view: exactly one visible label | 0 | visual map test, visible label count 1 |
+| R8 | Day back control has the chevron | DOM: the control contains the chevron icon and is one line | 0 | visual day test passed; shot shows ‹ 이번 주 |
 
 ## Report
 
@@ -31,3 +39,7 @@ Written 2026-10-01 before implementation. Result cells are filled only after run
    - `/admin` was redirected to `/ko/admin` by the locale middleware, so the token check never reached the page. The middleware now leaves `/admin` alone.
 
 6. **Not done** — empty.
+
+## Review round 2
+
+`busy_top` keeps levels 2 and 3 only. The home screenshot waits until a row or the empty sentence is on screen; at 23:00 KST the busy list is the empty sentence and the quiet cards are still there. Condition and alt controls have 16 px padding and a sliders icon. The alt day is the weekday. English week times use a 104 px column and are not clipped. Badges stay 24 px and the place name ellipsizes. Map labels show for the selected pin, and for every pin from zoom 13. The day back control is the chevron plus "이번 주" on one line. `npx playwright test e2e/visual.spec.ts` exit 0, 4 passed.

@@ -4,9 +4,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, Legend, Phone, StateBox } from "@/components/ui";
-import { formatLongDate, formatShortDate, formatStoredWindows } from "@/lib/format";
+import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
+import { kstNow } from "@/lib/kst";
 import { readConditions, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
 import { useLoad } from "@/lib/use-load";
 
@@ -58,6 +59,9 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   const myeongjeol = rec?.off_reason === "myeongjeol";
   const preparing = place?.serve_state === "preparing" || rec?.off_reason === "preparing";
   const ranges = formatStoredWindows(rec?.windows, locale, suffix);
+  const today = kstNow().date;
+  const weekdays = t.raw("time.weekdays") as string[];
+  const altDay = (iso: string) => formatShortWeekday(iso, weekdays, t("time.today"), today);
   const holiday = loaded.data?.holiday;
   const holidayName = holiday ? (locale === "en" ? holiday.name_en || holiday.name : holiday.name) : null;
   const dateLine = holidayName ? `${formatLongDate(date, locale, marks)} · ${holidayName}` : formatLongDate(date, locale, marks);
@@ -96,7 +100,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
       ) : null}
       {place && none && !myeongjeol && !preparing
         ? (loaded.data?.alt_dates ?? []).slice(0, 1).map((alt) => (
-            <AltButton key={alt.date} href={`/${locale}/p/${id}/${alt.date}`} label={t("alt.betterDay", { day: formatShortDate(alt.date), date: formatShortDate(alt.date), time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
+            <AltButton key={alt.date} href={`/${locale}/p/${id}/${alt.date}`} label={t("alt.betterDay", { day: altDay(alt.date), date: formatShortDate(alt.date), time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
           ))
         : null}
       {place && place.tier === "A1" && none && !myeongjeol

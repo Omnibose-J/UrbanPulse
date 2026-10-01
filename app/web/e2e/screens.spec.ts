@@ -258,12 +258,15 @@ test("D1 and live smoke walk the home list when a busy row exists", async ({ pag
     if (response.url().includes("/api/")) statuses.push({ url: response.url(), status: response.status() });
   });
   await page.goto("/ko");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const first = page.locator("ol a").first();
-  await expect(first).toBeVisible();
-  await first.click();
-  await expect(page).toHaveURL(/\/ko\/p\//);
-  await page.locator("[data-answer-card]").click();
-  await expect(page).toHaveURL(/\/ko\/p\/.+\/\d{4}-\d{2}-\d{2}/);
+  await expect(page.locator("[data-busy-empty], [data-busy] [data-row]").first()).toBeVisible();
+  const first = page.locator("[data-busy] [data-row]").first();
+  if (await first.count()) {
+    await first.click();
+    await expect(page).toHaveURL(/\/ko\/p\//);
+    await page.locator("[data-answer-card]").click();
+    await expect(page).toHaveURL(/\/ko\/p\/.+\/\d{4}-\d{2}-\d{2}/);
+  } else {
+    await expect(page.locator("[data-busy-empty]")).toBeVisible();
+  }
   expect(statuses.every((item) => item.status === 200)).toBe(true);
 });

@@ -93,7 +93,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     const onLoad = () => {
       const bounds = boundsRef.current;
       if (bounds && !bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 13, duration: 0 });
+        map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 12, duration: 0 });
       }
     };
     const onError = (event: { error: { message: string } }) => {
@@ -142,6 +142,8 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       button.style.padding = "0";
       button.addEventListener("click", () => setSelected(place.id));
       const label = document.createElement("span");
+      label.dataset.pinLabel = "1";
+      label.dataset.selected = on ? "1" : "0";
       label.textContent = place.name;
       label.lang = "ko";
       label.style.fontSize = "11px";
@@ -150,6 +152,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       label.style.borderRadius = "6px";
       label.style.padding = "2px 6px";
       label.style.whiteSpace = "nowrap";
+      label.style.display = on || map.getZoom() >= 13 ? "block" : "none";
       wrap.append(button, label);
       const marker = new Marker({ element: wrap, anchor: "center" }).setLngLat([place.lon, place.lat]).addTo(map);
       markersRef.current.push(marker);
@@ -158,9 +161,19 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     boundsRef.current = bounds;
     const key = places.map((place) => `${place.id}:${place.lon}:${place.lat}`).join(",");
     if (map.loaded() && key && key !== fitted.current && !bounds.isEmpty()) {
-      map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 13, duration: 0 });
+      map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 12, duration: 0 });
       fitted.current = key;
     }
+    const onZoom = () => {
+      const showAll = map.getZoom() >= 13;
+      map.getContainer().querySelectorAll<HTMLElement>("[data-pin-label]").forEach((node) => {
+        node.style.display = showAll || node.dataset.selected === "1" ? "block" : "none";
+      });
+    };
+    map.on("zoom", onZoom);
+    return () => {
+      map.off("zoom", onZoom);
+    };
   }, [places, clock, selected, mounted, styleFailed]);
 
   const current = places.find((place) => place.id === selected) ?? places[0];

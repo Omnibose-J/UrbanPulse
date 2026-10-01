@@ -43,14 +43,20 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
         </a>
       </div>
       <div className="mt-6 flex flex-col gap-6">
-      <section>
+      <section data-busy>
         <h2 className="section mb-2">
           {t("home.busyTop")}
           {loaded.data?.stale ? <span className="caption ml-2" style={{ color: "var(--stale-fg)" }}>{t("now.asOf", { time: "" })}</span> : null}
         </h2>
         {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
-        {loaded.loading ? <StateBox kind="skeleton" /> : null}
-        {loaded.data && loaded.data.busy_top.length === 0 ? <p className="body">{t("home.busyTopEmpty")}</p> : null}
+        {!loaded.data && !loaded.error ? (
+          <div data-state="skeleton" className="flex flex-col gap-2">
+            {[0, 1, 2].map((key) => (
+              <div key={key} className="row rounded-[12px] bg-bg-soft" />
+            ))}
+          </div>
+        ) : null}
+        {loaded.data && loaded.data.busy_top.length === 0 ? <p data-busy-empty className="body">{t("home.busyTopEmpty")}</p> : null}
         <ol>
           {(loaded.data?.busy_top ?? []).map((row, index) => {
             const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
@@ -77,9 +83,16 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
           })}
         </ol>
       </section>
-      <section>
+      <section data-quiet-section>
         <h2 className="section mb-2">{t("home.openQuiet")}</h2>
-        {(loaded.data?.open_quiet.length ?? 0) === 0 && loaded.data ? <p className="body">{t("home.openQuietEmpty")}</p> : null}
+        {!loaded.data && !loaded.error ? (
+          <div data-state="skeleton" className="flex gap-3">
+            {[0, 1].map((key) => (
+              <div key={key} className="h-32 w-[232px] shrink-0 rounded-[16px] bg-bg-soft" />
+            ))}
+          </div>
+        ) : null}
+        {(loaded.data?.open_quiet.length ?? 0) === 0 && loaded.data ? <p data-quiet-empty className="body">{t("home.openQuietEmpty")}</p> : null}
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-3">
           {(loaded.data?.open_quiet ?? []).map((row) => {
             const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
