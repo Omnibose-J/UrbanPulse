@@ -5,12 +5,10 @@ Uses the same upsert statements as collect. A second run of the same files chang
 
 from __future__ import annotations
 
-import gzip
-import json
 from datetime import datetime
 
-from engine import settings
-from engine.jobs.collect import _ledger, _raw_dir, _relative, store_observations
+from engine import raw_store, settings
+from engine.jobs.collect import _ledger, _raw_dir, store_observations
 from engine.log import log
 from engine.parsers import KST, parse_citydata
 
@@ -27,37 +25,31 @@ def run(date: str | None = None) -> int:
     settings.load_env()
     env = settings.require(("DATABASE_URL",))
     day = _day(date)
-    root = _raw_dir(env, None) / f"{day:%Y}" / f"{day:%m}" / f"{day:%d}"
-    if not root.is_dir():
-        log(JOB, "fail", reason="no raw folder", raw_dir=_relative(root))
+    location = _raw_dir(env, None)
+    snapshots = raw_store.read_day(location, day)
+    if not snapshots:
+        log(JOB, "fail", reason="no raw folder", raw_dir=f"{day.isoformat()}")
         return 1
-    folders = sorted(path for path in root.iterdir() if path.is_dir())
     live = []
     commerce = []
     forecasts = []
-    files = 0
     unknowns: list[tuple[str, ...]] = []
-    for folder in folders:
-        for path in sorted(folder.glob("*.json.gz")):
-            place_id = path.name.removesuffix(".json.gz")
-            body = json.loads(gzip.decompress(path.read_bytes()))
-            snapshot = parse_citydata(place_id, body)
-            files += 1
-            if snapshot.live is None:
-                continue
-            live.append(snapshot.live)
-            if snapshot.commerce is not None:
-                commerce.append(snapshot.commerce)
-            forecasts.extend(snapshot.forecasts)
-            if snapshot.unknown_categories:
-                unknowns.append(snapshot.unknown_categories)
-    log(JOB, "start", date=day.isoformat(), folders=len(folders), files=files)
+    for place_id, body in snapshots:
+        snapshot = parse_citydata(place_id, body)
+        if snapshot.live is None:
+            continue
+        live.append(snapshot.live)
+        if snapshot.commerce is not None:
+            commerce.append(snapshot.commerce)
+        forecasts.extend(snapshot.forecasts)
+        if snapshot.unknown_categories:
+            unknowns.append(snapshot.unknown_categories)
+    log(JOB, "start", date=day.isoformat(), files=len(snapshots))
     try:
         with _ledger(env["DATABASE_URL"], JOB) as ctx:
             affected = store_observations(env["DATABASE_URL"], live, commerce, forecasts)
             ctx["detail"] = {
-                "folders": len(folders),
-                "files": files,
+                "files": len(snapshots),
                 "live": len(live),
                 "commerce": len(commerce),
                 "unknown_categories": sorted(

@@ -135,10 +135,12 @@ def _ledger(database_url: str, job: str) -> Iterator[dict[str, Any]]:
         conn.close()
 
 
-def _raw_dir(env: Mapping[str, str], raw_dir: Path | None) -> Path:
+def _raw_dir(env: Mapping[str, str], raw_dir: str | Path | None) -> str | Path:
     if raw_dir is not None:
         return raw_dir
     configured = env.get("RAW_DIR") or os.environ.get("RAW_DIR") or "data/raw"
+    if str(configured).startswith("gs://"):
+        return str(configured)
     path = Path(configured)
     if not path.is_absolute():
         path = settings.REPO_ROOT / path
@@ -164,7 +166,7 @@ def _one(
     client: httpx.Client,
     key: str,
     run_ts: datetime,
-    raw_dir: Path,
+    raw_dir: str | Path,
 ) -> dict[str, Any]:
     place_id = place["id"]
     try:
@@ -241,7 +243,7 @@ def run(
     env: Mapping[str, str] | None = None,
     client: httpx.Client | None = None,
     places: list[dict[str, str]] | None = None,
-    raw_dir: Path | None = None,
+    raw_dir: str | Path | None = None,
     ledger: Ledger | None = None,
     store: Store | None = None,
     now: datetime | None = None,
@@ -273,8 +275,10 @@ def run(
     else:
         codes = [place["id"] for place in places]
     log(JOB, "start", called=len(places))
-    folder = raw_store.folder_for(run_ts, raw_dir)
-    raw_rel = _relative(folder)
+    if raw_store.is_gcs(raw_dir):
+        raw_rel = raw_store.relative_folder(run_ts)
+    else:
+        raw_rel = _relative(raw_store.folder_for(run_ts, raw_dir))
     try:
         from concurrent.futures import ThreadPoolExecutor
 
