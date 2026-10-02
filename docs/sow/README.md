@@ -24,9 +24,10 @@ Build of UrbanPulse v1 (mobile web + PC map dashboard, ko/en, visitors only). Ar
 | [SOW-MB](SOW-MB.md) | W9 (cut down) | tier B station places, usual-flow profile, B recommendations; experimental, search and map toggle only. Holiday adjustment and `ratio_v1b` deferred | M3, M4 |
 | [SOW-M6](SOW-M6.md) | W6 fix | level thresholds by the error-minimising boundary (E17) · one combination off · `reason.closed` copy | MB |
 | [SOW-M7](SOW-M7.md) | W3, W7 fixes | collect works with station places present · missed snapshots ingested · tasks wake the machine · forecast under 5 minutes · station places only with a profile | MB, M6 |
+| [SOW-M8](SOW-M8.md) | W10, W11 fixes | `windows_only` states no unverified verdict · today's station rows refreshed by collect · search, card, week-row, pin-size defects | M7 |
 | SOW-MC (outline) | W0 cloud half | GCP project, Artifact Registry image push, Cloud Run Jobs + Scheduler, GCS buckets (raw and archive move from `data/`), hosted Supabase (`db push`), Vercel deploy, map provider decision | everything above working locally; accounts and billing (user) |
 
-Run order: **M2 → M3 → M4 → M5 → M4.1 → MB → M6 → M7**. SOW-MC is an outline and needs the user's cloud accounts; do not start it.
+Run order: **M2 → M3 → M4 → M5 → M4.1 → MB → M6 → M7 → M8**. SOW-MC is an outline and needs the user's cloud accounts; do not start it.
 
 ## Unattended run
 
