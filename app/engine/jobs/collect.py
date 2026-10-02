@@ -152,11 +152,11 @@ def _relative(path: Path) -> str:
         return path.as_posix()
 
 
-def _load_places(database_url: str) -> list[dict[str, str]]:
+def _load_places(database_url: str) -> list[dict[str, str | None]]:
     with _connect(database_url) as conn:
         with conn.cursor() as cur:
-            cur.execute("select id, serve_state from places order by id")
-            return [{"id": row[0], "serve_state": row[1]} for row in cur.fetchall()]
+            cur.execute("select id, serve_state, poi_code from places order by id")
+            return [{"id": row[0], "serve_state": row[1], "poi_code": row[2]} for row in cur.fetchall()]
 
 
 def _one(
@@ -294,7 +294,8 @@ def run(
         with ledger(env["DATABASE_URL"], JOB) as ctx:
             if from_file:
                 db_rows = _load_places(env["DATABASE_URL"])
-                db_ids = {row["id"] for row in db_rows}
+                coded = [row for row in db_rows if row.get("poi_code") is not None]
+                db_ids = {row["id"] for row in coded}
                 file_ids = set(codes)
                 only_file = sorted(file_ids - db_ids)
                 only_db = sorted(db_ids - file_ids)
@@ -307,7 +308,7 @@ def run(
                     }
                     exit_code = 1
                 else:
-                    serve = {row["id"]: row["serve_state"] for row in db_rows}
+                    serve = {row["id"]: row["serve_state"] for row in coded}
                     for result in results:
                         result["serve_state"] = serve[result["id"]]
             if exit_code == 0:

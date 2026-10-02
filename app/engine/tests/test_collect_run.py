@@ -117,6 +117,46 @@ def test_five_failures_warn_and_exit_0(tmp_path, capsys):
     assert SENTINEL not in blob
 
 
+def test_a_station_without_a_code_still_ends_ok(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "load_place_codes", lambda path=None: ["POI001", "POI002", "POI003"])
+
+    def places(_url: str):
+        rows = [
+            {"id": f"POI{number:03d}", "serve_state": "on", "poi_code": f"POI{number:03d}"}
+            for number in range(1, 4)
+        ]
+        rows.append({"id": "STN001", "serve_state": "experimental", "poi_code": None})
+        return rows
+
+    monkeypatch.setattr(collect, "_load_places", places)
+
+    class _Conn:
+        def commit(self) -> None:
+            return None
+
+    @contextmanager
+    def connected(_url: str):
+        yield _Conn()
+
+    monkeypatch.setattr(collect, "_connect", connected)
+    import engine.jobs.forecast as forecast
+
+    monkeypatch.setattr(forecast, "apply_overlay", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(forecast, "refresh_recommendations", lambda *_args, **_kwargs: None)
+    runs = _Runs()
+    code = collect.run(
+        env=ENV,
+        client=_client(0),
+        raw_dir=tmp_path,
+        ledger=runs.job_run,
+        store=lambda live, commerce, forecasts: None,
+        now=datetime(2026, 10, 1, 9, 20, tzinfo=KST),
+    )
+    assert code == 0
+    assert runs.rows[-1]["status"] == "ok"
+    assert "only_in_db" not in runs.rows[-1]["detail"]
+
+
 def test_database_down_writes_raw_and_exits_1(tmp_path, monkeypatch, capsys):
     import psycopg
 
