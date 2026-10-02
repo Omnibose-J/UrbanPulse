@@ -41,7 +41,7 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 | G1 | Engine suite | pytest exit 0, 0 skipped; ruff exit 0; no tautology asserts | | |
 | G2 | Web suite twice | lint, test, build, playwright twice, same result | | |
 | G3 | Live system | collect ok ≥ 100; forecast under 300 s; integrity exit 0 | | |
-| G4 | Values unchanged | before dump equals after, floats within 1e-6 | | |
+| G4 | Values unchanged | before dump equals after, floats within 1e-6 | 1 | FAIL row counts match; forecast source 363 pop 464 level 349 a_* ~243 a_actual 246 from collects during the part; recommendations windows 895 hours 1081 no_window 39 alt_places 92 from the A11 refresh |
 | G5 | Image | docker build exit 0; container prints 111 | | |
 | G6 | Clean tree, no key | git status empty; key grep no match | | |
 
