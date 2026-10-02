@@ -14,7 +14,7 @@ import {
   WeekList,
 } from "@/components/ui";
 import { formatClock, formatShortWeekday, formatStoredWindows } from "@/lib/format";
-import { kstNow } from "@/lib/kst";
+import { kstNow, stillAhead } from "@/lib/kst";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
 import { readConditions, readFavorites, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
@@ -56,7 +56,11 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
   const purpose = cond.purpose;
   const loaded = useLoad<Body>(ready ? `/api/places/${id}/week?tolerance=${cond.tolerance}&purpose=${purpose}` : null);
   const place = loaded.data?.place;
-  const days = loaded.data?.days ?? [];
+  const clock = kstNow();
+  // A window of today that has already ended is not a recommendation any more.
+  const days = (loaded.data?.days ?? []).map((day) =>
+    day.date === clock.date && day.windows ? { ...day, windows: stillAhead(day.windows, true, clock.hour) } : day,
+  );
   // Three different "nothing to show" states, each said as what it is.
   const placePreparing = place?.serve_state === "preparing";
   const allOff = days.every((day) => day.state === "off");
@@ -68,7 +72,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
   const best = ranked[0];
   const suffix = t("time.hour");
   const weekdays = t.raw("time.weekdays") as string[];
-  const today = kstNow().date;
+  const today = clock.date;
   const now = loaded.data?.now;
   const nowText = place?.tier === "B"
     ? t("state.tierb")

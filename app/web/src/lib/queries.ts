@@ -1,7 +1,7 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { addDays, dayBounds, hourBounds, kstHour, kstNow } from "@/lib/kst";
+import { addDays, dayBounds, hourBounds, kstHour, kstNow, stillAhead } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
 import { driverMessage } from "@/lib/api-log";
 import { likePattern, namedAltPlaces, nowFromLive, quietSelection, requireForeignHeavy, selectAll } from "@/lib/shape";
@@ -297,7 +297,7 @@ export async function homePayload(tolerance: string, purpose: string) {
   );
   const quiet = await quietPlaces(date, hour, liveNow);
   const windowIds = [...busy.map((row) => row.id), ...quiet.map((row) => row.id)];
-  const windows = await todayWindows(date, tolerance, purpose, windowIds);
+  const windows = await todayWindows(date, hour, tolerance, purpose, windowIds);
   return {
     as_of: asOf,
     stale,
@@ -388,7 +388,7 @@ async function latestMeasured(date: string, clockHour: number, placeId?: string)
   return [...seen.values()];
 }
 
-async function todayWindows(date: string, tolerance: string, purpose: string, ids: string[]) {
+async function todayWindows(date: string, clockHour: number, tolerance: string, purpose: string, ids: string[]) {
   const out = new Map<string, { window: unknown; hours: unknown; strip_mode: string | null }>();
   if (!ids.length) return out;
   const rows = await must(
@@ -406,7 +406,7 @@ async function todayWindows(date: string, tolerance: string, purpose: string, id
     if (row.purpose !== wanted) continue;
     if (out.has(row.place_id)) continue;
     out.set(row.place_id, {
-      window: row.windows?.[0] ?? null,
+      window: stillAhead(row.windows, true, clockHour)[0] ?? null,
       hours: row.hours,
       strip_mode: row.strip_mode,
     });

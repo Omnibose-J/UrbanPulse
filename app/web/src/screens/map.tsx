@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppBar, ConditionSheet, HourSentence, PlaceName, StateBox } from "@/components/ui";
 import { useLoad } from "@/lib/use-load";
 import { formatShortDate, formatShortWeekday, formatStoredWindows, kstParts } from "@/lib/format";
-import { addDays, initialHour, kstNow } from "@/lib/kst";
+import { addDays, initialHour, kstNow, stillAhead } from "@/lib/kst";
 import { cellTone, toneColor, type HourCell } from "@/lib/strip";
 import { readConditions, readStations, writeConditions, writeStations, type Purpose, type Tolerance } from "@/lib/storage";
 
@@ -207,7 +207,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const clockCell = current ? current.hours.find((cell) => cell.h === clock) : undefined;
   const dateLabel = day === today ? t("time.today") : formatShortDate(day);
   const pickLine = (place: Drawn) => {
-    const first = formatStoredWindows(place.windows, locale, suffix)[0];
+    const first = formatStoredWindows(stillAhead(place.windows, day === today, kstNow().hour), locale, suffix)[0];
     if (first) return t("map.dayPick", { date: dateLabel, time: first });
     return day === today ? t("home.noPickToday") : `${dateLabel} ${t("week.none")}`;
   };

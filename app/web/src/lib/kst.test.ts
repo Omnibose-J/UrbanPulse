@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { hourBounds, inServedRange, initialHour, kstNow } from "./kst.ts";
+import { hourBounds, inServedRange, initialHour, kstNow, stillAhead } from "./kst.ts";
 
 test("the map hour is an integer from 9 to 23, else the clamped clock hour", () => {
   assert.equal(initialHour("18", 3), 18);
@@ -30,4 +30,13 @@ test("the clock is read in Seoul whatever the machine zone", () => {
 
 test("hour bounds cross midnight at 23", () => {
   assert.deepEqual(hourBounds("2026-10-02", 23), ["2026-10-02T23:00:00+09:00", "2026-10-03T00:00:00+09:00"]);
+});
+
+test("a window of today that has ended is dropped; other dates and null are left as they are", () => {
+  const windows = [{ hours: [18] }, { hours: [19, 20] }, { hours: [11] }];
+  assert.deepEqual(stillAhead(windows, true, 19), [{ hours: [19, 20] }]);
+  assert.deepEqual(stillAhead(windows, true, 20), [{ hours: [19, 20] }]);
+  assert.deepEqual(stillAhead(windows, true, 21), []);
+  assert.deepEqual(stillAhead(windows, false, 21), windows);
+  assert.deepEqual(stillAhead(null, true, 9), []);
 });

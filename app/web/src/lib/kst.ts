@@ -17,6 +17,16 @@ export function kstNow(now = new Date()): { date: string; hour: number } {
   return { date: `${get("year")}-${get("month")}-${get("day")}`, hour };
 }
 
+/**
+ * Today's rows are rebuilt every 30 minutes, so just after the hour turns a stored window can be over.
+ * A window that has ended is not shown as a recommendation.
+ */
+export function stillAhead<T extends { hours: number[] }>(windows: T[] | null, isToday: boolean, clockHour: number): T[] {
+  if (windows === null) return [];
+  if (!isToday) return windows;
+  return windows.filter((window) => window.hours[window.hours.length - 1] >= clockHour);
+}
+
 export function addDays(iso: string, days: number): string {
   const [year, month, day] = iso.split("-").map(Number);
   const utc = new Date(Date.UTC(year, month - 1, day + days));

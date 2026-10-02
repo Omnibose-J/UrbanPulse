@@ -7,7 +7,7 @@ import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip
 import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
-import { kstNow } from "@/lib/kst";
+import { kstNow, stillAhead } from "@/lib/kst";
 import { readConditions, readFavorites, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
 import { useLoad } from "@/lib/use-load";
 
@@ -52,17 +52,20 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   }, [id]);
   const loaded = useLoad<Rec>(ready ? `/api/places/${id}/recommend?date=${date}&tolerance=${cond.tolerance}&purpose=${cond.purpose}` : null);
   const place = loaded.data?.place;
-  const rec = loaded.data?.recommendation;
+  const clock = kstNow();
+  const stored = loaded.data?.recommendation;
+  // A window of today that has already ended is not a recommendation any more.
+  const rec = stored && stored.windows ? { ...stored, windows: stillAhead(stored.windows, date === clock.date, clock.hour) } : stored;
   const suffix = t("time.hour");
   const marks = { month: t("time.month"), day: t("time.day"), weekdays: t.raw("time.weekdays") as string[] };
   const back = fromMap ? `/${locale}/map?date=${date}&hour=${hour ?? "9"}` : `/${locale}/p/${id}`;
   const comboOff = rec?.state === "off" && (rec.off_reason === "failed" || rec.off_reason === "unverified");
-  const none = Boolean(rec?.no_window) && rec?.state !== "off";
+  const none = rec?.state !== "off" && Boolean(rec) && (rec?.windows ?? []).length === 0;
   const myeongjeol = rec?.off_reason === "myeongjeol";
   // No row at all for an in-range date is missing data, the same state as a row that says so.
   const preparing = place?.serve_state === "preparing" || rec?.off_reason === "preparing" || (Boolean(loaded.data) && !rec);
   const ranges = formatStoredWindows(rec?.windows, locale, suffix);
-  const today = kstNow().date;
+  const today = clock.date;
   const weekdays = t.raw("time.weekdays") as string[];
   const altDay = (iso: string) => formatShortWeekday(iso, weekdays, t("time.today"), today);
   const holiday = loaded.data?.holiday;
