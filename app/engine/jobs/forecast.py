@@ -62,6 +62,40 @@ def _today(now: datetime):
     return now.astimezone(KST).date()
 
 
+def issued_midnight(today):
+    """Start of the issued day. Later clock time must not move this."""
+    return datetime.combine(today, datetime.min.time()).replace(tzinfo=KST)
+
+
+def drop_past_forecasts(conn, today) -> None:
+    """Drop hours before the issued day, not before whatever day the clock shows now."""
+    with conn.cursor() as cur:
+        cur.execute("delete from forecast_hourly where target_ts < %s", (issued_midnight(today),))
+
+
+def drop_unprofiled_tier_b(conn) -> None:
+    """A tier B place with no profile keeps no forecast and no recommendation."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            delete from forecast_hourly f
+            using places p
+            where f.place_id = p.id
+              and p.tier = 'B'
+              and not exists (select 1 from tier_b_profile t where t.place_id = p.id)
+            """
+        )
+        cur.execute(
+            """
+            delete from recommendations r
+            using places p
+            where r.place_id = p.id
+              and p.tier = 'B'
+              and not exists (select 1 from tier_b_profile t where t.place_id = p.id)
+            """
+        )
+
+
 def apply_overlay(conn, now: datetime) -> None:
     """Hours with a live observation become `live`; later hours covered by city_fcst become `seoul`."""
     with conn.cursor() as cur:
@@ -261,13 +295,8 @@ def _build(conn, started: datetime, today) -> dict:
     _write_profiles(conn, today)
     _write_forecasts(conn, started, today, model, set(passing), version, ready_ids)
     _write_tier_b_forecasts(conn, started, today)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            delete from forecast_hourly
-            where target_ts < (date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')
-            """
-        )
+    drop_unprofiled_tier_b(conn)
+    drop_past_forecasts(conn, today)
     similar = replace_similar(conn, today)
     reco = refresh_recommendations(conn, started, today)
     conn.commit()
@@ -462,10 +491,6 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
         )
         apply_overlay(conn, started)
     conn.commit()
-
-
-def _threshold_ready_flag(place_id, ready_ids: set) -> bool:
-    return place_id in ready_ids
 
 
 _P90_KEY = {"sight": 0, "food": 1, "shop": 2}
