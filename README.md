@@ -66,15 +66,21 @@ npm run dev                 # http://localhost:3000
 
 ### 데이터
 
-저장소에는 데이터가 없음. 새로 받은 직후의 DB는 비어 있어서 화면에 보여 줄 내용이 없음.
-
-- 과거 데이터(연구용 6GB, `analysis/data/`)와 수집 원본(`data/`)은 용량 때문에 올리지 않았음
-- 제대로 보려면 기존 DB를 복사해 와야 함. 필요하면 저장소 관리자에게 요청
-- 복사한 뒤에는 아래 작업만 돌리면 최신 상태가 됨
+저장소에는 데이터가 없고, API 키만으로는 채울 수 없음. 장소 목록과 8~9월 과거 데이터가 있어야 예측이 나오는데 이 원본(6GB)은 올리지 않았음. 대신 DB를 파일 하나(약 6MB)로 주고받음.
 
 ```powershell
-python -m engine collect     # 지금 데이터 수집 (30분마다 돌리는 작업)
-python -m engine forecast    # 예측과 추천 다시 계산 (하루 한 번)
+# 주는 사람: data\urbanpulse-db.dump 가 생김. 깃 말고 메신저나 드라이브로 전달
+powershell -File scripts\db_export.ps1
+
+# 받는 사람: supabase start 를 한 뒤, 받은 파일을 넣음
+powershell -File scripts\db_import.ps1 -File <받은 파일 경로>
+
+# 그다음 최신 상태로 맞춤
+python -m engine collect     # 지금 데이터 수집
+python -m engine forecast    # 예측과 추천 다시 계산
 ```
+
+- `db_import`는 빈 DB에만 넣음. 이미 데이터가 있으면 아무것도 하지 않고 멈춤
+- 30분 수집은 한 PC에서만 돌리는 것을 권장 (API 호출 한도를 같이 씀). 나머지는 필요할 때 파일을 다시 받으면 됨
 
 Windows 작업 스케줄러에 등록하려면 `scripts/register_collect_task.ps1`, `register_forecast_task.ps1`, `register_evaluate_task.ps1`.
