@@ -119,3 +119,21 @@ test.describe("desktop", () => {
     expect(seen.errors).toEqual([]);
   });
 });
+
+test("the legend, the card and the map credit do not cover each other on a phone", async ({ page }) => {
+  await page.goto("/ko/map");
+  await expect(page.locator("[data-pin]").first()).toBeVisible({ timeout: 20000 });
+  const credit = page.locator(".maplibregl-ctrl-attrib");
+  await expect(credit).toBeVisible();
+  type Box = { x: number; y: number; width: number; height: number };
+  const boxes: Box[] = [];
+  for (const locator of [page.locator("[data-legend-box]"), page.locator("[data-map-card]"), credit]) {
+    const box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+    boxes.push(box!);
+  }
+  const overlap = (a: Box, b: Box) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  expect(overlap(boxes[0], boxes[2]), "legend over credit").toBe(false);
+  expect(overlap(boxes[1], boxes[2]), "card over credit").toBe(false);
+});

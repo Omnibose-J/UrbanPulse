@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AppBar, LevelDot, Phone, PlaceName, StateBox } from "@/components/ui";
@@ -41,7 +42,7 @@ export function SearchScreen() {
       <ul>
         {(loaded.data?.places ?? []).map((place) => (
           <li key={place.id}>
-            <a href={`/${locale}/p/${place.id}`} data-row className="row flex items-center justify-between">
+            <Link prefetch={false} href={`/${locale}/p/${place.id}`} data-row className="row flex items-center justify-between">
               <span>
                 <span className="body block font-semibold"><PlaceName name={place.name} nameEn={place.name_en} /></span>
                 <span className="caption text-text-3" lang="ko">{place.gu}</span>
@@ -52,7 +53,7 @@ export function SearchScreen() {
                   {t(`level.l${place.level}`)}
                 </span>
               )}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>

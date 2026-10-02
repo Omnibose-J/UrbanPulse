@@ -18,6 +18,14 @@ def test_alt_dates_keep_only_better_dates_and_at_most_two():
     assert [item["date"] for item in rows[0]["alt_dates"]] == ["2026-10-02", "2026-10-03"]
 
 
+def test_equal_scores_pick_the_earlier_dates_whatever_order_the_pool_arrives_in():
+    origin = _row("POI001", date(2026, 10, 1), 0.4, crowd=2)
+    ties = [_row("POI001", date(2026, 10, day), 0.9, crowd=1) for day in (8, 6, 7)]
+    for pool in ([origin, *ties], [*reversed(ties), origin]):
+        fill_alternatives([origin], pool, {}, {})
+        assert [item["date"] for item in origin["alt_dates"]] == ["2026-10-06", "2026-10-07"]
+
+
 def test_no_window_lists_any_date_that_has_one():
     origin = date(2026, 10, 1)
     empty = _row("POI001", origin, None, crowd=None)

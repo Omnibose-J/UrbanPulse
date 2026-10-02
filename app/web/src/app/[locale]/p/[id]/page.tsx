@@ -9,5 +9,5 @@ export default async function Page({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  return <WeekScreen id={id} notice={query.notice} />;
+  return <WeekScreen key={id} id={id} notice={query.notice} />;
 }

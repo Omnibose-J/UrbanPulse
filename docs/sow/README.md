@@ -26,9 +26,10 @@ Build of UrbanPulse v1 (mobile web + PC map dashboard, ko/en, visitors only). Ar
 | [SOW-M7](SOW-M7.md) | W3, W7 fixes | collect works with station places present · missed snapshots ingested · tasks wake the machine · forecast under 5 minutes · station places only with a profile | MB, M6 |
 | [SOW-M8](SOW-M8.md) | W10, W11 fixes | `windows_only` states no unverified verdict · today's station rows refreshed by collect · search, card, week-row, pin-size defects | M7 |
 | [SOW-H1](SOW-H1.md) | hardening | fixes from the full review (model missing from the image, stuck `running` rows, unverified verdict on recommended hours, capped reads, unsafe defaults) · tests that execute the job code · `integrity` sweep · permanent journey, map, API and state e2e specs | M8 |
+| [SOW-L1](SOW-L1.md) | local completion | every SOW-MC script written and plan-checked · dress rehearsal against local stand-ins (`scripts/cloud/rehearse.ps1`) · admin token out of the address · static map worker · client-side links · production-build e2e · runbook | H1 |
 | [SOW-MC](SOW-MC.md) | W0 cloud half | hosted Supabase (schema + one-time data copy) · GCS raw bucket (write-once) · Cloud Run Jobs + Scheduler for collect, forecast, evaluate, sync_holidays · Vercel deploy · cutover from the laptop · runbook | M8; user inputs U1-U4 (GCP billing, Supabase project, `.env.cloud`, Vercel login) |
 
-Run order: **M2 → M3 → M4 → M5 → M4.1 → MB → M6 → M7 → M8 → H1 → MC**. SOW-MC needs the user's accounts (its inputs U1-U4); without them only its steps 1-2 can be done.
+Run order: **M2 → M3 → M4 → M5 → M4.1 → MB → M6 → M7 → M8 → H1 → L1 → MC**. SOW-MC needs the user's accounts (its inputs U1-U4); without them only its steps 1-2 can be done.
 
 ## Unattended run
 

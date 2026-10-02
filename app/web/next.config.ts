@@ -10,6 +10,10 @@ if (fs.existsSync(envFile)) {
 }
 
 const nextConfig: NextConfig = {
+  // The service is not announced yet: no route may be indexed. Remove at launch (SOW-MC step 9).
+  async headers() {
+    return [{ source: "/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex" }] }];
+  },
   turbopack: {
     resolveAlias: {
       "next-intl/config": "./src/i18n/request.ts",

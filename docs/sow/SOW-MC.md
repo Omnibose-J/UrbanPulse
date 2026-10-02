@@ -11,6 +11,26 @@ Everything runs on one laptop today, and it stops whenever the laptop sleeps (14
 
 Not in this SOW: custom domain, CI, Google Maps (the map stays MapLibre + OpenFreeMap; the billing finding in `findings.md` is closed as "not needed"), `archive` to GCS (waits for the retention decision), running `tier_b` / `load_places` / `backfill` / training in the cloud (they need `geopandas` and `analysis/data`; they run on the laptop against the hosted database when needed).
 
+## Amendments from SOW-L1 (2026-10-02; these win over the text below)
+
+SOW-L1 wrote and rehearsed everything here that needs no account. What changed against the original text:
+
+- Steps 1–2 and every script of steps 3–10 exist. `scripts/cloud/rehearse.ps1` proves the database, engine and
+  raw-object parts against local stand-ins; the `gcloud` and `vercel` calls are plan-checked only. Follow
+  `docs/RUNBOOK.md` for the order.
+- Database work is `scripts/cloud/dbtool.py` (psycopg `COPY`, one transaction), not `pg_dump`: no client-version
+  matching, no URL on a command line. `supabase db push --db-url` is the one place a URL is a child-process
+  argument (the CLI has no other input for it); it is never echoed.
+- U2 is checked against `SUPABASE_PROJECT_REF`, not "any project in Seoul".
+- Forecast runs at 05:10, not 05:00 (SOW-H1 A14: keep it off the `collect` slot).
+- The map worker is a static file (`public/vendor/maplibre/`, copied at build), not a route handler reading
+  `node_modules`; the admin page takes its token in a form (`/admin`) and answers with a session cookie.
+  `90_verify` therefore checks: `/admin/eval` 404 without a session, 200 with one. It never sends the token in an
+  address (that would write it to the deployment's access log).
+- A13 across two databases compares every column except `alt_dates`: a later date's alternatives may point at
+  today, and two collectors hold different rows for today. The rehearsal compares all columns on the same data.
+- `package.json` pins Node 24.x: `npm test` (run by `prebuild`) needs Node's TypeScript stripping.
+
 ## Inputs from the user (the implementer cannot do these; stop and list what is missing)
 
 | # | Input | How the implementer checks it |

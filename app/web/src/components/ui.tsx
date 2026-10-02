@@ -2,6 +2,7 @@
 
 import { ChevronLeft, Clock, Map, SlidersHorizontal, Star, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -51,10 +52,10 @@ export function AppBar({
       <div className="flex items-center gap-1">
         {backHref ? (
           <>
-            <a href={backHref} className={`-ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold ${backLabel ? "h-11 pr-2" : "icon-hit"}`}>
+            <Link prefetch={false} href={backHref} className={`-ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold ${backLabel ? "h-11 pr-2" : "icon-hit"}`}>
               <ChevronLeft aria-hidden />
               {backLabel ? <span className="whitespace-nowrap">{backLabel}</span> : null}
-            </a>
+            </Link>
             {title ? <span className="text-[17px] font-extrabold tracking-tight">{title}</span> : null}
           </>
         ) : (
@@ -71,9 +72,9 @@ export function AppBar({
       {children ? <div className="min-w-0 flex-1">{children}</div> : null}
       <div className={`${children ? "ml-auto" : ""} flex items-center`}>
         {mapHref ? (
-          <a href={mapHref} className="icon-hit flex items-center justify-center" aria-label={t("map.title")}>
+          <Link prefetch={false} href={mapHref} className="icon-hit flex items-center justify-center" aria-label={t("map.title")}>
             <Map />
-          </a>
+          </Link>
         ) : null}
         {onCond ? (
           <button type="button" data-cond-button className="icon-hit flex items-center justify-center" onClick={onCond} aria-label={t("sheet.title")}>
@@ -103,9 +104,9 @@ export function StateBox({ kind, onRetry, text }: { kind: "preparing" | "error" 
     return (
       <div data-state="missing" className="rounded-[var(--r)] bg-bg-soft p-4">
         <p className="body">{t("state.notFoundPlace")}</p>
-        <a href={`/${locale}`} className="press body mt-2 flex items-center font-semibold" style={{ color: "var(--go-text)" }}>
+        <Link prefetch={false} href={`/${locale}`} className="press body mt-2 flex items-center font-semibold" style={{ color: "var(--go-text)" }}>
           {t("nav.home")}
-        </a>
+        </Link>
       </div>
     );
   }
@@ -244,9 +245,9 @@ export function AnswerCard({
   );
   if (href) {
     return (
-      <a href={href} className="block">
+      <Link prefetch={false} href={href} className="block">
         {body}
-      </a>
+      </Link>
     );
   }
   return body;
@@ -311,7 +312,7 @@ export function WeekList({
           const lowerColor = holiday ? "var(--hol)" : recommended ? "var(--go-text)" : "var(--text-3)";
           return (
             <li key={day.date}>
-              <a
+              <Link prefetch={false}
                 href={hrefFor(day.date)}
                 className="row relative grid h-14 items-center gap-3"
                 style={{ gridTemplateColumns: locale === "en" ? "56px minmax(0,1fr) 104px" : "56px minmax(0,1fr) 72px" }}
@@ -334,7 +335,7 @@ export function WeekList({
                 <span data-week-time className={`relative min-w-0 text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
                   {time}
                 </span>
-              </a>
+              </Link>
             </li>
           );
         })}
@@ -461,10 +462,10 @@ export function ConditionField({ label, onClick }: { label: string; onClick: () 
 
 export function AltButton({ href, label }: { href: string; label: string }) {
   return (
-    <a href={href} data-press className="press body mt-2 flex items-center justify-between gap-3 rounded-[12px] px-4 font-semibold" style={{ background: "var(--go-soft)", color: "var(--go-text)" }}>
+    <Link prefetch={false} href={href} data-press className="press body mt-2 flex items-center justify-between gap-3 rounded-[12px] px-4 font-semibold" style={{ background: "var(--go-soft)", color: "var(--go-text)" }}>
       <span data-field-label className="truncate">{label}</span>
       <span aria-hidden>›</span>
-    </a>
+    </Link>
   );
 }
 

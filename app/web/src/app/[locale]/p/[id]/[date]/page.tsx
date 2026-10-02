@@ -17,5 +17,6 @@ export default async function Page({
   const valid = readDate(date);
   if (valid && valid < today) redirect(`/${locale}/p/${id}?notice=past`);
   if (!valid || !inServedRange(valid, today)) redirect(`/${locale}/p/${id}?notice=range`);
-  return <DayScreen id={id} date={date} fromMap={query.from === "map"} hour={query.hour} />;
+  // Keyed: a link to another date of the same place must start from a fresh screen, not reuse this one's state.
+  return <DayScreen key={`${id}/${date}`} id={id} date={date} fromMap={query.from === "map"} hour={query.hour} />;
 }

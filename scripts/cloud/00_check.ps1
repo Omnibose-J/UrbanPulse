@@ -1,5 +1,6 @@
 # Print which cloud inputs are present. Names only. Never a value.
 # ASCII. PowerShell 5.1. Idempotent: reads tools and .env.cloud, changes nothing.
+param([string]$EnvFile = ".env.cloud")
 $ErrorActionPreference = "Continue"
 $Repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location -LiteralPath $Repo
@@ -23,14 +24,6 @@ if ($null -ne $gcloud) {
 }
 Write-Item "U1" $u1
 
-$u2 = "missing"
-$supabase = Get-Command supabase -ErrorAction SilentlyContinue
-if ($null -ne $supabase) {
-    $listing = & supabase projects list 2>$null | Out-String
-    if ($LASTEXITCODE -eq 0 -and $listing -match "Seoul") { $u2 = "present" }
-}
-Write-Item "U2" $u2
-
 $required = @(
     "DATABASE_URL",
     "SUPABASE_URL",
@@ -42,7 +35,9 @@ $required = @(
     "ADMIN_TOKEN"
 )
 $set = @{}
-$cloudFile = Join-Path $Repo ".env.cloud"
+$refValue = ""
+$cloudFile = $EnvFile
+if (-not [System.IO.Path]::IsPathRooted($cloudFile)) { $cloudFile = Join-Path $Repo $EnvFile }
 if (Test-Path -LiteralPath $cloudFile) {
     Get-Content -LiteralPath $cloudFile -Encoding UTF8 | ForEach-Object {
         $line = $_.Trim()
@@ -52,6 +47,7 @@ if (Test-Path -LiteralPath $cloudFile) {
         $name = $line.Substring(0, $eq).Trim()
         $value = $line.Substring($eq + 1).Trim()
         if ($value.Length -gt 0) { $set[$name] = $true }
+        if ($name -eq "SUPABASE_PROJECT_REF") { $refValue = $value }
     }
 }
 $have = @()
@@ -65,6 +61,15 @@ if ($lack.Count -eq 0 -and $have.Count -eq $required.Count) {
     Write-Output ("U3 missing " + ($lack -join " "))
 }
 Write-Output ("U3 names " + ($have -join " "))
+
+# U2 is the project named in .env.cloud, not any project of the account: another project must never be used.
+$u2 = "missing"
+$supabase = Get-Command supabase -ErrorAction SilentlyContinue
+if ($null -ne $supabase -and $refValue.Length -gt 0) {
+    $listing = & supabase projects list 2>$null | Out-String
+    if ($LASTEXITCODE -eq 0 -and $listing.Contains($refValue)) { $u2 = "present" }
+}
+Write-Item "U2" $u2
 
 $u4 = "missing"
 $vercel = Get-Command vercel -ErrorAction SilentlyContinue

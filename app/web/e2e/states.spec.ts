@@ -139,3 +139,11 @@ test("english pages keep Hangul inside lang=ko", async ({ page }) => {
     expect(await strayHangul(page), path).toEqual([]);
   }
 });
+
+test("the bare address goes to the visitor's language", async ({ request }) => {
+  for (const [language, expected] of [["en-US,en;q=0.9", "/en"], ["ko-KR,ko;q=0.9", "/ko"], ["fr-FR", "/ko"]]) {
+    const response = await request.get("/", { headers: { "accept-language": language }, maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(new URL(response.headers().location, "http://x").pathname).toBe(expected);
+  }
+});

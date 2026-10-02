@@ -1,23 +1,14 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
+import { ADMIN_COOKIE, sessionValid } from "@/lib/admin-session";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-function allowed(given: string): boolean {
-  const expected = process.env.ADMIN_TOKEN ?? "";
-  if (!expected || given.length !== expected.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    mismatch |= given.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  return mismatch === 0;
-}
-
-export default async function Page({ searchParams }: { searchParams: Promise<{ token?: string | string[] }> }) {
-  const given = (await searchParams).token;
-  // A repeated parameter arrives as an array; only a single string can be the token.
-  if (typeof given !== "string" || !allowed(given)) notFound();
+export default async function Page() {
+  // No session, no page: the token is given at /admin and never travels in an address.
+  if (!sessionValid((await cookies()).get(ADMIN_COOKIE)?.value, process.env.ADMIN_TOKEN)) notFound();
   const db = supabaseServer();
   const [models, forecast, reco, strip, places, jobs] = await Promise.all([
     db.from("model_registry").select("name, version, horizons, active"),

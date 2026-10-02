@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// PLAYWRIGHT_BASE_URL points the suite at a server that is already running (the production build, or a deployment).
+const external = process.env.PLAYWRIGHT_BASE_URL;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 45000,
@@ -9,12 +12,14 @@ export default defineConfig({
   use: {
     ...devices["Pixel 5"],
     viewport: { width: 390, height: 844 },
-    baseURL: "http://localhost:3000",
+    baseURL: external ?? "http://localhost:3000",
   },
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  webServer: external
+    ? undefined
+    : {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        reuseExistingServer: true,
+        timeout: 120000,
+      },
 });

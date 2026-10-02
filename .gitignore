@@ -28,3 +28,6 @@ app/supabase/.branches/
 *.log
 .DS_Store
 Thumbs.db
+
+# copied from node_modules by scripts/copy-maplibre.mjs
+app/web/public/vendor/

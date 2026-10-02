@@ -294,7 +294,8 @@ def _alt_dates(row: dict, pool: list[dict]) -> list[dict]:
         if own is not None and best["score"] <= own["score"]:
             continue
         found.append(best | {"date": other["date"].isoformat(), "score": best["score"]})
-    found.sort(key=lambda item: -item["score"])
+    # Equal scores are common; the nearer date wins, so a rebuild cannot reorder them.
+    found.sort(key=lambda item: (-item["score"], item["date"]))
     return [{"date": item["date"], "hours": item["hours"], "score": item["score"]} for item in found[:2]]
 
 

@@ -7,7 +7,7 @@ function localeFrom(request: NextRequest, pathname: string): "ko" | "en" {
   return preferred.startsWith("en") ? "en" : "ko";
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return NextResponse.next();
   const hasLocale = pathname === "/ko" || pathname.startsWith("/ko/") || pathname === "/en" || pathname.startsWith("/en/");

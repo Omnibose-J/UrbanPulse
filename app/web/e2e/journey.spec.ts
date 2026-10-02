@@ -24,6 +24,8 @@ test("search to week to day, conditions, back chain, favourite and share link", 
   await page.goto("/");
   await expect(page).toHaveURL(/\/ko$/);
   await expect(page.locator("[data-busy] [data-row], [data-busy-empty], [data-state=stale], [data-state=preparing]").first()).toBeVisible();
+  // A page load would wipe this; in-app links must not reload the page.
+  await page.evaluate(() => Object.assign(window, { stayed: 1 }));
 
   // ② search
   await page.locator('a[href$="/search"]').click();
@@ -54,6 +56,7 @@ test("search to week to day, conditions, back chain, favourite and share link", 
   await expect(page).toHaveURL(/\/ko\/p\/[A-Z0-9]+\/\d{4}-\d{2}-\d{2}$/);
   const cells = page.locator("[data-cell]");
   await expect(cells).toHaveCount(15);
+  expect(await page.evaluate(() => (window as { stayed?: number }).stayed)).toBe(1);
   const sentence = page.locator("[data-hour-sentence]");
   const hint = "칸을 누르면 그 시간이 어떤지 알려 드려요";
   await expect(sentence).toHaveText(hint);

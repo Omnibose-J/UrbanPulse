@@ -3,6 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { AttributionControl, LngLatBounds, Map as MapLibre, Marker, setWorkerUrl } from "maplibre-gl";
 import { useLocale, useTranslations } from "next-intl";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppBar, ConditionSheet, HourSentence, PlaceName, StateBox } from "@/components/ui";
@@ -101,7 +102,8 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       zoom: 11,
       attributionControl: false,
     });
-    map.addControl(new AttributionControl({ compact: true }), "top-right");
+    // Bottom right: the legend owns the top edge, and the card on a phone ends above this corner.
+    map.addControl(new AttributionControl({ compact: true }), "bottom-right");
     mapRef.current = map;
     setMounted(true);
     const drawn = markers.current;
@@ -218,7 +220,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     : [];
   const failed = loaded.error || mapError;
   const card = current && clockCell ? (
-    <a
+    <Link prefetch={false}
       data-map-card
       href={detailHref(current)}
       className="absolute bottom-16 left-4 right-4 z-10 flex flex-col gap-3 rounded-[16px] bg-bg p-4 shadow-[0_8px_24px_rgb(15_24_34/18%)] min-[1024px]:hidden"
@@ -233,7 +235,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       <span data-map-action className="press flex items-center justify-between rounded-[12px] px-4 font-semibold" style={{ background: "var(--go-soft)", color: "var(--go-text)" }}>
         {t("map.seePlace")} ›
       </span>
-    </a>
+    </Link>
   ) : null;
 
   return (
@@ -272,7 +274,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
           <StateBox kind="error" onRetry={() => { setMapError(false); loaded.retry(); }} />
         ) : null}
         <div ref={box} data-map className="relative min-h-[420px] flex-1" style={{ height: "calc(100dvh - 220px)", background: "var(--map-land)", display: failed ? "none" : undefined }}>
-          <div className="absolute left-4 top-3 z-10 flex items-center gap-2 rounded-[var(--r-pill)] bg-bg px-3 py-1.5 text-[11px] font-semibold text-text-2 shadow-[var(--shadow-card)]">
+          <div data-legend-box className="absolute left-4 top-3 z-10 flex items-center gap-2 rounded-[var(--r-pill)] bg-bg px-3 py-1.5 text-[11px] font-semibold text-text-2 shadow-[var(--shadow-card)]">
             {(current?.strip_mode === "two_step" ? (["win", "1", "0"] as const) : (["win"] as const)).map((key) => (
               <span key={key} data-legend className="inline-flex items-center gap-1">
                 <i className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: key === "win" ? "var(--go)" : key === "1" ? "var(--ok)" : "var(--bad-pin)" }} />
@@ -315,9 +317,9 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
                   <span className="caption block text-text-3">{pickLine(place)}</span>
                 </span>
               </button>
-              <a href={detailHref(place)} className="caption shrink-0 font-semibold" style={{ color: "var(--go-text)" }}>
+              <Link prefetch={false} href={detailHref(place)} className="caption shrink-0 font-semibold" style={{ color: "var(--go-text)" }}>
                 {t("map.seePlace")} ›
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
