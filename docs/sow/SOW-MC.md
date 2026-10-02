@@ -55,7 +55,7 @@ Edit: `app/engine/{raw_store,settings,__init__}.py`, `app/engine/jobs/{collect,i
 - Secrets `urbanpulse-database-url`, `urbanpulse-seoul-api-key`, `urbanpulse-kasi-api-key`: created if absent; a new version is added only when the value differs from the latest (compare by hash inside the script; print `unchanged` / `updated`).
 
 ### 4 Database — `30_db_push.ps1`, `31_db_copy.ps1`
-1. `supabase link --project-ref <ref>`; `supabase db push` (the three migrations). Run the pgTAP file against the hosted database only if it needs no fixture writes that would stay; otherwise check with: 21 tables exist, RLS enabled on all, `anon` has no grant.
+1. `supabase link --project-ref <ref>`; `supabase db push` (the three migrations). Run the pgTAP file against the hosted database only if it needs no fixture writes that would stay; otherwise check with: 19 tables exist, RLS enabled on all, `anon` has no grant.
 2. Copy data once, **before** any cloud job is scheduled: `pg_dump --data-only --no-owner --schema=public` from the local database (run it inside the local Postgres container so the client version matches), restore into the hosted one in a single transaction. Order by foreign keys (`places` first). If the hosted `public` tables are not all empty, stop: never merge by hand.
 3. Compare: for every table, row count local at dump time = hosted after restore; `max(ts)` of `live_obs` equal. Paste the table of counts.
 4. Report the hosted database size (`pg_database_size`). The free plan holds 500 MB; today's data is about 170 MB. Do not change the plan; report the number.
@@ -112,7 +112,7 @@ Leave the local Supabase stack installed and stopped (`supabase stop`); its data
 | A1 | Code changes are safe locally | `python -m pytest app/engine/tests -q` → exit 0, 0 skipped; `ruff check app/engine` → exit 0; local `python -m engine collect` with the local `RAW_DIR` → `ok ≥ 100` |
 | A2 | Inputs present | `scripts/cloud/00_check.ps1` → exit 0, lists U1–U4 as present (names only) |
 | A3 | Scripts idempotent | each of `10`, `20`, `30`, `50`, `60` run a second time → exit 0 and reports no change |
-| A4 | Schema on the hosted database | 21 public tables; RLS enabled on all; `select count(*) from information_schema.role_table_grants where grantee in ('anon','authenticated') and table_schema = 'public'` → 0 |
+| A4 | Schema on the hosted database | 19 public tables; RLS enabled on all; `select count(*) from information_schema.role_table_grants where grantee in ('anon','authenticated') and table_schema = 'public'` → 0 |
 | A5 | Data copied | the per-table count comparison of step 4.3, all equal; hosted database size pasted |
 | A6 | Raw in the bucket, write-once | object count and bytes equal the local folder at upload time; as `urbanpulse-engine`, a second upload of an existing object name fails (paste the error class, not a URL) |
 | A7 | Jobs run in the cloud | the four manual executions succeeded; paste status and duration of each and the peak memory of `forecast` |
