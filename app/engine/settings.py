@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from engine import ROOT_ENV_FILE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+MODELS_DIR = Path(os.environ["MODELS_DIR"]) if os.environ.get("MODELS_DIR") else REPO_ROOT / "models"
 
 
 def env_file() -> Path | None:

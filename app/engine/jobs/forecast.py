@@ -6,7 +6,9 @@ Refreshes place state, thresholds and activity profiles, then writes today's 8-d
 
 from __future__ import annotations
 
+import json
 import math
+import sys
 import time
 from datetime import datetime, timedelta
 
@@ -129,23 +131,37 @@ def apply_overlay(conn, now: datetime) -> None:
     _measure_activity(conn, now)
 
 
+def require_model_files(directory, version: str) -> None:
+    """Exit 1 when an active registry row has no artifact or a different version."""
+    meta_path = directory / "meta.json"
+    artifact = directory / "model.joblib"
+    if not meta_path.is_file() or not artifact.is_file():
+        print(f"missing model: {directory}", file=sys.stderr)
+        raise SystemExit(1)
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if meta.get("created_at") != version:
+        print(f"model version mismatch: {meta_path}", file=sys.stderr)
+        raise SystemExit(1)
+
+
 def _active_model(conn):
-    root = settings.REPO_ROOT / "models" / "ratio_v1"
-    if not (root / "meta.json").exists():
-        return None, []
-    model = load(root)
+    root = settings.MODELS_DIR / "ratio_v1"
     with conn.cursor() as cur:
         cur.execute(
             """
-            select horizons from model_registry
+            select version, horizons from model_registry
             where name = 'ratio_v1' and active
             order by created_at desc
             limit 1
             """
         )
         row = cur.fetchone()
-    passing = list(row[0]) if row and row[0] else []
-    return model, passing
+    if row is None:
+        if not (root / "meta.json").is_file():
+            return None, []
+        return load(root), []
+    require_model_files(root, row[0])
+    return load(root), list(row[1] or [])
 
 
 def run() -> int:
@@ -154,36 +170,13 @@ def run() -> int:
     started = datetime.now(KST)
     today = _today(started)
     log(JOB, "start", issued=today.isoformat())
-    with db.connect(env["DATABASE_URL"]) as conn:
-        with conn.cursor() as cur:
-            cur.execute("set time zone 'Asia/Seoul'")
-            cur.execute(
-                """
-                insert into job_runs (job, status) values ('forecast', 'running') returning id
-                """
-            )
-            run_id = cur.fetchone()[0]
-        conn.commit()
-        try:
-            detail = _build(conn, started, today)
-            status = "ok"
-        except Exception as exc:
-            status = "fail"
-            detail = {"error": f"{type(exc).__name__}: {exc}"}
-            log(JOB, "fail", reason=detail["error"])
-            with conn.cursor() as cur:
-                cur.execute(
-                    "update job_runs set finished_at = now(), status = %s, detail = %s where id = %s",
-                    (status, Jsonb(detail), run_id),
-                )
-            conn.commit()
-            return 1
-        with conn.cursor() as cur:
-            cur.execute(
-                "update job_runs set finished_at = now(), status = %s, detail = %s where id = %s",
-                (status, Jsonb(detail), run_id),
-            )
-        conn.commit()
+    try:
+        with db.ledger(env["DATABASE_URL"], JOB) as (conn, ctx):
+            ctx["detail"] = _build(conn, started, today)
+            detail = ctx["detail"]
+    except BaseException as exc:
+        log(JOB, "fail", reason=type(exc).__name__)
+        raise
     log(JOB, "done", places=detail.get("places"), transitions=len(detail.get("transitions", {})))
     return 0
 
