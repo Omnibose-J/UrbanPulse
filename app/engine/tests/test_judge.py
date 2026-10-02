@@ -25,7 +25,3 @@ def test_bootstrap_is_deterministic_for_seed_zero():
     second = boot(groups, stat)
     assert np.allclose(first, second)
 
-
-def test_insufficient_minimums_are_the_callers_rule():
-    assert 27 < 28
-    assert 9 < 10

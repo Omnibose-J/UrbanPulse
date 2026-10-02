@@ -6,6 +6,7 @@ import uuid
 from contextlib import contextmanager
 
 import psycopg
+import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from engine import settings
@@ -44,7 +45,10 @@ def schema():
     settings.load_env()
     url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
     name = "h1_" + uuid.uuid4().hex[:8]
-    admin = psycopg.connect(url, autocommit=True, connect_timeout=5)
+    try:
+        admin = psycopg.connect(url, autocommit=True, connect_timeout=5)
+    except psycopg.OperationalError:
+        pytest.fail("local database not reachable (cd app; supabase start)")
     try:
         admin.execute(f"create schema {name}")
         for table in TABLES:

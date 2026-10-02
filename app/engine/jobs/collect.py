@@ -344,6 +344,7 @@ def run(
                         commerce.append(snapshot.commerce)
                     forecasts.extend(snapshot.forecasts)
                 store(live, commerce, forecasts)
+                found: dict[str, int] = {}
                 if from_file:
                     from engine.jobs.forecast import apply_overlay, refresh_recommendations
 
@@ -358,6 +359,10 @@ def run(
                             only_today=True,
                         )
                         overlay_conn.commit()
+                        from engine.jobs import integrity
+
+                        found = integrity.sweep(overlay_conn)
+                        overlay_conn.rollback()
                 ok = sum(1 for row in results if row["outcome"] == "ok")
                 no_data = sum(1 for row in results if row["outcome"] == "no_data")
                 failed = sum(1 for row in results if row["outcome"] == "failed")
@@ -382,6 +387,10 @@ def run(
                         }
                     ),
                 }
+                if found:
+                    detail["integrity"] = found
+                    if status == "ok":
+                        status = "warn"
                 ctx["detail"] = detail
                 ctx["status"] = status
     except psycopg.OperationalError:

@@ -1,11 +1,8 @@
 """Overlap rule and stable station ids. Synthetic polygons, no shapefile."""
 
-import psycopg
-import pytest
 from psycopg.types.json import Jsonb
 from shapely.geometry import box
 
-from engine import settings
 from engine.tierb.stations import _counts, covered, display_name, station_ids, upsert_station
 
 
@@ -25,13 +22,8 @@ def test_ids_follow_normalised_name_order():
     assert station_ids(keys) == station_ids(list(reversed(keys)))
 
 
-def test_second_upsert_changes_nothing_and_leaves_other_tiers():
-    settings.load_env()
-    url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
-    try:
-        conn = psycopg.connect(url, autocommit=False, connect_timeout=5)
-    except psycopg.OperationalError:
-        pytest.fail("local database not reachable (cd app; supabase start)")
+def test_second_upsert_changes_nothing_and_leaves_other_tiers(private_conn):
+    conn = private_conn
     row = {
         "id": "STNTEST",
         "name": "테스트역",

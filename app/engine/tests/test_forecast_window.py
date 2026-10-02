@@ -2,10 +2,6 @@
 
 from datetime import date, datetime
 
-import psycopg
-import pytest
-
-from engine import settings
 from engine.jobs.forecast import apply_overlay, drop_past_forecasts, issued_midnight
 from engine.parsers import KST
 
@@ -14,13 +10,8 @@ def test_issued_midnight_stays_on_the_issued_day():
     assert issued_midnight(date(2026, 10, 1)) == datetime(2026, 10, 1, 0, 0, tzinfo=KST)
 
 
-def test_past_cut_keeps_the_issued_day_when_the_clock_has_moved():
-    settings.load_env()
-    url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
-    try:
-        conn = psycopg.connect(url, autocommit=False, connect_timeout=5)
-    except psycopg.OperationalError:
-        pytest.fail("local database not reachable (cd app; supabase start)")
+def test_past_cut_keeps_the_issued_day_when_the_clock_has_moved(private_conn):
+    conn = private_conn
     issued = date(2026, 10, 1)
     bare = "STNTEST"
     kept = "STNKEEP"
@@ -73,13 +64,8 @@ def test_past_cut_keeps_the_issued_day_when_the_clock_has_moved():
     assert bare_days == [issued]
 
 
-def test_overlay_after_midnight_stays_on_the_issued_day():
-    settings.load_env()
-    url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
-    try:
-        conn = psycopg.connect(url, autocommit=False, connect_timeout=5)
-    except psycopg.OperationalError:
-        pytest.fail("local database not reachable (cd app; supabase start)")
+def test_overlay_after_midnight_stays_on_the_issued_day(private_conn):
+    conn = private_conn
     issued = date(2026, 10, 1)
     nxt = date(2026, 10, 2)
     place_id = "STNOVL"

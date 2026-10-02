@@ -19,6 +19,7 @@ from engine import db, settings
 from engine.calendar_feats import day_type
 from engine.flags import load as load_flags
 from engine.hourly import baseline, hourly_frame
+from engine.jobs import integrity
 from engine.levels import level_of, thresholds_for
 from engine.lively import activity_update, hourly_commerce, p90_scales, profile_rows
 from engine.log import log
@@ -40,18 +41,6 @@ def next_place_state(recent_commerce, recent_live, live_days, in_index, threshol
     else:
         new_state = "preparing"
     return new_tier, new_state
-
-
-def served_source(in_index: bool, horizon: int, passing: set[int]) -> str:
-    if in_index and horizon in passing:
-        return "model"
-    return "profile"
-
-
-def served_pop(baseline_value: float, source: str, log_ratio: float) -> float:
-    if source == "model":
-        return baseline_value * math.exp(log_ratio)
-    return baseline_value
 
 
 def activity_for(tier: str, stored: tuple) -> tuple:
@@ -239,6 +228,11 @@ def run() -> int:
         with db.ledger(env["DATABASE_URL"], JOB) as (conn, ctx):
             ctx["detail"] = _build(conn, started, today)
             detail = ctx["detail"]
+            found = integrity.sweep(conn, full=True)
+            conn.rollback()
+            if found:
+                detail["integrity"] = found
+                ctx["status"] = "warn"
     except BaseException as exc:
         log(JOB, "fail", reason=type(exc).__name__)
         raise

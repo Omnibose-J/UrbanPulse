@@ -146,7 +146,7 @@ def _reco_rows(logs: list[dict], tiers: dict[str, str], live: pd.DataFrame, comm
     unscored = 0
     live_index = _index(live)
     for row in logs:
-        tier = tiers.get(row["place_id"], "A2")
+        tier = tiers[row["place_id"]]
         cells = row["hours"] or []
         windows = row["windows"] or []
         window_hours = {hour for window in windows for hour in window.get("hours", [])}

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 import httpx
+import pytest
 
 from engine.jobs import collect
 from engine.parsers import KST
@@ -119,7 +120,12 @@ def test_five_failures_warn_and_exit_0(tmp_path, capsys):
     assert SENTINEL not in blob
 
 
-def test_a_station_without_a_code_still_ends_ok(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("found", "status"),
+    [({}, "ok"), ({"window cell that is not rated 1": 2}, "warn")],
+)
+def test_a_station_without_a_code_still_ends_ok(tmp_path, monkeypatch, found, status):
+    """Places without a code pass the code check; a sweep finding turns the run into a warning."""
     monkeypatch.setattr(collect, "load_place_codes", lambda path=None: ["POI001", "POI002", "POI003"])
 
     def places(_url: str):
@@ -136,15 +142,21 @@ def test_a_station_without_a_code_still_ends_ok(tmp_path, monkeypatch):
         def commit(self) -> None:
             return None
 
+        def rollback(self) -> None:
+            return None
+
     @contextmanager
     def connected(_url: str):
         yield _Conn()
 
     monkeypatch.setattr(collect, "_connect", connected)
     import engine.jobs.forecast as forecast
+    import engine.jobs.integrity as integrity
 
+    # The database is a stand-in here, so the three functions that read and write it are too.
     monkeypatch.setattr(forecast, "apply_overlay", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(forecast, "refresh_recommendations", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(integrity, "sweep", lambda *_args, **_kwargs: dict(found))
     runs = _Runs()
     code = collect.run(
         env=ENV,
@@ -155,8 +167,9 @@ def test_a_station_without_a_code_still_ends_ok(tmp_path, monkeypatch):
         now=datetime(2026, 10, 1, 9, 20, tzinfo=KST),
     )
     assert code == 0
-    assert runs.rows[-1]["status"] == "ok"
+    assert runs.rows[-1]["status"] == status
     assert "only_in_db" not in runs.rows[-1]["detail"]
+    assert runs.rows[-1]["detail"].get("integrity", {}) == found
 
 
 def test_database_down_writes_raw_and_exits_1(tmp_path, monkeypatch, capsys):

@@ -30,3 +30,18 @@ def cli(clean_env):
         )
 
     return _run
+
+
+@pytest.fixture
+def private_conn():
+    """A connection whose search_path is a throwaway copy of the schema. The live tables are never written."""
+    import psycopg
+
+    from engine.tests.tempdb import schema
+
+    with schema() as dsn:
+        conn = psycopg.connect(dsn, autocommit=False, connect_timeout=5)
+        try:
+            yield conn
+        finally:
+            conn.close()
