@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { inServedRange, readDate } from "@/lib/http";
 import { kstNow } from "@/lib/kst";
 import { DayScreen } from "@/screens/day";
 
@@ -12,6 +13,9 @@ export default async function Page({
 }) {
   const { locale, id, date } = await params;
   const query = await searchParams;
-  if (date < kstNow().date) redirect(`/${locale}/p/${id}?notice=past`);
+  const today = kstNow().date;
+  const valid = readDate(date);
+  if (valid && valid < today) redirect(`/${locale}/p/${id}?notice=past`);
+  if (!valid || !inServedRange(valid, today)) redirect(`/${locale}/p/${id}?notice=range`);
   return <DayScreen id={id} date={date} fromMap={query.from === "map"} hour={query.hour} />;
 }

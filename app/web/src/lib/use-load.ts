@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 export function useLoad<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -19,15 +20,26 @@ export function useLoad<T>(path: string | null) {
       if (!cancel && !done) {
         setData(null);
         setError(false);
+        setMissing(false);
       }
     }, 0);
     fetch(path)
       .then(async (response) => {
+        if (response.status === 404) return null;
         if (!response.ok) throw new Error("bad");
         return response.json() as Promise<T>;
       })
       .then((body) => {
         if (cancel) return;
+        if (body === null) {
+          done = true;
+          window.clearTimeout(timer);
+          window.clearTimeout(clear);
+          setData(null);
+          setMissing(true);
+          setLoading(false);
+          return;
+        }
         done = true;
         window.clearTimeout(timer);
         window.clearTimeout(clear);
@@ -50,5 +62,5 @@ export function useLoad<T>(path: string | null) {
     };
   }, [path, tick]);
 
-  return { data, error, loading, retry: () => setTick((value) => value + 1) };
+  return { data, error, missing, loading, retry: () => setTick((value) => value + 1) };
 }

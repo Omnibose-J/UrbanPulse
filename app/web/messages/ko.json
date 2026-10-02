@@ -43,7 +43,8 @@
     "dayPick": "{date} 추천 {time}",
     "includeStations": "역세권 포함",
     "hourNow": "{hour}시",
-    "hourLine": "{hour}시는 {verdict}."
+    "hourLine": "{hour}시는 {verdict}.",
+    "station": "{name} · 추정"
   },
   "cond": {
     "change": "바꾸기"
@@ -53,8 +54,10 @@
     "purpose": "무엇을 하러 가세요?",
     "crowd": "사람은 어느 정도가 좋아요?",
     "apply": "적용하기",
-    "preparing": "{purpose}는 '{tolerance}'를 아직 준비하고 있어요.",
-    "moved": "'{tolerance}'로 바꿨어요."
+    "preparing": "{purpose}은 ‘{tolerance}’를 아직 준비하고 있어요.",
+    "moved": "‘{tolerance}’로 바꿨어요.",
+    "close": "닫기",
+    "preparingPlain": "‘{tolerance}’는 아직 준비하고 있어요."
   },
   "purpose": {
     "sight": "구경·산책",
@@ -94,7 +97,11 @@
     "ok": "가도 괜찮아요",
     "avoid": "피하는 게 좋아요",
     "notPick": "{hour}시는 추천 시간이 아니에요.",
-    "cell": "{hour}시는 {verdict}. {why}"
+    "cell": "{hour}시는 {verdict}. {why}",
+    "crowdOnly0": "사람이 적어요",
+    "crowdOnly1": "사람이 적당해요",
+    "crowdOnly2": "조금 붐벼요",
+    "crowdOnly3": "꽤 붐벼요"
   },
   "now": {
     "l0": "지금은 사람이 적어요",
@@ -121,7 +128,10 @@
     "weekNoneHint": "조건을 바꾸면 찾을 수 있을지도 몰라요.",
     "past": "지난 날짜라 이번 주를 보여 드려요",
     "stale": "데이터가 늦어지고 있어요 (마지막 {time})",
-    "tierb": "실시간 데이터가 없어서 평소 흐름으로 추정했어요. 실험 중인 기능이에요"
+    "tierb": "실시간 데이터가 없어서 평소 흐름으로 추정했어요. 실험 중인 기능이에요",
+    "notFoundPlace": "이 장소는 찾을 수 없어요.",
+    "notFoundPage": "이 페이지는 찾을 수 없어요.",
+    "outOfRange": "오늘부터 7일 뒤까지만 볼 수 있어요."
   },
   "search": {
     "empty": "찾는 장소가 없어요. 가까운 지하철역 이름으로 찾아보세요."
@@ -131,7 +141,15 @@
     "month": "월",
     "day": "일",
     "hour": "시",
-    "weekdays": ["일", "월", "화", "수", "목", "금", "토"]
+    "weekdays": [
+      "일",
+      "월",
+      "화",
+      "수",
+      "목",
+      "금",
+      "토"
+    ]
   },
   "about": {
     "title": "안내",
@@ -147,6 +165,7 @@
   },
   "nav": {
     "logo": "UrbanPulse",
-    "language": "언어"
+    "language": "언어",
+    "home": "홈으로"
   }
 }

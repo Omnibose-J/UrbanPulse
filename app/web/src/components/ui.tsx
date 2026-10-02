@@ -27,6 +27,7 @@ export function AppBar({
   star,
   onStar,
   mapHref,
+  onCond,
   children,
 }: {
   backHref?: string;
@@ -35,6 +36,7 @@ export function AppBar({
   star?: boolean;
   onStar?: () => void;
   mapHref?: string;
+  onCond?: () => void;
   children?: React.ReactNode;
 }) {
   const t = useTranslations();
@@ -73,6 +75,11 @@ export function AppBar({
             <Map />
           </a>
         ) : null}
+        {onCond ? (
+          <button type="button" data-cond-button className="icon-hit flex items-center justify-center" onClick={onCond} aria-label={t("sheet.title")}>
+            <SlidersHorizontal aria-hidden />
+          </button>
+        ) : null}
         {onStar ? (
           <button type="button" className="icon-hit" onClick={onStar} aria-pressed={star} aria-label={t("home.favorites")}>
             <Star fill={star ? "var(--star)" : "none"} color="var(--star)" />
@@ -86,10 +93,29 @@ export function AppBar({
   );
 }
 
-export function StateBox({ kind, onRetry }: { kind: "preparing" | "error" | "skeleton"; onRetry?: () => void }) {
+export function StateBox({ kind, onRetry, text }: { kind: "preparing" | "error" | "skeleton" | "missing" | "comboOff" | "stale"; onRetry?: () => void; text?: string }) {
   const t = useTranslations();
+  const locale = useLocale();
   if (kind === "skeleton") {
     return <div data-state="skeleton" className="h-40 rounded-[20px] bg-ink" />;
+  }
+  if (kind === "missing") {
+    return (
+      <div data-state="missing" className="rounded-[var(--r)] bg-bg-soft p-4">
+        <p className="body">{t("state.notFoundPlace")}</p>
+        <a href={`/${locale}`} className="press body mt-2 flex items-center font-semibold" style={{ color: "var(--go-text)" }}>
+          {t("nav.home")}
+        </a>
+      </div>
+    );
+  }
+  if (kind === "comboOff" || kind === "stale") {
+    return (
+      <div data-state={kind} className="flex items-start gap-3 rounded-[var(--r)] bg-bg-soft p-4">
+        <Clock aria-hidden />
+        <p className="body">{kind === "comboOff" ? t("state.comboOff") : text}</p>
+      </div>
+    );
   }
   if (kind === "error") {
     return (
@@ -336,32 +362,16 @@ export function DayStrip({
 }) {
   const t = useTranslations();
   const locale = useLocale() as "ko" | "en";
+  const say = useCellText();
   if (hidden) return <p className="body">{t("state.foreignStrip")}</p>;
+  const labels = hours.map((cell) => say({ mode, hour: cell.h, cell, locale, tier, purpose }));
   return (
     <section>
       <h2 className="section mb-2">{t("day.byHour")}</h2>
       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
-        {hours.map((cell) => {
+        {hours.map((cell, index) => {
           const tone = cellTone(cell, mode);
-          const sentence = cellSentence({
-            mode,
-            inWindow: cell.in_window,
-            rating: cell.rating,
-            reason: cell.reason,
-            hour: cell.h,
-            locale,
-            tier,
-            purpose,
-            crowd: cell.crowd,
-            act: cell.act,
-          });
-          const label = sentence.kind === "notPick"
-            ? t("reason.notPick", { hour: sentence.hour })
-            : t("reason.cell", {
-                hour: sentence.hour,
-                verdict: t(`reason.${sentence.verdict}`),
-                why: sentence.whys.map((id) => t(id)).join(" "),
-              });
+          const label = labels[index];
           const on = selected === cell.h;
           return (
             <button
@@ -386,54 +396,52 @@ export function DayStrip({
           </span>
         ))}
       </div>
-      <table className="sr-only">
-        <tbody>
-          {hours.map((cell) => (
-            <tr key={cell.h}>
-              <td>{cell.h}</td>
-              <td>{cell.reason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ul className="sr-only">
+        {labels.map((label, index) => (
+          <li key={hours[index].h}>{label}</li>
+        ))}
+      </ul>
     </section>
   );
 }
 
-export function HourSentence({
-  mode,
-  hour,
-  cell,
-  locale,
-  tier,
-  purpose,
-}: {
+type CellTextInput = {
   mode: string | null;
   hour: number;
-  cell: { in_window?: boolean; rating?: number; reason?: string; crowd?: number; act?: string | null } | null;
+  cell: HourCell;
   locale: "ko" | "en";
   tier?: string;
   purpose?: string;
-}) {
+};
+
+/** The one place a cell becomes a sentence: the strip, its screen-reader list and the map card all use it. */
+export function useCellText() {
   const t = useTranslations();
-  const sentence = cellSentence({
-    mode,
-    inWindow: Boolean(cell?.in_window),
-    rating: cell?.rating ?? 0,
-    reason: cell?.reason ?? "",
-    hour,
-    locale,
-    tier,
-    purpose,
-    crowd: cell?.crowd,
-    act: cell?.act,
-  });
-  if (sentence.kind === "notPick") return t("reason.notPick", { hour: sentence.hour });
-  return t("reason.cell", {
-    hour: sentence.hour,
-    verdict: t(`reason.${sentence.verdict}`),
-    why: sentence.whys.map((id) => t(id)).join(" "),
-  });
+  return ({ mode, hour, cell, locale, tier, purpose }: CellTextInput): string => {
+    const sentence = cellSentence({
+      mode,
+      inWindow: cell.in_window,
+      rating: cell.rating,
+      reason: cell.reason,
+      hour,
+      locale,
+      tier,
+      purpose,
+      crowd: cell.crowd,
+      act: cell.act,
+    });
+    if (sentence.kind === "notPick") return t("reason.notPick", { hour: sentence.hour });
+    return t("reason.cell", {
+      hour: sentence.hour,
+      verdict: t(`reason.${sentence.verdict}`),
+      why: sentence.whys.map((id) => t(id)).join(" "),
+    });
+  };
+}
+
+export function HourSentence(props: CellTextInput) {
+  const say = useCellText();
+  return say(props);
 }
 
 export function ConditionField({ label, onClick }: { label: string; onClick: () => void }) {
@@ -479,23 +487,48 @@ export function ConditionSheet({
 }) {
   const t = useTranslations();
   const title = useRef<HTMLHeadingElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
   const [purposeNow, setPurposeNow] = useState(purpose);
   const [toleranceNow, setToleranceNow] = useState(tolerance);
   const [note, setNote] = useState<string | null>(null);
 
+  // Focus moves into the sheet when it opens and back to what opened it when it closes; Tab stays inside.
   useEffect(() => {
     if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    title.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog.current) return;
+      const items = [...dialog.current.querySelectorAll<HTMLElement>("button")];
+      const first = items[0];
+      const last = items[items.length - 1];
+      const inside = dialog.current.contains(document.activeElement);
+      if (event.shiftKey && (!inside || document.activeElement === first || document.activeElement === title.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (!inside || document.activeElement === last)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      opener?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
+  // Invariant 7: a combination the API did not list is off.
   const stateOf = (p: string, tol: string) => combos.find((row) => row.purpose === p && row.tolerance === tol)?.state ?? "off";
   const purposes: Purpose[] = ["sight", "food", "shop"];
   const tolerances: Tolerance[] = ["calm", "moderate", "busy_ok"];
+  const usedPurpose = tier === "A1" ? (purposeNow as string) : "none";
+  const offNow = tolerances.filter((item) => stateOf(usedPurpose, item) === "off");
 
   function choosePurpose(next: Purpose) {
     let tol = toleranceNow as Tolerance;
@@ -509,9 +542,27 @@ export function ConditionSheet({
     setNote(moved);
   }
 
+  // Arrow keys move the choice within a group, skipping options that are not ready.
+  function onArrow<T extends string>(event: React.KeyboardEvent, items: T[], current: T, usable: (item: T) => boolean, choose: (item: T) => void) {
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const start = items.indexOf(current);
+    for (let moved = 1; moved <= items.length; moved += 1) {
+      const next = items[(start + step * moved + items.length * moved) % items.length];
+      if (usable(next)) {
+        choose(next);
+        const group = event.currentTarget as HTMLElement;
+        window.setTimeout(() => group.querySelector<HTMLElement>('[aria-checked="true"]')?.focus(), 0);
+        return;
+      }
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-20 flex items-end" style={{ background: "var(--ink-48)" }} onClick={onClose}>
       <div
+        ref={dialog}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-title"
@@ -520,19 +571,33 @@ export function ConditionSheet({
       >
         <div className="mx-auto mb-3 h-[5px] w-9 rounded-[var(--r-pill)] bg-line" />
         <div className="flex items-center justify-between">
-          <h2 id="sheet-title" ref={title} tabIndex={-1} className="heading">
+          <h2 id="sheet-title" ref={title} tabIndex={-1} className="heading outline-none">
             {t("sheet.title")}
           </h2>
-          <button type="button" className="icon-hit" onClick={onClose} aria-label={t("cond.change")}>
-            <X />
+          <button type="button" className="icon-hit" onClick={onClose} aria-label={t("sheet.close")}>
+            <X aria-hidden />
           </button>
         </div>
         {tier === "A1" ? (
           <fieldset className="mt-4">
             <legend className="section">{t("sheet.purpose")}</legend>
-            <div role="radiogroup" className="mt-2 flex h-12 items-center gap-1 rounded-[12px] bg-bg-soft p-1">
+            <div
+              role="radiogroup"
+              aria-label={t("sheet.purpose")}
+              className="mt-2 flex h-12 items-center gap-1 rounded-[12px] bg-bg-soft p-1"
+              onKeyDown={(event) => onArrow(event, purposes, purposeNow, () => true, choosePurpose)}
+            >
               {purposes.map((item) => (
-                <button key={item} type="button" role="radio" aria-checked={purposeNow === item} className="h-10 flex-1 rounded-[10px] font-bold" style={{ background: purposeNow === item ? "var(--bg)" : "transparent" }} onClick={() => choosePurpose(item)}>
+                <button
+                  key={item}
+                  type="button"
+                  role="radio"
+                  aria-checked={purposeNow === item}
+                  tabIndex={purposeNow === item ? 0 : -1}
+                  className="h-10 flex-1 rounded-[10px] font-bold"
+                  style={{ background: purposeNow === item ? "var(--bg)" : "transparent" }}
+                  onClick={() => choosePurpose(item)}
+                >
                   {t(`purpose.${item}`)}
                 </button>
               ))}
@@ -541,9 +606,13 @@ export function ConditionSheet({
         ) : null}
         <fieldset className="mt-4">
           <legend className="section">{t("sheet.crowd")}</legend>
-          <div role="radiogroup" className="mt-2 flex h-12 items-center gap-1 rounded-[12px] bg-bg-soft p-1">
+          <div
+            role="radiogroup"
+            aria-label={t("sheet.crowd")}
+            className="mt-2 flex h-12 items-center gap-1 rounded-[12px] bg-bg-soft p-1"
+            onKeyDown={(event) => onArrow(event, tolerances, toleranceNow, (item) => stateOf(usedPurpose, item) !== "off", setToleranceNow)}
+          >
             {tolerances.map((item) => {
-              const usedPurpose = tier === "A1" ? (purposeNow as string) : "none";
               const off = stateOf(usedPurpose, item) === "off";
               return (
                 <button
@@ -552,6 +621,8 @@ export function ConditionSheet({
                   role="radio"
                   aria-checked={toleranceNow === item}
                   aria-disabled={off}
+                  aria-describedby={off ? "sheet-not-ready" : undefined}
+                  tabIndex={toleranceNow === item ? 0 : -1}
                   className="h-10 flex-1 rounded-[10px] font-bold"
                   style={{ background: toleranceNow === item ? "var(--bg)" : "transparent", color: off ? "var(--text-3)" : "var(--ink)" }}
                   onClick={() => {
@@ -559,18 +630,23 @@ export function ConditionSheet({
                     setToleranceNow(item);
                   }}
                 >
-                  {off ? <Clock className="inline" size={14} /> : null}
+                  {off ? <Clock className="inline" size={14} aria-hidden /> : null}
                   {t(`tol.${item}`)}
                 </button>
               );
             })}
           </div>
-          <p className="label mt-2 text-text-2">
-            {tolerances
-              .filter((item) => stateOf(tier === "A1" ? (purposeNow as string) : "none", item) === "off")
-              .map((item) => t("sheet.preparing", { purpose: t(`purpose.${purposeNow}`), tolerance: t(`tol.${item}`) }))
-              .join(" ")}
-          </p>
+          {offNow.length ? (
+            <p id="sheet-not-ready" className="label mt-2 text-text-2">
+              {offNow
+                .map((item) =>
+                  tier === "A1"
+                    ? t("sheet.preparing", { purpose: t(`purpose.${purposeNow}`), tolerance: t(`tol.${item}`) })
+                    : t("sheet.preparingPlain", { tolerance: t(`tol.${item}`) }),
+                )
+                .join(" ")}
+            </p>
+          ) : null}
           {note ? <p className="label mt-1">{note}</p> : null}
         </fieldset>
         <button

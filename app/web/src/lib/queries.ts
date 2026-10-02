@@ -1,10 +1,10 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { addDays, dayBounds, kstHour, kstNow } from "@/lib/kst";
+import { addDays, dayBounds, hourBounds, kstHour, kstNow } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
 import { driverMessage } from "@/lib/api-log";
-import { measuredNow, namedAltPlaces, requireForeignHeavy } from "@/lib/shape";
+import { likePattern, namedAltPlaces, nowFromLive, quietSelection, requireForeignHeavy, selectAll } from "@/lib/shape";
 
 type Place = {
   id: string;
@@ -41,28 +41,33 @@ export function purposeFor(tier: string, purpose: string): string {
 
 export async function searchPlaces(q: string) {
   const sb = supabaseServer();
-  const safe = q.replace(/[%_,]/g, " ");
-  const places = await must(
-    q
-      ? sb
-          .from("places")
-          .select("id, tier, name, name_en, gu, serve_state")
-          .in("serve_state", ["on", "preparing", "experimental"])
-          .or(`name.ilike.%${safe}%,name_en.ilike.%${safe}%,gu.ilike.%${safe}%`)
-          .order("name")
-          .limit(50)
-      : sb
-          .from("places")
-          .select("id, tier, name, name_en, gu, serve_state")
-          .in("tier", ["A1", "A2"])
-          .eq("serve_state", "on")
-          .order("name")
-          .limit(200),
-  );
+  const columns = "id, tier, name, name_en, gu, serve_state";
+  type Row = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
+  let places: Row[];
+  if (q) {
+    const pattern = likePattern(q);
+    const hits = await Promise.all(
+      (["name", "name_en", "gu"] as const).map((column) =>
+        must<Row[]>(
+          sb.from("places").select(columns).in("serve_state", ["on", "preparing", "experimental"]).ilike(column, pattern).order("name").limit(50),
+        ),
+      ),
+    );
+    // PostgREST reads `*` as a wildcard and offers no escape for it, so the literal match is confirmed here.
+    const needle = q.toLowerCase();
+    const literal = (row: Row) => [row.name, row.name_en, row.gu].some((value) => value !== null && value.toLowerCase().includes(needle));
+    const byId = new Map<string, Row>();
+    for (const row of hits.flat()) if (literal(row)) byId.set(row.id, row);
+    places = [...byId.values()].sort((x, y) => x.name.localeCompare(y.name, "ko")).slice(0, 50);
+  } else {
+    places = await must<Row[]>(
+      sb.from("places").select(columns).in("tier", ["A1", "A2"]).eq("serve_state", "on").order("name").limit(200),
+    );
+  }
   const { date, hour } = kstNow();
   const measured = await latestMeasured(date, hour);
   const levelById = new Map(measured.map((row) => [row.place.id, row.level]));
-  return (places as { id: string; tier: string; serve_state: string }[]).map((place) => ({
+  return places.map((place) => ({
     ...place,
     level: place.tier !== "B" && place.serve_state === "on" ? (levelById.get(place.id) ?? null) : null,
   }));
@@ -72,7 +77,7 @@ export async function weekPayload(id: string, tolerance: string, purpose: string
   const place = await findPlace(id);
   if (!place) return null;
   const used = purposeFor(place.tier, purpose);
-  const { date, hour } = kstNow();
+  const { date } = kstNow();
   const dates = Array.from({ length: 8 }, (_, index) => addDays(date, index));
   const sb = supabaseServer();
   const days = await must(
@@ -91,21 +96,16 @@ export async function weekPayload(id: string, tolerance: string, purpose: string
   const combos = await must(
     sb.from("recommendations").select("purpose, tolerance, state").eq("place_id", id).eq("date", date),
   );
-  let now: unknown = null;
+  let now: ReturnType<typeof nowFromLive> = null;
   if (place.tier !== "B") {
-    const measured = await latestMeasured(date, hour, id);
-    const row = measured[0];
-    if (row) {
-      const { data: liveRows, error: liveError } = await sb
-        .from("live_obs")
-        .select("ts, pop_min, pop_max")
-        .eq("place_id", id)
-        .order("ts", { ascending: false })
-        .limit(1);
-      if (liveError) throw new Error(driverMessage(liveError));
-      const live = liveRows?.[0] ?? null;
-      now = measuredNow(row, live);
-    }
+    const { data: liveRows, error: liveError } = await sb
+      .from("live_obs")
+      .select("ts, pop_min, pop_max, level")
+      .eq("place_id", id)
+      .order("ts", { ascending: false })
+      .limit(1);
+    if (liveError) throw new Error(driverMessage(liveError));
+    now = nowFromLive(liveRows?.[0] ?? null, Date.now());
   }
   return {
     place: {
@@ -184,14 +184,16 @@ export async function dayHours(id: string, date: string) {
 }
 
 export async function mapPayload(date: string, tolerance: string, purpose: string, stations: boolean) {
-  const rows = await must(
+  const rows = await selectAll((from, to) =>
     supabaseServer()
       .from("recommendations")
       .select("place_id, purpose, state, windows, hours, strip_mode, places!inner(id, tier, name, name_en, lat, lon)")
       .eq("date", date)
       .eq("tolerance", tolerance)
       .in("purpose", [purpose, "none"])
-      .limit(500),
+      .order("place_id")
+      .order("purpose")
+      .range(from, to),
   );
   const list = rows as unknown as {
     purpose: string;
@@ -234,15 +236,18 @@ export async function upcomingHolidays() {
 
 export async function flagCounts() {
   const { date } = kstNow();
-  const rows = await must(
+  const rows = await selectAll((from, to) =>
     supabaseServer()
       .from("recommendations")
       .select("purpose, tolerance, state, places!inner(tier, foreign_heavy)")
       .eq("date", date)
-      .limit(2000),
+      .order("place_id")
+      .order("purpose")
+      .order("tolerance")
+      .range(from, to),
   );
   const counts = new Map<string, number>();
-  for (const row of rows as { purpose: string; tolerance: string; state: string; places: { tier: string; foreign_heavy: boolean } | { tier: string; foreign_heavy: boolean }[] }[]) {
+  for (const row of rows as unknown as { purpose: string; tolerance: string; state: string; places: { tier: string; foreign_heavy: boolean } | { tier: string; foreign_heavy: boolean }[] }[]) {
     const place = Array.isArray(row.places) ? row.places[0] : row.places;
     if (!place) throw new Error("foreign_heavy");
     const heavy = requireForeignHeavy(place.foreign_heavy);
@@ -269,9 +274,9 @@ export async function homePayload(tolerance: string, purpose: string) {
   const ids = liveNow.map((row) => row.place.id);
   const pops = new Map<string, { pop_min: number; pop_max: number }>();
   if (ids.length) {
-    const [dayStart] = dayBounds(date);
+    const [since] = hourBounds(date, Math.max(hour - 2, 0));
     const live = await must(
-      sb.from("live_obs").select("place_id, ts, pop_min, pop_max").in("place_id", ids).gte("ts", dayStart).order("ts", { ascending: false }).limit(2000),
+      sb.from("live_obs").select("place_id, ts, pop_min, pop_max").in("place_id", ids).gte("ts", since).order("ts", { ascending: false }).limit(1000),
     );
     for (const row of live as { place_id: string; pop_min: number; pop_max: number }[]) {
       if (!pops.has(row.place_id)) pops.set(row.place_id, { pop_min: row.pop_min, pop_max: row.pop_max });
@@ -290,7 +295,7 @@ export async function homePayload(tolerance: string, purpose: string) {
       pop_max: pops.get(row.place.id)?.pop_max ?? null,
     })),
   );
-  const quiet = await quietPlaces(date, liveNow);
+  const quiet = await quietPlaces(date, hour, liveNow);
   const windowIds = [...busy.map((row) => row.id), ...quiet.map((row) => row.id)];
   const windows = await todayWindows(date, tolerance, purpose, windowIds);
   return {
@@ -303,80 +308,69 @@ export async function homePayload(tolerance: string, purpose: string) {
 
 async function quietPlaces(
   date: string,
+  clockHour: number,
   measured: { place: Place; level: number; hour: number }[],
 ) {
   const sb = supabaseServer();
   const onNow = measured.filter((row) => row.level <= 1);
-  const latest = new Map<string, number>();
+  const activity = new Map<string, { hour: number; value: number }>();
+  const openA2 = new Set<string>();
   if (onNow.length) {
-    const [dayStart, dayEnd] = dayBounds(date);
+    const [since] = hourBounds(date, Math.max(clockHour - 2, 0));
+    const [, dayEnd] = dayBounds(date);
     const rows = await must(
       sb
         .from("forecast_hourly")
         .select("place_id, target_ts, a_all")
         .eq("a_actual", true)
         .in("place_id", onNow.map((row) => row.place.id))
-        .gte("target_ts", dayStart)
+        .gte("target_ts", since)
         .lt("target_ts", dayEnd)
         .order("target_ts", { ascending: false })
-        .limit(4000),
+        .limit(1000),
     );
     for (const row of rows as { place_id: string; target_ts: string; a_all: number | null }[]) {
-      if (latest.has(row.place_id) || row.a_all === null) continue;
-      const owner = onNow.find((item) => item.place.id === row.place_id);
-      if (!owner) continue;
-      if (kstHour(row.target_ts) < owner.hour - 2) continue;
-      latest.set(row.place_id, row.a_all);
+      if (activity.has(row.place_id) || row.a_all === null) continue;
+      activity.set(row.place_id, { hour: kstHour(row.target_ts), value: row.a_all });
     }
-  }
-  const a2ids = onNow.filter((row) => row.place.tier === "A2").map((row) => row.place.id);
-  const openA2 = new Set<string>();
-  if (a2ids.length) {
-    const rows = await must(
-      sb
-        .from("recommendations")
-        .select("place_id, hours")
-        .eq("date", date)
-        .eq("tolerance", "moderate")
-        .eq("purpose", "none")
-        .in("place_id", a2ids),
-    );
-    for (const row of rows as { place_id: string; hours: { h: number; reason: string }[] | null }[]) {
-      const owner = onNow.find((item) => item.place.id === row.place_id);
-      const cell = row.hours?.find((item) => item.h === owner?.hour);
-      if (cell && cell.reason !== "outside_hours") openA2.add(row.place_id);
-    }
-  }
-  const candidates = onNow
-    .filter((row) => {
-      if (row.place.tier === "A1") {
-        const activity = latest.get(row.place.id);
-        return activity !== undefined && activity >= 0.5;
+    const a2 = onNow.filter((row) => row.place.tier === "A2");
+    if (a2.length) {
+      const cells = await must(
+        sb
+          .from("recommendations")
+          .select("place_id, hours")
+          .eq("date", date)
+          .eq("tolerance", "moderate")
+          .eq("purpose", "none")
+          .in("place_id", a2.map((row) => row.place.id)),
+      );
+      for (const row of cells as { place_id: string; hours: { h: number; reason: string }[] | null }[]) {
+        const cell = row.hours?.find((item) => item.h === clockHour);
+        if (cell && cell.reason !== "outside_hours") openA2.add(row.place_id);
       }
-      return openA2.has(row.place.id);
-    })
-    .map((row) => ({
-      id: row.place.id,
-      tier: row.place.tier,
-      name: row.place.name,
-      name_en: row.place.name_en,
-      gu: row.place.gu,
-      level: row.level,
-      activity: row.place.tier === "A1" ? latest.get(row.place.id) ?? null : null,
-    }));
-  return pickQuiet(candidates);
+    }
+  }
+  const chosen = quietSelection(
+    onNow.map((row) => ({ id: row.place.id, tier: row.place.tier, level: row.level, hour: row.hour, name: row.place.name, name_en: row.place.name_en, gu: row.place.gu })),
+    clockHour,
+    activity,
+    openA2,
+  );
+  return pickQuiet(chosen.map((row) => ({ id: row.id, tier: row.tier, name: row.name, name_en: row.name_en, gu: row.gu, level: row.level, activity: row.activity })));
 }
 
 async function latestMeasured(date: string, clockHour: number, placeId?: string) {
-  const [dayStart, dayEnd] = dayBounds(date);
+  // "Now" is the current or the previous clock hour, so only those two hours are read.
+  const [since] = hourBounds(date, Math.max(clockHour - 1, 0));
+  const [, dayEnd] = dayBounds(date);
   let query = supabaseServer()
     .from("forecast_hourly")
     .select("place_id, target_ts, level, places!inner(id, tier, name, name_en, gu, serve_state)")
     .eq("source", "live")
-    .gte("target_ts", dayStart)
+    .gte("target_ts", since)
     .lt("target_ts", dayEnd)
     .order("target_ts", { ascending: false })
-    .limit(4000);
+    .limit(1000);
   if (placeId) query = query.eq("place_id", placeId);
   const rows = await must(query);
   const seen = new Map<string, { place: Place; level: number; hour: number; target_ts: string }>();
@@ -388,7 +382,6 @@ async function latestMeasured(date: string, clockHour: number, placeId?: string)
   }[]) {
     if (seen.has(row.place_id) || row.level === null) continue;
     const hour = kstHour(row.target_ts);
-    if (hour < clockHour - 1) continue;
     const place = Array.isArray(row.places) ? row.places[0] : row.places;
     seen.set(row.place_id, { place, level: row.level, hour, target_ts: row.target_ts });
   }

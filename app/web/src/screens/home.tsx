@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { AppBar, LevelDot, MiniStrip, Phone, PlaceName, StateBox } from "@/components/ui";
-import { formatStoredWindows } from "@/lib/format";
+import { formatClock, formatStoredWindows } from "@/lib/format";
 import { kstNow } from "@/lib/kst";
 import type { HourCell } from "@/lib/strip";
 import { readConditions, readFavorites, type Favorite } from "@/lib/storage";
@@ -31,6 +31,11 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
   }, []);
   const loaded = useLoad<HomeBody>(`/api/home?tolerance=${cond.tolerance}&purpose=${cond.purpose}`);
   const suffix = t("time.hour");
+  // Late data is said as late data. The lists are for fresh data only.
+  const late = Boolean(loaded.data?.stale);
+  const lateText = late && loaded.data?.as_of ? t("state.stale", { time: formatClock(loaded.data.as_of) }) : undefined;
+  const busy = loaded.data && !late ? loaded.data.busy_top : [];
+  const quiet = loaded.data && !late ? loaded.data.open_quiet : [];
   return (
     <Phone>
       <AppBar mapHref={`/${locale}/map`} />
@@ -44,10 +49,8 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
       </div>
       <div className="mt-6 flex flex-col gap-6">
       <section data-busy>
-        <h2 className="section mb-2">
-          {t("home.busyTop")}
-          {loaded.data?.stale ? <span className="caption ml-2" style={{ color: "var(--stale-fg)" }}>{t("now.asOf", { time: "" })}</span> : null}
-        </h2>
+        <h2 className="section mb-2">{t("home.busyTop")}</h2>
+        {late ? <StateBox kind={lateText ? "stale" : "preparing"} text={lateText} /> : null}
         {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
         {!loaded.data && !loaded.error ? (
           <div data-state="skeleton" className="flex flex-col gap-2">
@@ -56,9 +59,9 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
             ))}
           </div>
         ) : null}
-        {loaded.data && loaded.data.busy_top.length === 0 ? <p data-busy-empty className="body">{t("home.busyTopEmpty")}</p> : null}
+        {loaded.data && !late && loaded.data.busy_top.length === 0 ? <p data-busy-empty className="body">{t("home.busyTopEmpty")}</p> : null}
         <ol>
-          {(loaded.data?.busy_top ?? []).map((row, index) => {
+          {busy.map((row, index) => {
             const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
             return (
             <li key={row.id}>
@@ -92,9 +95,9 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
             ))}
           </div>
         ) : null}
-        {(loaded.data?.open_quiet.length ?? 0) === 0 && loaded.data ? <p data-quiet-empty className="body">{t("home.openQuietEmpty")}</p> : null}
+        {loaded.data && !late && quiet.length === 0 ? <p data-quiet-empty className="body">{t("home.openQuietEmpty")}</p> : null}
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-3">
-          {(loaded.data?.open_quiet ?? []).map((row) => {
+          {quiet.map((row) => {
             const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
             return (
             <a key={row.id} href={`/${locale}/p/${row.id}/${kstNow().date}`} data-quiet={row.level} className="flex w-[232px] shrink-0 snap-start flex-col gap-3 rounded-[16px] border border-line p-4 shadow-[var(--shadow-card)]">

@@ -14,9 +14,10 @@ function allowed(given: string): boolean {
   return mismatch === 0;
 }
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
-  const token = (await searchParams).token ?? "";
-  if (!allowed(token)) notFound();
+export default async function Page({ searchParams }: { searchParams: Promise<{ token?: string | string[] }> }) {
+  const given = (await searchParams).token;
+  // A repeated parameter arrives as an array; only a single string can be the token.
+  if (typeof given !== "string" || !allowed(given)) notFound();
   const db = supabaseServer();
   const [models, forecast, reco, strip, places, jobs] = await Promise.all([
     db.from("model_registry").select("name, version, horizons, active"),
@@ -26,6 +27,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     db.from("places").select("tier, serve_state"),
     db.from("job_runs").select("job, status, started_at, finished_at, detail").order("id", { ascending: false }).limit(50),
   ]);
+  // A failed read must not render as an empty table.
+  const failed = Object.entries({ models, forecast, reco, strip, places, jobs }).filter(([, result]) => result.error).map(([name]) => name);
+  if (failed.length) throw new Error(`admin read failed: ${failed.join(", ")}`);
   return (
     <main>
       <h1>Model registry</h1>

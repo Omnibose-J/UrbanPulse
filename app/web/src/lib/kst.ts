@@ -48,3 +48,14 @@ export function hourBounds(date: string, hour: number): [string, string] {
 export function dayBounds(date: string): [string, string] {
   return [`${date}T00:00:00+09:00`, `${addDays(date, 1)}T00:00:00+09:00`];
 }
+
+/** The hour the map shows: an integer from 9 to 23. Anything else in the address is replaced by the clock hour. */
+export function initialHour(given: string | undefined, clockHour: number): number {
+  const parsed = given !== undefined && /^\d{1,2}$/.test(given) ? Number(given) : clockHour;
+  return Math.min(23, Math.max(9, parsed));
+}
+
+/** A date the service can answer for: today through today + 7 (KST). */
+export function inServedRange(date: string, today: string): boolean {
+  return date >= today && date <= addDays(today, 7);
+}

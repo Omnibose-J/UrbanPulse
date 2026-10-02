@@ -8,7 +8,7 @@ import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindow
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
 import { kstNow } from "@/lib/kst";
-import { readConditions, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
+import { readConditions, readFavorites, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
 import { useLoad } from "@/lib/use-load";
 
 type Rec = {
@@ -45,10 +45,11 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
         purpose: purpose === "food" || purpose === "shop" || purpose === "sight" ? purpose : stored.purpose,
         tolerance: tol === "calm" || tol === "moderate" || tol === "busy_ok" ? tol : stored.tolerance,
       });
+      setStar(readFavorites().some((item) => item.id === id));
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [id]);
   const loaded = useLoad<Rec>(ready ? `/api/places/${id}/recommend?date=${date}&tolerance=${cond.tolerance}&purpose=${cond.purpose}` : null);
   const place = loaded.data?.place;
   const rec = loaded.data?.recommendation;
@@ -58,7 +59,8 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   const comboOff = rec?.state === "off" && (rec.off_reason === "failed" || rec.off_reason === "unverified");
   const none = Boolean(rec?.no_window) && rec?.state !== "off";
   const myeongjeol = rec?.off_reason === "myeongjeol";
-  const preparing = place?.serve_state === "preparing" || rec?.off_reason === "preparing";
+  // No row at all for an in-range date is missing data, the same state as a row that says so.
+  const preparing = place?.serve_state === "preparing" || rec?.off_reason === "preparing" || (Boolean(loaded.data) && !rec);
   const ranges = formatStoredWindows(rec?.windows, locale, suffix);
   const today = kstNow().date;
   const weekdays = t.raw("time.weekdays") as string[];
@@ -74,20 +76,20 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
         backHref={back}
         backLabel={fromMap ? t("map.title") : t("week.back")}
         star={star}
-        onStar={() => {
-          if (!place) return;
-          const next = toggleFavorite({ id: place.id, name: place.name, nameEn: place.name_en, gu: place.gu });
-          setStar(next.some((item) => item.id === place.id));
-        }}
+        onStar={
+          place
+            ? () => {
+                const next = toggleFavorite({ id: place.id, name: place.name, nameEn: place.name_en, gu: place.gu });
+                setStar(next.some((item) => item.id === place.id));
+              }
+            : undefined
+        }
       />
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
+      {loaded.missing ? <StateBox kind="missing" /> : null}
       {loaded.loading ? <StateBox kind="skeleton" /> : null}
       {place && preparing ? <StateBox kind="preparing" /> : null}
-      {place && comboOff ? (
-        <div data-state="preparing" className="flex items-start gap-3 rounded-[var(--r)] bg-bg-soft p-4">
-          <p className="body">{t("state.comboOff")}</p>
-        </div>
-      ) : null}
+      {place && comboOff && !preparing ? <StateBox kind="comboOff" /> : null}
       {place && myeongjeol ? <AnswerCard variant="myeongjeol" name={place.name} nameEn={place.name_en} dateLine={dateLine} /> : null}
       {place && !preparing && !myeongjeol && none ? (
         <AnswerCard variant="none" name={place.name} nameEn={place.name_en} dateLine={dateLine} />
@@ -114,7 +116,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
             <AltButton key={alt.place_id} href={`/${locale}/p/${alt.place_id}/${date}`} label={t("alt.similar", { place: alt.name, time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
           ))
         : null}
-      {place && !myeongjeol && (place.tier !== "B" || comboOff) ? (
+      {place && !myeongjeol && place.serve_state !== "preparing" ? (
         <ConditionField label={condLabel} onClick={() => setOpen(true)} />
       ) : null}
       {rec?.hours && rec.state !== "off" ? (
@@ -136,6 +138,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
           onApply={(next) => {
             writeConditions(next);
             setCond(next);
+            setPicked(null);
             setOpen(false);
           }}
         />

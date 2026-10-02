@@ -43,7 +43,8 @@
     "dayPick": "Best on {date}: {time}",
     "includeStations": "Include station areas",
     "hourNow": "{hour}",
-    "hourLine": "{hour}: {verdict}."
+    "hourLine": "{hour}: {verdict}.",
+    "station": "{name} · estimate"
   },
   "cond": {
     "change": "Change"
@@ -53,8 +54,10 @@
     "purpose": "What are you going for?",
     "crowd": "How busy is OK?",
     "apply": "Apply",
-    "preparing": "{purpose} with '{tolerance}' is not ready yet.",
-    "moved": "Switched to '{tolerance}'."
+    "preparing": "{purpose} with ‘{tolerance}’ is not ready yet.",
+    "moved": "Switched to ‘{tolerance}’.",
+    "close": "Close",
+    "preparingPlain": "‘{tolerance}’ is not ready yet."
   },
   "purpose": {
     "sight": "Look around",
@@ -90,11 +93,15 @@
     "closed": "Shops are quiet at this hour.",
     "tooBusy": "It is too busy.",
     "tooBusyB": "This is the busiest part of the day.",
-    "window": "This is a recommended time",
-    "ok": "OK to go",
-    "avoid": "Better to avoid",
+    "window": "is a recommended time",
+    "ok": "is OK to go",
+    "avoid": "is better avoided",
     "notPick": "{hour} is not one of the best times.",
-    "cell": "{hour}: {verdict}. {why}"
+    "cell": "{hour} {verdict}. {why}",
+    "crowdOnly0": "It is quiet",
+    "crowdOnly1": "It is moderately busy",
+    "crowdOnly2": "It is a bit busy",
+    "crowdOnly3": "It is quite busy"
   },
   "now": {
     "l0": "It is quiet right now",
@@ -121,7 +128,10 @@
     "weekNoneHint": "Changing your settings might turn one up.",
     "past": "That date has passed, so here is this week",
     "stale": "Data is running late (last update {time})",
-    "tierb": "No live data, so this is the usual flow. This feature is experimental."
+    "tierb": "No live data, so this is the usual flow. This feature is experimental.",
+    "notFoundPlace": "We cannot find this place.",
+    "notFoundPage": "We cannot find this page.",
+    "outOfRange": "You can look up to 7 days ahead."
   },
   "search": {
     "empty": "No place with that name. Try a nearby station."
@@ -131,7 +141,15 @@
     "month": "",
     "day": "",
     "hour": "",
-    "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    "weekdays": [
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ]
   },
   "about": {
     "title": "About",
@@ -147,6 +165,7 @@
   },
   "nav": {
     "logo": "UrbanPulse",
-    "language": "Language"
+    "language": "Language",
+    "home": "Home"
   }
 }

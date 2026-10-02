@@ -11,12 +11,11 @@ export function reasonMessageIds(tier: string, window: ReasonWindow | null | und
     const band = window.crowd <= 0 ? 0 : window.crowd === 1 ? 1 : 2;
     return [`reason.b${band}`];
   }
-  const ids = [`reason.crowd${window.crowd}`];
   if (window.act && window.act_level) {
     const level = window.act_level === "lively" ? "Lively" : "Quiet";
-    ids.push(`reason.${window.act}${level}`);
+    return [`reason.crowd${window.crowd}`, `reason.${window.act}${level}`];
   }
-  return ids;
+  return [`reason.crowdOnly${window.crowd}`];
 }
 
 export type HourCell = {

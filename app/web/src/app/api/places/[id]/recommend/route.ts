@@ -1,4 +1,4 @@
-import { jsonFail, jsonOk, logApiError, readDate, readPurpose, readTolerance } from "@/lib/http";
+import { inServedRange, jsonFail, jsonOk, logApiError, readDate, readPurpose, readTolerance } from "@/lib/http";
 import { kstNow } from "@/lib/kst";
 import { recommendPayload } from "@/lib/queries";
 
@@ -13,6 +13,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!date || !tolerance || !purpose) return jsonFail(400, "invalid date, tolerance, or purpose");
   const today = kstNow().date;
   if (date < today) return jsonFail(410, "date has passed");
+  if (!inServedRange(date, today)) return jsonFail(400, "date is more than 7 days ahead");
   try {
     const body = await recommendPayload(id, date, tolerance, purpose, today);
     if (!body) return jsonFail(404, "unknown place");
