@@ -28,24 +28,24 @@ def run(apply: bool = False, flags_path: Path | None = None) -> int:
             cur.execute("set time zone 'Asia/Seoul'")
         table, strip, changes = _judge(conn)
     today = datetime.now(KST).date()
-    out = settings.REPO_ROOT / "data" / "rejudge" / f"{today.isoformat()}.yaml"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_proposed_text(path, changes, today), encoding="utf-8")
     for line in table:
         print(line)
     detail = {
         "table": table,
         "strip": strip,
-        "changes": changes,
-        "yaml": str(out.relative_to(settings.REPO_ROOT)),
+        "changes": {
+            f"{group}/{purpose}/{tolerance}": state for (group, purpose, tolerance), state in changes.items()
+        },
     }
-    if apply and changes:
-        path.write_text(_proposed_text(path, changes, today), encoding="utf-8")
+    _record(env["DATABASE_URL"], detail)
+    proposed = _proposed_text(path, changes, today)
+    if apply and changes and proposed.encode("utf-8") != before:
+        print(proposed)
+        path.write_text(proposed, encoding="utf-8")
     elif path.read_bytes() != before:
         path.write_bytes(before)
         return 1
     log(JOB, "done", changes=len(changes))
-    _record(env["DATABASE_URL"], detail)
     return 0
 
 
@@ -94,7 +94,12 @@ def _rate(frame: pd.DataFrame, numer: str, denom: str) -> dict:
     point = float(frame[numer].sum()) / float(frame[denom].sum()) * 100
     groups = {}
     for place, part in frame.groupby("place_id"):
-        groups[place] = np.array([float(part[numer].sum()) / float(part[denom].sum())])
+        rows = []
+        for lively, hours in zip(part[numer].tolist(), part[denom].tolist(), strict=True):
+            good = int(lively or 0)
+            total = int(hours or 0)
+            rows.append(np.array([1] * good + [0] * max(total - good, 0), dtype=float))
+        groups[place] = np.concatenate(rows) if rows else np.array([0.0])
     return {"point": point, "ci": boot(groups, lambda samples: np.concatenate(samples).mean() * 100)}
 
 
