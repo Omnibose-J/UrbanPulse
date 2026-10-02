@@ -23,6 +23,6 @@ $CmdExe = Join-Path $env:SystemRoot "System32\cmd.exe"
 $Arg = '/c cd /d "' + $Repo + '" && "' + $Python + '" -m engine evaluate >> "' + $Log + '" 2>&1'
 $Action = New-ScheduledTaskAction -Execute $CmdExe -Argument $Arg -WorkingDirectory $Repo
 $Trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
-$Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 20) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 20) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -WakeToRun
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Force | Out-Null
 Write-Output ("registered " + $TaskName + " at 06:00")
