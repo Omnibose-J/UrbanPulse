@@ -1,5 +1,7 @@
 # SOW-MC — Move to the cloud: hosted database, Cloud Run Jobs, GCS, Vercel
 
+The other work orders this file mentions (SOW-M4, SOW-M7, SOW-H1, SOW-L1) are finished and were removed from the repo on 2026-10-02; they are in git history. `docs/RUNBOOK.md` is the order to follow; this file is the list of what must be true afterwards.
+
 Everything runs on one laptop today, and it stops whenever the laptop sleeps (14 collect slots lost on 2026-10-02). This SOW moves the three parts to managed services without changing any computed value:
 
 | Part | Local now | After this SOW |

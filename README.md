@@ -16,7 +16,7 @@
 | `models/` | 학습된 예측 모델 |
 | `analysis/scripts/` | 수치의 근거가 된 실험 코드 (실행·수정 금지, 읽기용) |
 | `scripts/` | 작업 스케줄 등록, 클라우드 이전 스크립트(`scripts/cloud/`) |
-| `design/` | 화면 시안 (`UrbanPulse_시안_v6.html`을 브라우저로 열면 됨) |
+| `design/` | 화면 시안 (브라우저로 열면 됨) |
 | `docs/` | 문서 전부 (아래 표) |
 
 ## 문서
@@ -28,11 +28,9 @@
 | `docs/specs/UrbanPulse_구현설계서.md` | 구조, DB, 작업, 검증 규칙 |
 | `docs/specs/UrbanPulse_디자인명세서.md` | 화면, 색·글자 규칙, 문구 |
 | `docs/RUNBOOK.md` | 클라우드로 옮기는 순서와 운영 방법 |
-| `docs/sow/` | 단계별 작업 지시서 |
-| `docs/tracking/` | 단계별 검수 기록, 미해결 사항(`findings.md`) |
+| `docs/sow/SOW-MC.md` | 클라우드 이전 때 확인할 항목 |
+| `docs/tracking/findings.md` | 아직 안 고친 문제 목록 |
 | `AGENTS.md`, `docs/LLM_PROJECT_MAP.md` | 코딩 에이전트용 규칙과 파일 지도 (영어) |
-
-같은 내용의 `.docx`가 `docs/specs/`에 같이 있음.
 
 ## 로컬 실행
 

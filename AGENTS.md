@@ -1,48 +1,69 @@
 # AGENTS.md — UrbanPulse
 
-Read this and `docs/LLM_PROJECT_MAP.md` before touching anything. Human-facing specs are Korean; this file and `docs/sow/` are written for whoever implements, a person or a coding agent. A SOW is the contract: the implementer builds exactly what it says and reports evidence. Start with `README.md` for the local setup.
+Rules for any coding agent (or person) changing this repo. Read this file, then `docs/LLM_PROJECT_MAP.md` (where things live, every command). Setup for a fresh clone is in `README.md` (Korean).
 
-UrbanPulse tells visitors (first target: Seoul residents and domestic travellers; English UI for tourists) when to go to a Seoul hotspot they already chose, from later today up to 7 days ahead, avoiding closed hours and the busiest hour. Tier B (station areas outside the 121 places) is an experimental feature reachable by search only. Screens read precomputed rows; a Python engine running as scheduled jobs does all computation.
+UrbanPulse tells a visitor when to go to a Seoul hotspot they already chose, from later today up to 7 days ahead, avoiding closed hours and the busiest hour. A Python engine runs as scheduled batch jobs and writes precomputed rows to Postgres; a Next.js app only reads them. Everything runs locally today; the cloud move is scripted and rehearsed but not done (`docs/RUNBOOK.md`).
 
-## What is in this repo
+## Sources of truth
 
-| Path | What | Your access |
+| Question | Where | Note |
 |---|---|---|
-| `docs/specs/UrbanPulse_구현설계서.md` | **Build contract** (Korean): architecture, schema, jobs, invariants, work units W0–W13 | Read |
-| `docs/specs/UrbanPulse_서비스정의서.md` | Product spec (Korean). Wins over the build contract on product questions; report any conflict | Read |
-| `docs/specs/UrbanPulse_디자인명세서.md` | UI spec (Korean): tokens, components, screens, copy, states | Read |
-| `docs/specs/*.docx` | Exports of the specs for humans, regenerated with `pandoc` | Never edit by hand |
-| `analysis/scripts/` | Research code that produced every number in the specs. Source of parsers and model code the engine ports | **Read-only.** Port by copying into `app/engine/` when a SOW says so; never import from `analysis/` |
-| `analysis/data/` | 6 GB of research data. Gitignored | Read-only. Never rewrite |
-| `app/engine/` | Python engine (package `engine`), Docker image for Cloud Run Jobs | You build this |
-| `app/supabase/` | Supabase config, migrations, pgTAP tests | You build this |
-| `app/web/` | Next.js (App Router, TypeScript, Tailwind v4) on Vercel | You build this |
-| `models/` | Trained model artifacts (W5+), tracked | Created by SOW steps only |
-| `docs/LLM_PROJECT_MAP.md` | Where everything lives, entry-point commands, data flow, invariants, milestone order | Read first; update when you add a file class or a command |
-| `docs/sow/` | Statements of work | Read; do not edit |
-| `docs/tracking/` | `criteria-<milestone>.md` per milestone; `findings.md` for out-of-scope problems | You fill result cells **after** running |
+| What the product promises and why | `docs/specs/UrbanPulse_서비스정의서.md` | Wins over the other specs |
+| Architecture, schema, jobs, invariants | `docs/specs/UrbanPulse_구현설계서.md` | The build contract |
+| Screens, tokens, copy, states | `docs/specs/UrbanPulse_디자인명세서.md` | Copy tables in §5 and §9 |
+| One-page summary | `docs/specs/UrbanPulse_PRD.md` | Not a contract |
+| Cloud move and operations | `docs/RUNBOOK.md`, `docs/sow/SOW-MC.md` | SOW-MC is the acceptance list for the move |
+| Known problems not yet fixed | `docs/tracking/findings.md` | Append-only table |
+
+The specs are Korean and are the contract. When a change alters behaviour, a screen, a token, a message or the schema, update the matching spec section in the same commit and add one line to the version notes at the top of that spec.
+
+## Where to change what
+
+| Task | Files | Then |
+|---|---|---|
+| UI text | `app/web/messages/ko.json` and `en.json` (both, same keys) | the copy table in the design spec; `node app/web/scripts/check-messages.mjs` |
+| Colour, radius, shadow, spacing | `app/web/src/styles/tokens.css` | design spec §3; no hex in components |
+| A screen | `app/web/src/screens/*.tsx`, shared parts in `src/components/ui.tsx` | e2e spec for that screen |
+| What an API returns | `app/web/src/lib/queries.ts`, routes under `src/app/api/` | `e2e/api.spec.ts` |
+| Turn a recommendation combination on, reference or off | `app/engine/config/feature_flags.yaml` | `python -m engine forecast`; never hard-code it in the web app |
+| Recommendation rules | `app/engine/reco.py`, `judge.py` | `app/engine/tests/`; build contract §4.4 |
+| Level thresholds, forecast | `app/engine/levels.py`, `ratio_model.py`, `jobs/forecast.py` | build contract §4.2, §5 |
+| A job | `app/engine/jobs/<job>.py`, wired in `app/engine/__main__.py` | a test that runs the job on `tempdb.schema()` |
+| Schema | a new file in `app/supabase/migrations/` (never edit an applied one) | build contract §3; `scripts/cloud/rehearse.ps1` |
+| Cloud scripts | `scripts/cloud/` | `-Plan` run; `rehearse.ps1`; `docs/RUNBOOK.md` |
 
 ## Hard rules
 
-1. **No computation on the request path.** Web route handlers only read tables. Every forecast, level, recommendation and flag is computed by the engine and stored.
-2. **The on/off table is data, not code.** Whether a recommendation combination is on, reference-only or off comes from `recommendations.state` (written by the engine from `app/engine/config/feature_flags.yaml`). The web app never hard-codes which combinations are off. A combination that is not in the flag file is off.
-3. **Fail loud, no silent fallback.** Missing data → `ready=false` and the "준비 중" state. An API failure → the error state, never stale data shown as fresh. A missing env var → exit non-zero naming the variable. Do not add a fallback a SOW did not ask for.
-4. **Secrets via environment only.** `.env` stays gitignored; commit `.env.example` with names only. Never print a secret or a URL that contains one (the Seoul API puts the key in the URL path — log the place code, never the URL). Never paste a secret into a report. The service-role key and database URL never reach browser code.
-5. **Korean and English UI strings live only in `app/web/messages/{ko,en}.json`**, copied byte-for-byte from `docs/specs/UrbanPulse_디자인명세서.md` §5 and §9. Components contain no literal user-facing text. Do not "improve" copy.
-6. **Colors, type and spacing only through the tokens** in 디자인명세서 §3 (`app/web/src/styles/tokens.css`). No hex values in components.
-7. **Evidence = literal command + exit code + the decisive output line**, recorded in `docs/tracking/criteria-<milestone>.md` **after** the run. Create that file with empty result cells before you start; never pre-fill a cell. Never weaken, skip or delete a test, special-case a fixture, or hard-code an expected value. Pre-registered bars (build contract §7, reproduction tolerances in §8) are not tuned to pass: if one is missed, stop that step, record the measured value, and follow `docs/sow/README.md` "Unattended run".
-8. **Language.** Code, comments, commit messages, docs you write → English. User-facing strings → from the specs.
-9. **Windows dev box.** Python 3.10 at `python`; PowerShell 5.1 (no `&&`/`||`); paths may contain Korean, always quote them; write files as UTF-8; set `PYTHONUTF8=1` when a script prints Korean. Installed: git, gh, node 24, npm, Docker Desktop, `supabase`, `vercel`, `pandoc`. `gcloud` arrives at SOW-MC. Local Supabase for this project runs on ports 553xx (`app/supabase/config.toml`) because another project occupies 543xx. `pip install -e .` once, then `python -m engine <job>` works from any directory.
-10. **Do not run research scripts** in `analysis/scripts/` unless a SOW step names the exact command. Some of them download for hours or rewrite `analysis/data/`.
-11. **When blocked** (API behaves differently, platform limit, spec conflict, bar missed): stop that step, write it under **Open facts** in your report, and if it is outside the SOW's scope append it to `docs/tracking/findings.md` with why it cannot be fixed now and what it touches. Do not invent a workaround or silently narrow scope.
-12. **Surgical.** Touch only what the SOW names. Do not reformat, rename or reorganise files you did not create.
-13. **Time.** Store `timestamptz`; the engine computes in `Asia/Seoul`; display KST.
+1. **No computation on the request path.** Route handlers only read tables. Forecasts, levels, recommendations and flags are computed by the engine and stored.
+2. **The on/off table is data.** A combination's state comes from `recommendations.state`, written by the engine from `feature_flags.yaml`. A combination missing from the file is off.
+3. **Fail loud, no silent fallback.** Missing data shows the "준비 중" state; an API failure shows the error state; stale data is labelled stale; a missing env var exits non-zero naming it. Never show a default in place of a value that is not there.
+4. **Secrets via environment only.** `.env` and `.env.cloud` are gitignored; `.env.example` has names only. Never print a secret or a URL containing one (the Seoul API key is in the URL path: log the place code, not the URL). The service-role key and the database URL never reach browser code. The admin token is never put in an address.
+5. **UI strings live only in `app/web/messages/{ko,en}.json`** and match the design spec's copy tables. Components contain no literal user-facing text. Korean copy is 해요체, plain, with the visitor as the subject.
+6. **Colours, type and spacing only through tokens.** No gradients, no hex in components.
+7. **Evidence is a command and its exit code.** Before saying something works, run the gates below and report what ran. Untested code is "built, untested". Never weaken, skip or delete a test to get green, special-case a fixture, or hard-code an expected value. Pre-registered bars (build contract §7) are not tuned to pass: report the measured value instead.
+8. **Language.** Code, comments, this file and `docs/` (except `docs/specs/`) are English. Specs, `README.md`, UI copy and **commit messages are Korean**.
+9. **Research code is frozen.** `analysis/scripts/` produced every number in the specs: read it, never edit or import it, and do not run it (some scripts download for hours). `analysis/data/` is gitignored and read-only.
+10. **Surgical changes.** Touch what the task needs. No reformatting or renaming of unrelated files. A problem outside the task goes to `docs/tracking/findings.md` (date, where found, why not now, what it touches), not into the diff.
+11. **Never destroy data.** No `supabase db reset`, locally or remotely. Raw snapshots and `forecast_log` are never modified. Engine tests use a throwaway schema (`engine.tests.tempdb`), never the live tables.
+12. **No cloud action without the user.** Nothing touches a cloud account until `scripts/cloud/00_check.ps1` exits 0 and the user says go.
+13. **Time.** Store `timestamptz`; compute in `Asia/Seoul`; display KST.
 
-## Report format (end of every SOW, in the chat and in `docs/tracking/criteria-<milestone>.md`)
+## Gates (run what your change touches; all of them before a push)
 
-1. **Intent** — one paragraph: what the SOW asked, what you built.
-2. **Files** — created / modified / deleted, one line each.
-3. **Commands and exit codes** — every acceptance command, verbatim, with exit code and the decisive output line.
-4. **Tests** — name, pass/fail, count.
-5. **Open facts** — anything measured that the SOW did not predict, and anything you could not verify.
-6. **Not done** — every SOW item not finished, and why. Empty = everything in scope is done and verified.
+```
+python -m pytest app/engine/tests -q
+ruff check app/engine scripts/cloud
+cd app/web; npm run lint; npm test; npx playwright test
+python -m engine integrity --full
+powershell -File scripts/cloud/rehearse.ps1      # engine, migrations or scripts/cloud changed
+```
+
+Playwright needs the local database with data and starts `next dev` itself. Stop `next dev` before `npm run build`.
+
+## Environment
+
+Windows, PowerShell 5.1 (no `&&`), Python 3.10 at `python`, Node 24, Docker Desktop, `supabase`, `vercel`, `pandoc`; `gcloud` is not installed. Paths may contain Korean: quote them, write files as UTF-8, set `PYTHONUTF8=1` when printing Korean. `.ps1` files stay ASCII. Local Supabase runs on ports 553xx (`app/supabase/config.toml`). Write any file that contains backslashes or quotes with an editor tool, not a shell heredoc.
+
+## Reporting a change
+
+State what changed, the commands you ran with exit codes, anything measured that was not expected, and anything not done. Do not claim more than the commands proved.
