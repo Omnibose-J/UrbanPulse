@@ -19,7 +19,7 @@ import psycopg
 import yaml
 from psycopg.types.json import Jsonb
 
-from engine import raw_store, settings
+from engine import db, raw_store, settings
 from engine.log import log
 from engine.parsers import KST, CitySnapshot, parse_citydata
 from engine.seoul_api import SeoulError, fetch
@@ -100,39 +100,13 @@ def load_place_codes(path: Path | None = None) -> list[str]:
 @contextmanager
 def _ledger(database_url: str, job: str) -> Iterator[dict[str, Any]]:
     """job_runs row whose status comes from ctx['status'] (ok, warn, or fail)."""
-    conn = _connect(database_url)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("set time zone 'Asia/Seoul'")
-            cur.execute("insert into job_runs (job, status) values (%s, 'running') returning id", (job,))
-            row = cur.fetchone()
-            assert row is not None
-            run_id = row[0]
-        conn.commit()
-        ctx: dict[str, Any] = {"detail": None, "status": "ok"}
+    with db.ledger(database_url, job) as (_conn, ctx):
         try:
             yield ctx
-            status = ctx.get("status") or "ok"
-            detail = ctx["detail"]
         except psycopg.OperationalError:
-            status = "fail"
-            detail = dict(ctx["detail"] or {})
-            detail["reason"] = "database unavailable"
+            ctx["detail"] = dict(ctx["detail"] or {})
+            ctx["detail"]["reason"] = "database unavailable"
             raise
-        except Exception as exc:
-            status = "fail"
-            detail = dict(ctx["detail"] or {})
-            detail["error"] = f"{type(exc).__name__}: {exc}"
-            raise
-        finally:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "update job_runs set finished_at = now(), status = %s, detail = %s where id = %s",
-                    (status, Jsonb(detail) if detail is not None else None, run_id),
-                )
-            conn.commit()
-    finally:
-        conn.close()
 
 
 def _raw_dir(env: Mapping[str, str], raw_dir: str | Path | None) -> str | Path:

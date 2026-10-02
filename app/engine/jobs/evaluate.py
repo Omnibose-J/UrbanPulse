@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 import pandas as pd
-from psycopg.types.json import Jsonb
 
 from engine import db, settings
 from engine.hourly import hourly_frame
@@ -33,28 +32,15 @@ def run(day: date | None = None) -> int:
     env = settings.require(("DATABASE_URL",))
     target = day or yesterday()
     log(JOB, "start", date=target.isoformat())
-    with db.connect(env["DATABASE_URL"]) as conn:
-        with conn.cursor() as cur:
-            cur.execute("set time zone 'Asia/Seoul'")
-            cur.execute("insert into job_runs (job, status) values ('evaluate', 'running') returning id")
-            run_id = cur.fetchone()[0]
-        conn.commit()
-        try:
+    try:
+        with db.ledger(env["DATABASE_URL"], JOB) as (conn, ctx):
             detail = evaluate_date(conn, target)
-            status = "warn" if detail.get("warn") else "ok"
-        except Exception as exc:
-            detail = {"error": f"{type(exc).__name__}: {exc}"}
-            status = "fail"
-            log(JOB, "fail", reason=detail["error"])
-        with conn.cursor() as cur:
-            cur.execute(
-                "update job_runs set finished_at = now(), status = %s, detail = %s where id = %s",
-                (status, Jsonb(detail), run_id),
-            )
-        conn.commit()
-    if status == "fail":
-        return 1
-    log(JOB, "done", status=status)
+            ctx["status"] = "warn" if detail.get("warn") else "ok"
+            ctx["detail"] = detail
+    except BaseException as exc:
+        log(JOB, "fail", reason=type(exc).__name__)
+        raise
+    log(JOB, "done", status=ctx["status"])
     return 0
 
 
