@@ -12,8 +12,8 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 | A6 | A killed raw write can be rewritten | existing final name → error, no temp left | 0 | second write raises; the folder has no .tmp |
 | A7 | Collect fails loud and meets its deadline | all no_data → fail; hang ends at the deadline; one raw-write error | 0 | 21 no_data → fail; hang within 2s, POI001 deadline; POI002 raw write, other two stored; one storage client |
 | A8 | A bad database URL does not leak the password | raised text and stderr omit the dummy password | 0 | malformed URL raises "database connection failed"; dummy password absent from the text and stderr |
-| A9 | Archive does not delete unless a future decision says so | no flag, --dry-run, --execute | | |
-| A10 | Off places disappear from the forecast tables | a place switched to off has no rows after the run | | |
+| A9 | Archive does not delete unless a future decision says so | no flag, --dry-run, --execute | 0 | no flag exits 2 without connecting; --execute prints "retention decision pending" and exits 2; --dry-run prints counts and runs no delete |
+| A10 | Off places disappear from the forecast tables | a place switched to off has no rows after the run | 0 | temp schema: POI001 switched off, forecast and recommendation counts 0; preparing POI002 kept hours |
 | A11 | Today's refresh fixes alt dates that point at past hours | integrity query → 0 | | |
 | A12 | Stale follows the newest observation | both directions | | |
 | A13 | The model uses the holidays table | a newly added date changes hol | | |

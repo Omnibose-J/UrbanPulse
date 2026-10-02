@@ -76,6 +76,18 @@ def drop_past_forecasts(conn, today) -> None:
         cur.execute("delete from forecast_hourly where target_ts < %s", (issued_midnight(today),))
 
 
+def drop_unbuilt_forecasts(conn, started: datetime, today) -> None:
+    """Hours this run did not write are not part of the forecast anymore."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            delete from forecast_hourly
+            where target_ts >= %s and issued_ts is distinct from %s
+            """,
+            (issued_midnight(today), started),
+        )
+
+
 def apply_overlay(conn, now: datetime) -> None:
     """Hours with a live observation become `live`; later hours covered by city_fcst become `seoul`."""
     issued = issued_midnight(_today(now))
@@ -285,6 +297,7 @@ def _build(conn, started: datetime, today) -> dict:
     timing["forecast_hourly"] = round(time.perf_counter() - mark[0], 1)
     mark[0] = time.perf_counter()
     _write_tier_b_forecasts(conn, started, today)
+    drop_unbuilt_forecasts(conn, started, today)
     drop_past_forecasts(conn, today)
     _lap(mark, timing, "tier B")
     similar = replace_similar(conn, today)
@@ -726,6 +739,13 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
         if not only_today:
             log_rows = [_log_tuple(row, today) for row in log_candidates(built, today)]
             cur.execute("delete from recommendations where date < %s", (today,))
+            cur.execute(
+                """
+                delete from recommendations
+                where date >= %s and generated_at is distinct from %s
+                """,
+                (today, started),
+            )
     off_by: dict[str, int] = {}
     on = reference = no_window = 0
     for row in built:
