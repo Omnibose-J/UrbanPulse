@@ -114,7 +114,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
             <AltButton key={alt.place_id} href={`/${locale}/p/${alt.place_id}/${date}`} label={t("alt.similar", { place: alt.name, time: formatStoredWindows([{ hours: alt.hours }], locale, suffix).join(", ") })} />
           ))
         : null}
-      {place && !myeongjeol && place.tier !== "B" ? (
+      {place && !myeongjeol && (place.tier !== "B" || comboOff) ? (
         <ConditionField label={condLabel} onClick={() => setOpen(true)} />
       ) : null}
       {rec?.hours && rec.state !== "off" ? (

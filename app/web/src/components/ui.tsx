@@ -270,7 +270,8 @@ export function WeekList({
       <ul>
         {days.map((day) => {
           const best = day.state !== "off" && day.windows && day.windows.length > 0;
-          const time = best ? formatStoredWindows(day.windows, locale, mark.suffix)[0] : t("week.none");
+          const offLabel = day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("about.preparing");
+          const time = day.state === "off" ? offLabel : best ? formatStoredWindows(day.windows, locale, mark.suffix)[0] : t("week.none");
           const holiday = day.holiday
             ? locale === "en"
               ? day.holiday.name_en || day.holiday.name
@@ -296,13 +297,13 @@ export function WeekList({
                 </span>
                 <span className="relative">
                   {day.state === "off" ? (
-                    <span className="caption text-text-3">{day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("about.preparing")}</span>
+                    <span className="caption text-text-3">{offLabel}</span>
                   ) : day.hours ? (
                     <MiniStrip hours={day.hours} mode={day.strip_mode} />
                   ) : null}
                 </span>
                 <span data-week-time className={`relative min-w-0 text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
-                  {day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : time}
+                  {time}
                 </span>
               </a>
             </li>

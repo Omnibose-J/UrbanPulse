@@ -14,9 +14,8 @@ const PURPOSES = new Set<Purpose>(["sight", "food", "shop"]);
 const TOLERANCES = new Set<Tolerance>(["calm", "moderate", "busy_ok"]);
 
 export function normalizeConditions(parsed: { purpose?: string; tolerance?: string } | null) {
-  const purpose = parsed && PURPOSES.has(parsed.purpose as Purpose) ? (parsed.purpose as Purpose) : null;
-  const tolerance = parsed && TOLERANCES.has(parsed.tolerance as Tolerance) ? (parsed.tolerance as Tolerance) : null;
-  if (!purpose || !tolerance) return DEFAULTS;
+  const purpose = parsed && PURPOSES.has(parsed.purpose as Purpose) ? (parsed.purpose as Purpose) : DEFAULTS.purpose;
+  const tolerance = parsed && TOLERANCES.has(parsed.tolerance as Tolerance) ? (parsed.tolerance as Tolerance) : DEFAULTS.tolerance;
   return { purpose, tolerance };
 }
 

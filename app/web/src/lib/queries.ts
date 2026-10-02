@@ -3,7 +3,8 @@ import "server-only";
 import { supabaseServer } from "@/lib/supabase-server";
 import { addDays, dayBounds, kstHour, kstNow } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
-import { measuredNow, namedAltPlaces } from "@/lib/shape";
+import { driverMessage } from "@/lib/api-log";
+import { measuredNow, namedAltPlaces, requireForeignHeavy } from "@/lib/shape";
 
 type Place = {
   id: string;
@@ -12,14 +13,14 @@ type Place = {
   name_en: string | null;
   gu: string | null;
   serve_state: string;
-  foreign_heavy?: boolean;
+  foreign_heavy: boolean;
   lat?: number | null;
   lon?: number | null;
 };
 
 async function must<T>(query: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> {
   const { data, error } = await query;
-  if (error || data === null) throw new Error("unavailable");
+  if (error || data === null) throw new Error(error ? driverMessage(error) : "unavailable");
   return data;
 }
 
@@ -29,8 +30,9 @@ export async function findPlace(id: string): Promise<Place | null> {
     .select("id, tier, name, name_en, gu, serve_state, foreign_heavy, lat, lon")
     .eq("id", id)
     .maybeSingle();
-  if (error) throw new Error("unavailable");
-  return data;
+  if (error) throw new Error(driverMessage(error));
+  if (!data) return null;
+  return { ...data, foreign_heavy: requireForeignHeavy(data.foreign_heavy) };
 }
 
 export function purposeFor(tier: string, purpose: string): string {
@@ -96,7 +98,7 @@ export async function weekPayload(id: string, tolerance: string, purpose: string
         .eq("place_id", id)
         .order("ts", { ascending: false })
         .limit(1);
-      if (liveError) throw new Error("unavailable");
+      if (liveError) throw new Error(driverMessage(liveError));
       const live = liveRows?.[0] ?? null;
       now = measuredNow(row, live);
     }
@@ -131,9 +133,9 @@ export async function recommendPayload(id: string, date: string, tolerance: stri
     .eq("tolerance", tolerance)
     .eq("purpose", used)
     .maybeSingle();
-  if (error) throw new Error("unavailable");
+  if (error) throw new Error(driverMessage(error));
   const holidayQuery = await sb.from("holidays").select("date, name, name_en, kind").eq("date", date).maybeSingle();
-  if (holidayQuery.error) throw new Error("unavailable");
+  if (holidayQuery.error) throw new Error(driverMessage(holidayQuery.error));
   const combos = await must(
     sb.from("recommendations").select("purpose, tolerance, state").eq("place_id", id).eq("date", date),
   );
@@ -238,7 +240,9 @@ export async function flagCounts() {
   const counts = new Map<string, number>();
   for (const row of rows as { purpose: string; tolerance: string; state: string; places: { tier: string; foreign_heavy: boolean } | { tier: string; foreign_heavy: boolean }[] }[]) {
     const place = Array.isArray(row.places) ? row.places[0] : row.places;
-    const key = [place.tier, place.foreign_heavy, row.purpose, row.tolerance, row.state].join("|");
+    if (!place) throw new Error("foreign_heavy");
+    const heavy = requireForeignHeavy(place.foreign_heavy);
+    const key = [place.tier, heavy, row.purpose, row.tolerance, row.state].join("|");
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return [...counts.entries()].map(([key, count]) => {
@@ -252,7 +256,7 @@ export async function homePayload(tolerance: string, purpose: string) {
   const sb = supabaseServer();
   const measured = await latestMeasured(date, hour);
   const asOfQuery = await sb.from("live_obs").select("ts").order("ts", { ascending: false }).limit(1);
-  if (asOfQuery.error) throw new Error("unavailable");
+  if (asOfQuery.error) throw new Error(driverMessage(asOfQuery.error));
   const asOf = asOfQuery.data?.[0]?.ts ?? null;
   const stale = asOf ? Date.now() - new Date(asOf).getTime() > 90 * 60 * 1000 : true;
   const liveNow = measured.filter(

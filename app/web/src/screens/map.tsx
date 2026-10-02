@@ -88,12 +88,8 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
         map.fitBounds(bounds, { padding: { top: 64, bottom: 210, left: 48, right: 48 }, maxZoom: 12, duration: 0 });
       }
     };
-    const onError = (event: { error: { message: string } }) => {
+    const onError = () => {
       if (map.loaded()) return;
-      if (!event.error.message) {
-        setMapError(true);
-        return;
-      }
       setMapError(true);
     };
     map.on("load", onLoad);

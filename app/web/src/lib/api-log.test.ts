@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { logApiError } from "./api-log.ts";
+import { driverMessage, logApiError } from "./api-log.ts";
 
 test("an API error is logged once with the message only", () => {
   const lines: string[] = [];
@@ -12,4 +12,10 @@ test("an API error is logged once with the message only", () => {
   logApiError("home", new Error("boom"));
   console.error = original;
   assert.deepEqual(lines, ["[api] home boom"]);
+});
+
+test("a driver message is kept and a secret is not", () => {
+  assert.equal(driverMessage({ message: "column foreign_heavy is missing" }), "column foreign_heavy is missing");
+  assert.equal(driverMessage({ message: "bad eyJ-token" }), "unavailable");
+  assert.equal(driverMessage(null), "unavailable");
 });

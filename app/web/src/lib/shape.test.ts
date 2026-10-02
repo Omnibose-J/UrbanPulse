@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { measuredNow, namedAltPlaces } from "./shape.ts";
+import { measuredNow, namedAltPlaces, requireForeignHeavy } from "./shape.ts";
 import { normalizeConditions } from "./storage.ts";
 
 test("a measured hour without a live row has no now line", () => {
@@ -29,4 +29,13 @@ test("an invalid stored setting is replaced by the default", () => {
     purpose: "food",
     tolerance: "calm",
   });
+  assert.deepEqual(normalizeConditions({ purpose: "food", tolerance: "nope" }), {
+    purpose: "food",
+    tolerance: "moderate",
+  });
+});
+
+test("a missing foreign_heavy flag is an error", () => {
+  assert.equal(requireForeignHeavy(false), false);
+  assert.throws(() => requireForeignHeavy(undefined), /foreign_heavy/);
 });

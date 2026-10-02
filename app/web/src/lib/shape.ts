@@ -1,3 +1,8 @@
+export function requireForeignHeavy(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("foreign_heavy");
+  return value;
+}
+
 export type LiveStamp = { ts: string; pop_min: number; pop_max: number };
 
 export type MeasuredRow = { level: number; hour: number; target_ts: string };
