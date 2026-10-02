@@ -1,6 +1,6 @@
 # SOW-MB — Tier B station areas, experimental (local)
 
-Work unit W9 (`UrbanPulse_구현설계서.md` §4.3), cut to what the frozen research files support. Station areas outside the 121 places get a usual-flow profile and recommendations, reachable by search and by the map toggle only. **Run this last**; nothing else depends on it.
+Work unit W9 (`docs/specs/UrbanPulse_구현설계서.md` §4.3), cut to what the frozen research files support. Station areas outside the 121 places get a usual-flow profile and recommendations, reachable by search and by the map toggle only. **Run this last**; nothing else depends on it.
 
 Deferred, not in this SOW: the holiday adjustment with `ratio_v1b`, `ratio_v1b` for A1/A2 places outside `place_index` (they stay `preparing`), monthly refresh from the ridership API. On holiday dates tier B rows are off.
 

@@ -7,7 +7,7 @@ Build of UrbanPulse v1 (mobile web + PC map dashboard, ko/en, visitors only). Ar
 | Who | Does | Does not |
 |---|---|---|
 | **Claude** (designer) | Writes and revises SOWs, pre-registers acceptance bars, reviews each milestone's evidence, updates the Korean specs when a finding changes the design | Write application code |
-| **Cursor** (implementer) | Implements a SOW end to end, creates and fills `docs/tracking/criteria-<milestone>.md`, reports per `AGENTS.md` | Change scope, relax a bar or a test, edit `analysis/`, decide product questions |
+| **Implementer** (a person or a coding agent; Cursor up to SOW-H1 part A, the designer since) | Implements a SOW end to end, creates and fills `docs/tracking/criteria-<milestone>.md`, reports per `AGENTS.md` | Change scope, relax a bar or a test, edit `analysis/`, decide product questions |
 | **User / team** | Keys (Seoul Open API and data.go.kr are already in `.env`), product answers, user interviews; cloud accounts and billing only at SOW-MC | — |
 
 ## Milestones
@@ -68,8 +68,8 @@ Written <date> before implementation. Result cells are filled only after running
 
 - **Repo root** is `UrbanPulse/`. Layout after M0:
   ```
-  AGENTS.md  .gitignore  .env.example  pyproject.toml
-  UrbanPulse_*.md / .docx        specs (read-only)
+  README.md  AGENTS.md  .gitignore  .env.example  pyproject.toml
+  docs/specs/                    specs, .md and .docx (read-only)
   analysis/scripts/              research (read-only)   analysis/data/  gitignored
   app/engine/                    package `engine` + Dockerfile + requirements.txt + tests/
   app/supabase/                  config.toml, migrations/, tests/

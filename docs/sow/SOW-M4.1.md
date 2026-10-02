@@ -1,6 +1,6 @@
 # SOW-M4.1 — Screens match the design; today's picks are still ahead (local)
 
-The M4 review opened the live screens at 390 × 844 on 2026-10-01 21:00 KST. The tests passed, but the screens do not yet look or read like `design/UrbanPulse_시안_v6.html` and `UrbanPulse_디자인명세서.md`, and two data rules produce answers a visitor cannot use. This SOW fixes those. Run it before SOW-MB.
+The M4 review opened the live screens at 390 × 844 on 2026-10-01 21:00 KST. The tests passed, but the screens do not yet look or read like `design/UrbanPulse_시안_v6.html` and `docs/specs/UrbanPulse_디자인명세서.md`, and two data rules produce answers a visitor cannot use. This SOW fixes those. Run it before SOW-MB.
 
 ## Files you may touch
 

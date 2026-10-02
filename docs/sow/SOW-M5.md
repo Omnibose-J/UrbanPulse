@@ -1,6 +1,6 @@
 # SOW-M5 — Evaluate, re-judge, archive, admin page (local)
 
-Work unit W12 (`UrbanPulse_구현설계서.md` §4.6, §4.7, §7.0, §7.2). The engine scores yesterday's forecasts and recommendations against what happened, proposes flag changes weekly, and can move old rows to parquet. A token-protected page shows the tables. Runs locally; SOW-MC later moves the archive target to GCS.
+Work unit W12 (`docs/specs/UrbanPulse_구현설계서.md` §4.6, §4.7, §7.0, §7.2). The engine scores yesterday's forecasts and recommendations against what happened, proposes flag changes weekly, and can move old rows to parquet. A token-protected page shows the tables. Runs locally; SOW-MC later moves the archive target to GCS.
 
 ## Depends on
 

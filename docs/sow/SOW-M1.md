@@ -1,6 +1,6 @@
 # SOW-M1 — Places, holidays, backfill, collect (local)
 
-Work units W2, W4, W3a, W3 of the build contract (`UrbanPulse_구현설계서.md` §2, §4.0, §4.1, §8). Everything runs on the laptop against the local Supabase stack from M0. No cloud. When M1 is done the database holds every A1/A2 place, the 2023–2027 holidays, the 2026-05-11→ history, and `collect` adds a fresh snapshot every 30 minutes.
+Work units W2, W4, W3a, W3 of the build contract (`docs/specs/UrbanPulse_구현설계서.md` §2, §4.0, §4.1, §8). Everything runs on the laptop against the local Supabase stack from M0. No cloud. When M1 is done the database holds every A1/A2 place, the 2023–2027 holidays, the 2026-05-11→ history, and `collect` adds a fresh snapshot every 30 minutes.
 
 ## Goal
 

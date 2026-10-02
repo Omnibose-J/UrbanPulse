@@ -1,6 +1,6 @@
 # SOW-M3 — Recommendations, feature flags, similar places (local)
 
-Work unit W8 of the build contract (`UrbanPulse_구현설계서.md` §4.4, §4.5, §4.8). The engine turns `forecast_hourly` into `recommendations` rows for A1 and A2 places, driven by a flag file. Tier B and `ratio_v1b` are SOW-MB. No web work, no cloud.
+Work unit W8 of the build contract (`docs/specs/UrbanPulse_구현설계서.md` §4.4, §4.5, §4.8). The engine turns `forecast_hourly` into `recommendations` rows for A1 and A2 places, driven by a flag file. Tier B and `ratio_v1b` are SOW-MB. No web work, no cloud.
 
 ## Depends on
 

@@ -31,3 +31,6 @@ Thumbs.db
 
 # copied from node_modules by scripts/copy-maplibre.mjs
 app/web/public/vendor/
+
+# local agent-tool rules (personal)
+.omnibose.rules.json

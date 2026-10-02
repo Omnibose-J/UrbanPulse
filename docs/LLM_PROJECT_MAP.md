@@ -13,18 +13,19 @@ and writes precomputed rows to Postgres; a Next.js app only reads them. Nothing 
 
 | Path | Class | Owner | Notes |
 |---|---|---|---|
-| `UrbanPulse_서비스정의서.md` | product spec (ko) | designer (Claude) | Wins on product questions |
-| `UrbanPulse_구현설계서.md` | build contract (ko) | designer | Architecture, schema, jobs, invariants, work units W0–W13, milestones M0–MC–M5 |
-| `UrbanPulse_디자인명세서.md` | UI spec (ko) | designer | Tokens, components, screens, copy keys, states, flow |
-| `UrbanPulse_PRD.md` | one-page summary (ko) | designer | For reviews; not a contract |
-| `design/UrbanPulse_시안_v6.html` | clickable mockup | designer | Visual reference for M4; example data only |
-| `AGENTS.md` | implementer rules | designer | Hard rules and report format for Cursor |
-| `docs/sow/` | statements of work | designer | `README.md` = milestones; `SOW-M0.md` (done) and `SOW-M1.md` are expanded; others are outlines until expanded |
+| `docs/specs/UrbanPulse_서비스정의서.md` | product spec (ko) | designer (Claude) | Wins on product questions |
+| `docs/specs/UrbanPulse_구현설계서.md` | build contract (ko) | designer | Architecture, schema, jobs, invariants, work units W0–W13, milestones M0–MC–M5 |
+| `docs/specs/UrbanPulse_디자인명세서.md` | UI spec (ko) | designer | Tokens, components, screens, copy keys, states, flow |
+| `docs/specs/UrbanPulse_PRD.md` | one-page summary (ko) | designer | For reviews; not a contract |
+| `design/UrbanPulse_시안_v6.html` | clickable mockup | designer | Visual reference; example data only. Earlier versions are in `design/archive/` |
+| `README.md` | setup (ko) | designer | Local setup for a teammate, in Korean |
+| `AGENTS.md` | implementer rules | designer | Hard rules and report format for the implementer |
+| `docs/sow/` | statements of work | designer | `README.md` = milestones and run order. Everything up to `SOW-L1` is done; `SOW-MC` (cloud) waits for accounts |
 | `docs/tracking/criteria-<m>.md` | acceptance evidence | implementer | Empty result cells created before work, filled after each run |
 | `docs/tracking/findings.md` | out-of-scope problems | implementer | Append-only |
 | `analysis/scripts/` | research code | frozen | Source of every number in the specs. Read-only; port into `app/engine` when a SOW says so; never import |
 | `analysis/data/` | 6 GB research data | frozen | Gitignored, read-only |
-| `app/engine/` | Python package `engine` | implementer | Jobs: `load_places sync_holidays backfill collect forecast tier_b evaluate archive healthcheck` |
+| `app/engine/` | Python package `engine` | implementer | Jobs: `load_places sync_holidays backfill collect ingest_raw forecast evaluate rejudge archive tier_b healthcheck integrity` |
 | `app/engine/tests/` | pytest | implementer | Excluded from the Docker image |
 | `app/supabase/` | Supabase project | implementer | `config.toml` (project `urbanpulse`, ports 553xx), `migrations/`, `tests/` (pgTAP) |
 | `app/web/` | Next.js 16 app | implementer | App Router, TypeScript, Tailwind v4; Supabase only from server code |

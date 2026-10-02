@@ -1,6 +1,6 @@
 # SOW-M4 — Screens (local, `next dev`)
 
-Work units W10, W11, W13: the read-only API and every visitor screen of `UrbanPulse_디자인명세서.md`, Korean and English, running on `next dev` against the local database. The visual reference is `design/UrbanPulse_시안_v6.html`; where it and the design spec differ, the spec wins and you report the difference. No engine change, no schema change, no cloud, no deploy.
+Work units W10, W11, W13: the read-only API and every visitor screen of `docs/specs/UrbanPulse_디자인명세서.md`, Korean and English, running on `next dev` against the local database. The visual reference is `design/UrbanPulse_시안_v6.html`; where it and the design spec differ, the spec wins and you report the difference. No engine change, no schema change, no cloud, no deploy.
 
 ## Depends on
 
@@ -57,7 +57,7 @@ Validate parameters (`tolerance` in `calm|moderate|busy_ok`, `purpose` in `sight
 - ③ `/[locale]/p/[id]`: answer card (best window of the week = highest first-window score among the 8 days) → condition field → week list → legend. `serve_state = 'preparing'` or every day off/preparing → the preparing box.
 - ⑤ `/[locale]/p/[id]/[date]`: answer card → (⑥ alt buttons when `no_window`) → condition field → strip → legend → reason box. Query `?purpose=&tol=` overrides stored conditions for that view (share link). A past date → redirect to ③ with the one-time notice of §2.2. Back button → ③ of the same place even without history.
 - ⑦ `/[locale]/map?date=&hour=`: date chips, hour slider (one fetch per date and condition; moving the slider fetches nothing), pins, legend, "역세권 포함" toggle (default off, remembered), bottom card → ⑤; returning from ⑤ restores date and hour. Width ≥ 1024: full-width map with a 400 px list on the right ordered recommended → OK → avoid; clicking a row flies to the pin.
-- `/[locale]/about`: what it does, how the forecast works, the on / reference / preparing table from `/api/flags`, limits, data sources with the 공공누리 attribution. Take the facts from `UrbanPulse_PRD.md` and 서비스정의서; do not add claims.
+- `/[locale]/about`: what it does, how the forecast works, the on / reference / preparing table from `/api/flags`, limits, data sources with the 공공누리 attribution. Take the facts from `docs/specs/UrbanPulse_PRD.md` and 서비스정의서; do not add claims.
 - Width ≥ 1024 on ①–⑤: a 440 px centred column on `--bg-soft`.
 - Accessibility per §8 (radiogroup, dialog focus, `aria-label` on cells, screen-reader table for the strip, focus ring).
 

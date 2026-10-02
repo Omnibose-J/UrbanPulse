@@ -1,6 +1,6 @@
 # AGENTS.md — UrbanPulse
 
-Read this and `docs/LLM_PROJECT_MAP.md` before touching anything. Human-facing specs are Korean; this file and `docs/sow/` are written for the implementing agent (Cursor). The designer (Claude) writes SOWs and reviews results; the implementer builds exactly what a SOW says and reports evidence.
+Read this and `docs/LLM_PROJECT_MAP.md` before touching anything. Human-facing specs are Korean; this file and `docs/sow/` are written for whoever implements, a person or a coding agent. A SOW is the contract: the implementer builds exactly what it says and reports evidence. Start with `README.md` for the local setup.
 
 UrbanPulse tells visitors (first target: Seoul residents and domestic travellers; English UI for tourists) when to go to a Seoul hotspot they already chose, from later today up to 7 days ahead, avoiding closed hours and the busiest hour. Tier B (station areas outside the 121 places) is an experimental feature reachable by search only. Screens read precomputed rows; a Python engine running as scheduled jobs does all computation.
 
@@ -8,10 +8,10 @@ UrbanPulse tells visitors (first target: Seoul residents and domestic travellers
 
 | Path | What | Your access |
 |---|---|---|
-| `UrbanPulse_구현설계서.md` | **Build contract** (Korean): architecture, schema, jobs, invariants, work units W0–W13 | Read |
-| `UrbanPulse_서비스정의서.md` | Product spec (Korean). Wins over the build contract on product questions; report any conflict | Read |
-| `UrbanPulse_디자인명세서.md` | UI spec (Korean): tokens, components, screens, copy, states | Read |
-| `*.docx` | Exports of the three specs for humans | Never edit |
+| `docs/specs/UrbanPulse_구현설계서.md` | **Build contract** (Korean): architecture, schema, jobs, invariants, work units W0–W13 | Read |
+| `docs/specs/UrbanPulse_서비스정의서.md` | Product spec (Korean). Wins over the build contract on product questions; report any conflict | Read |
+| `docs/specs/UrbanPulse_디자인명세서.md` | UI spec (Korean): tokens, components, screens, copy, states | Read |
+| `docs/specs/*.docx` | Exports of the specs for humans, regenerated with `pandoc` | Never edit by hand |
 | `analysis/scripts/` | Research code that produced every number in the specs. Source of parsers and model code the engine ports | **Read-only.** Port by copying into `app/engine/` when a SOW says so; never import from `analysis/` |
 | `analysis/data/` | 6 GB of research data. Gitignored | Read-only. Never rewrite |
 | `app/engine/` | Python engine (package `engine`), Docker image for Cloud Run Jobs | You build this |
@@ -28,7 +28,7 @@ UrbanPulse tells visitors (first target: Seoul residents and domestic travellers
 2. **The on/off table is data, not code.** Whether a recommendation combination is on, reference-only or off comes from `recommendations.state` (written by the engine from `app/engine/config/feature_flags.yaml`). The web app never hard-codes which combinations are off. A combination that is not in the flag file is off.
 3. **Fail loud, no silent fallback.** Missing data → `ready=false` and the "준비 중" state. An API failure → the error state, never stale data shown as fresh. A missing env var → exit non-zero naming the variable. Do not add a fallback a SOW did not ask for.
 4. **Secrets via environment only.** `.env` stays gitignored; commit `.env.example` with names only. Never print a secret or a URL that contains one (the Seoul API puts the key in the URL path — log the place code, never the URL). Never paste a secret into a report. The service-role key and database URL never reach browser code.
-5. **Korean and English UI strings live only in `app/web/messages/{ko,en}.json`**, copied byte-for-byte from `UrbanPulse_디자인명세서.md` §5 and §9. Components contain no literal user-facing text. Do not "improve" copy.
+5. **Korean and English UI strings live only in `app/web/messages/{ko,en}.json`**, copied byte-for-byte from `docs/specs/UrbanPulse_디자인명세서.md` §5 and §9. Components contain no literal user-facing text. Do not "improve" copy.
 6. **Colors, type and spacing only through the tokens** in 디자인명세서 §3 (`app/web/src/styles/tokens.css`). No hex values in components.
 7. **Evidence = literal command + exit code + the decisive output line**, recorded in `docs/tracking/criteria-<milestone>.md` **after** the run. Create that file with empty result cells before you start; never pre-fill a cell. Never weaken, skip or delete a test, special-case a fixture, or hard-code an expected value. Pre-registered bars (build contract §7, reproduction tolerances in §8) are not tuned to pass: if one is missed, stop that step, record the measured value, and follow `docs/sow/README.md` "Unattended run".
 8. **Language.** Code, comments, commit messages, docs you write → English. User-facing strings → from the specs.

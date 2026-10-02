@@ -1,6 +1,6 @@
 # UrbanPulse PRD (2026-10-01)
 
-> 상세: `UrbanPulse_서비스정의서.md`(무엇·왜), `UrbanPulse_구현설계서.md`(어떻게), `UrbanPulse_디자인명세서.md`(화면), 시안 `design/UrbanPulse_시안_v6.html`
+> 상세: `docs/specs/UrbanPulse_서비스정의서.md`(무엇·왜), `docs/specs/UrbanPulse_구현설계서.md`(어떻게), `docs/specs/UrbanPulse_디자인명세서.md`(화면), 시안 `design/UrbanPulse_시안_v6.html`
 
 ## 1. 정의
 - 가고 싶은 핫플은 그대로, 문 닫힌 시간과 가장 붐비는 시간을 피해 갈 때를 알려 주는 서비스
@@ -74,7 +74,6 @@
 - 계산은 모두 사전 처리, 화면은 읽기만
 - 구현 상태(2026-10-02): 수집·예측·추천·평가 엔진, 화면 전체(홈, 검색, 이번 주, 하루 상세, 지도), 역세권 실험 기능(247곳)이 로컬에서 동작. 남은 것은 클라우드 배포
 - 로컬 우선: M0~M4는 노트북에서 로컬 Supabase + `python -m engine` + `next dev`로 동작 확인, 클라우드는 그 뒤(SOW-MC)
-- 설계서·첫 작업 지시서(M0, 로컬) 완료, 구현은 Cursor
 
 ## 10. 한계와 리스크
 - 데이터 의존 외줄: 서울시 API 하나(운영 보장 없음), 과거 데이터는 공개 수집기 저장 이력, 결제는 한 카드사 표본. 대응: 원본 매회 보관, 수집 실패 매일 점검

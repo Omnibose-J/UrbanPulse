@@ -1,6 +1,6 @@
 # SOW-M0 — Local foundation: repo, schema, engine skeleton, empty web (no cloud)
 
-Work units W0 + W1 of the build contract (`UrbanPulse_구현설계서.md` §1, §3, §8). No product logic and **no cloud** in M0: everything runs on the dev laptop (local Supabase in Docker, `python -m engine`, `next dev`). The goal is that every piece exists and talks to the next one, so M1+ only add behaviour. Cloud wiring (GCP, Vercel, hosted Supabase, GCS) is SOW-MC, after the screens work locally (decided 2026-10-01: local first).
+Work units W0 + W1 of the build contract (`docs/specs/UrbanPulse_구현설계서.md` §1, §3, §8). No product logic and **no cloud** in M0: everything runs on the dev laptop (local Supabase in Docker, `python -m engine`, `next dev`). The goal is that every piece exists and talks to the next one, so M1+ only add behaviour. Cloud wiring (GCP, Vercel, hosted Supabase, GCS) is SOW-MC, after the screens work locally (decided 2026-10-01: local first).
 
 ## Goal
 

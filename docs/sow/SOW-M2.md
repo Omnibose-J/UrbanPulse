@@ -1,7 +1,7 @@
 # SOW-M2 — Collect hardening, then models and the forecast job (local)
 
 Two parts, done in order, one criteria file (`docs/tracking/criteria-m2.md`).
-**Part A** (was SOW-M1.1) closes the data-loss gaps found in the M1 review. **Part B** is work units W5, W6, W7 of the build contract (`UrbanPulse_구현설계서.md` §4.0, §4.2, §5, §8): port the calendar-ratio model, prove the port, compute thresholds and activity profiles, and run `forecast` daily. Recommendations (W8) and tier B (W9, `ratio_v1b`) are M3. No cloud, no web work, no schema change.
+**Part A** (was SOW-M1.1) closes the data-loss gaps found in the M1 review. **Part B** is work units W5, W6, W7 of the build contract (`docs/specs/UrbanPulse_구현설계서.md` §4.0, §4.2, §5, §8): port the calendar-ratio model, prove the port, compute thresholds and activity profiles, and run `forecast` daily. Recommendations (W8) and tier B (W9, `ratio_v1b`) are M3. No cloud, no web work, no schema change.
 
 ## Inputs from the user
 
