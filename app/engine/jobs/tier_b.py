@@ -73,6 +73,17 @@ def _figures(
     return median, weak, agreement
 
 
+def verdict_code(measured: tuple[float, float, float]) -> int:
+    """0 when every figure is inside its tolerance, else 1. Prints one line each."""
+    labels = ("median r", "r<0.3 share %", "three-level agreement %")
+    failed = False
+    for label, value, target, tolerance in zip(labels, measured, TARGETS, TOLERANCES, strict=True):
+        ok = abs(value - target) <= tolerance
+        print(f"{label}: {value:.2f} vs {target:.2f} {'PASS' if ok else 'FAIL'} (tolerance {tolerance})")
+        failed = failed or not ok
+    return 1 if failed else 0
+
+
 def check() -> int:
     holidays = _holidays()
     groups, coords = station_groups()
@@ -86,12 +97,7 @@ def check() -> int:
     oa = oa_flow(circles)
     ridership = st_flow(groups)
     median, weak, agreement = _figures(live, oa, ridership, holidays)
-    labels = ("median r", "r<0.3 share %", "three-level agreement %")
-    measured = (median, weak, agreement)
-    for label, value, target, tolerance in zip(labels, measured, TARGETS, TOLERANCES, strict=True):
-        verdict = "PASS" if abs(value - target) <= tolerance else "FAIL"
-        print(f"{label}: {value:.2f} vs {target:.2f} {verdict} (tolerance {tolerance})")
-    return 0
+    return verdict_code((median, weak, agreement))
 
 
 def run(check_only: bool = False) -> int:
