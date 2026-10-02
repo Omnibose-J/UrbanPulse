@@ -415,7 +415,11 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
         )
         profiles = {(row[0], row[1], row[2]): row[3:] for row in cur.fetchall()}
         cur.execute("select date, kind from holidays")
-        kinds = {row[0]: row[1] for row in cur.fetchall()}
+        holiday_rows = cur.fetchall()
+        kinds = {row[0]: row[1] for row in holiday_rows}
+        holiday_dates = [row[0] for row in holiday_rows]
+        seol_starts = [row[0] for row in holiday_rows if row[1] == "seol"]
+        chuseok_starts = [row[0] for row in holiday_rows if row[1] == "chuseok"]
         cur.execute(
             """
             select place_id, ts, (pop_min + pop_max) / 2.0, level
@@ -445,7 +449,11 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             midnight = datetime.combine(day, datetime.min.time()).replace(tzinfo=KST)
             targets = [midnight + timedelta(hours=hour) for hour in range(24)]
             use_model = model is not None and place_id in model.place_index and offset in passing
-            ratios = model.ratio(place_id, targets, offset) if use_model else None
+            ratios = (
+                model.ratio(place_id, targets, offset, holiday_dates, seol_starts, chuseok_starts)
+                if use_model
+                else None
+            )
             for hour, target in enumerate(targets):
                 base = baseline(place_series, pd.Timestamp(target), offset)
                 activity = activity_for(

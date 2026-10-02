@@ -28,15 +28,29 @@ class RatioModel:
         self.chuseok_starts = [date.fromisoformat(day) for day in meta["block_starts"]["chuseok"]]
         self.passing_horizons = set(meta.get("passing_horizons") or [])
 
-    def ratio(self, place_id: str, timestamps, horizon_d: int):
-        """Predicted log-ratio. None when the place was not in the training pivot."""
+    def ratio(self, place_id: str, timestamps, horizon_d: int, holidays, seol_starts, chuseok_starts):
+        """Predicted log-ratio. None when the place was not in the training pivot.
+
+        Holiday dates and block starts come from the caller (the holidays table).
+        """
         if place_id not in self.place_index:
             return None
         index = pd.DatetimeIndex(pd.to_datetime(list(timestamps)))
-        frame = calendar(index, self.holidays, self.seol_starts, self.chuseok_starts)
+        frame = calendar(index, list(holidays), list(seol_starts), list(chuseok_starts))
         frame["poi_i"] = self.place_index[place_id]
         frame["h"] = horizon_d
         return self.model.predict(frame[self.features])
+
+
+def load_calendar(conn) -> tuple[list[date], list[date], list[date]]:
+    """Holiday dates, Seol starts, and Chuseok starts from the holidays table."""
+    with conn.cursor() as cur:
+        cur.execute("select date, kind from holidays")
+        rows = cur.fetchall()
+    holidays = [row[0] for row in rows]
+    seol = [row[0] for row in rows if row[1] == "seol"]
+    chuseok = [row[0] for row in rows if row[1] == "chuseok"]
+    return holidays, seol, chuseok
 
 
 def load(directory: str | Path) -> RatioModel:

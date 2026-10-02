@@ -50,13 +50,15 @@ def test_batched_hours_match_one_call_each(tmp_path):
 
     model.model.predict = predict
     stamps = ["2026-08-15 09:00", "2026-08-15 18:00"]
-    batched = [float(value) for value in model.ratio("POI001", stamps, 1)]
-    single = [float(model.ratio("POI001", [stamp], 1)[0]) for stamp in stamps]
+    calendar_args = (model.holidays, model.seol_starts, model.chuseok_starts)
+    batched = [float(value) for value in model.ratio("POI001", stamps, 1, *calendar_args)]
+    single = [float(model.ratio("POI001", [stamp], 1, *calendar_args)[0]) for stamp in stamps]
     assert batched == single
 
 
 def test_unknown_place_returns_none(tmp_path):
     _write(tmp_path / "model", sklearn.__version__, {"POI001": 0})
     model = load(tmp_path / "model")
-    assert model.ratio("POI999", ["2026-08-15 12:00"], 3) is None
-    assert list(model.ratio("POI001", ["2026-08-15 12:00"], 3)) == [0.2]
+    calendar_args = (model.holidays, model.seol_starts, model.chuseok_starts)
+    assert model.ratio("POI999", ["2026-08-15 12:00"], 3, *calendar_args) is None
+    assert list(model.ratio("POI001", ["2026-08-15 12:00"], 3, *calendar_args)) == [0.2]

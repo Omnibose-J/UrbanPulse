@@ -17,7 +17,7 @@ from psycopg.types.json import Jsonb
 from engine import db, settings
 from engine.hourly import hourly_frame
 from engine.log import log
-from engine.ratio_model import load
+from engine.ratio_model import load, load_calendar
 
 TEST_START = pd.Timestamp("2026-08-01", tz="Asia/Seoul")
 TEST_END = pd.Timestamp("2026-09-29 23:00", tz="Asia/Seoul")
@@ -59,6 +59,10 @@ def _wape(pred: pd.Series, live: pd.Series) -> float:
 
 def evaluate(model_dir: Path, grid: str) -> tuple[list[dict], bool]:
     model = load(model_dir)
+    settings.load_env()
+    env = settings.require(("DATABASE_URL",))
+    with db.connect(env["DATABASE_URL"]) as conn:
+        holidays, seol_starts, chuseok_starts = load_calendar(conn)
     wide = _live_wide(grid)
     places = [place for place in wide.columns if place in model.place_index]
     wide = wide[places]
@@ -81,7 +85,7 @@ def evaluate(model_dir: Path, grid: str) -> tuple[list[dict], bool]:
             ).dropna()
             if frame.empty:
                 continue
-            ratio = model.ratio(place, frame.index, horizon)
+            ratio = model.ratio(place, frame.index, horizon, holidays, seol_starts, chuseok_starts)
             frame["model"] = frame["prof"].to_numpy() * np.exp(ratio)
             frame["place"] = place
             records.append(frame)

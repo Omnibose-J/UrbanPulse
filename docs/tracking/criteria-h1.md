@@ -16,7 +16,7 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 | A10 | Off places disappear from the forecast tables | a place switched to off has no rows after the run | 0 | temp schema: POI001 switched off, forecast and recommendation counts 0; preparing POI002 kept hours |
 | A11 | Today's refresh fixes alt dates that point at past hours | integrity query → 0 | 0 | unit test drops hour 9; live past-hour alt entries 965 → 0 after today's refresh |
 | A12 | Stale follows the newest observation | both directions | 0 | obs 120 min old → stale true; obs 10 min old → stale false |
-| A13 | The model uses the holidays table | a newly added date changes hol | | |
+| A13 | The model uses the holidays table | a newly added date changes hol | 0 | 2026-10-05 added to the table → hol 1; meta-only list → hol 0 |
 | A14 | Forecast starts at 05:10 and locks in one order | forecast task trigger 05:10 | | |
 | A15 | rel, open hours, holiday ledger, unscored count | tests for each | | |
 | B1 | A window cell does not say the unverified verdict | e2e window cell and map card; unknown code throws | | |
