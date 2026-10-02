@@ -108,7 +108,7 @@ def test_overlay_after_midnight_stays_on_the_issued_day():
                     """,
                     (place_id, stamp),
                 )
-        apply_overlay(conn, datetime(issued.year, issued.month, issued.day, 23, 50, tzinfo=KST))
+        apply_overlay(conn, datetime(issued.year, issued.month, issued.day, 23, 50, tzinfo=KST), [place_id])
         with conn.cursor() as cur:
             cur.execute(
                 """

@@ -88,74 +88,112 @@ def drop_unbuilt_forecasts(conn, started: datetime, today) -> None:
         )
 
 
-def apply_overlay(conn, now: datetime) -> None:
-    """Hours with a live observation become `live`; later hours covered by city_fcst become `seoul`."""
+def lock_forecast_rows(cur, place_ids: list[str]) -> None:
+    """Lock forecast rows in place_id, target_ts order so two jobs cannot deadlock."""
+    ids = sorted(set(place_ids))
+    if not ids:
+        return
+    cur.execute(
+        """
+        select place_id, target_ts
+        from forecast_hourly
+        where place_id = any(%s)
+        order by place_id, target_ts
+        for update
+        """,
+        (ids,),
+    )
+
+
+def apply_overlay(conn, now: datetime, place_ids: list[str]) -> None:
+    """Hours with a live observation become `live`; later hours covered by city_fcst become `seoul`.
+
+    One update statement per place, only for places just stored. Rows are locked in
+    place_id, target_ts order first.
+    """
+    ids = sorted(set(place_ids))
+    if not ids:
+        return
     issued = issued_midnight(_today(now))
     hour_start = now.astimezone(KST).replace(minute=0, second=0, microsecond=0)
+    horizon = issued + timedelta(days=1)
     with conn.cursor() as cur:
         cur.execute("set time zone 'Asia/Seoul'")
+        lock_forecast_rows(cur, ids)
         cur.execute(
             """
             select place_id, ts, (pop_min + pop_max) / 2.0, level
             from live_obs
-            where ts >= %s and ts < %s
+            where place_id = any(%s) and ts >= %s and ts < %s
+            order by place_id, ts
             """,
-            (issued, issued + timedelta(days=1)),
+            (ids, issued, horizon),
         )
         live_rows = pd.DataFrame(cur.fetchall(), columns=["place_id", "ts", "value", "level"])
         cur.execute(
             """
             select place_id, target_ts, (pop_min + pop_max) / 2.0, level
             from city_fcst
-            where target_ts >= %s and target_ts < %s
+            where place_id = any(%s) and target_ts >= %s and target_ts < %s
+            order by place_id, target_ts
             """,
-            (hour_start, issued + timedelta(days=1)),
+            (ids, hour_start, horizon),
         )
         city_rows = cur.fetchall()
-    if not live_rows.empty:
-        hourly = hourly_frame(live_rows, "floor")
-        with conn.cursor() as cur:
-            for row in hourly.itertuples(index=False):
-                cur.execute(
-                    """
-                    update forecast_hourly
-                    set source = 'live', pop = %s, level = %s, ready = true, stale = false
-                    where place_id = %s and target_ts = %s
-                    """,
-                    (
-                        float(row.value),
-                        int(row.level) if pd.notna(row.level) else None,
-                        row.place_id,
-                        row.hour.to_pydatetime(),
-                    ),
-                )
-    if city_rows:
-        with conn.cursor() as cur:
-            for place_id, target, pop, level in city_rows:
-                cur.execute(
-                    """
-                    update forecast_hourly
-                    set source = 'seoul', pop = %s, level = %s, ready = true
-                    where place_id = %s and target_ts = %s and source <> 'live'
-                    """,
-                    (float(pop), int(level), place_id, target),
-                )
-    _measure_activity(conn, now)
-    cutoff = now.astimezone(KST) - timedelta(minutes=90)
-    with conn.cursor() as cur:
         cur.execute(
             """
-            update forecast_hourly as forecast
-            set stale = age.newest is null or age.newest < %s
-            from (
-                select place_id, max(ts) as newest
-                from live_obs
-                group by place_id
-            ) as age
-            where forecast.place_id = age.place_id
+            select place_id, max(ts)
+            from live_obs
+            where place_id = any(%s)
+            group by place_id
             """,
-            (cutoff,),
+            (ids,),
         )
+        newest = dict(cur.fetchall())
+        if not live_rows.empty:
+            hourly = hourly_frame(live_rows, "floor")
+            for place_id, part in hourly.groupby("place_id", sort=True):
+                part = part.sort_values("hour")
+                cur.execute(
+                    """
+                    update forecast_hourly as forecast
+                    set source = 'live', pop = v.pop, level = v.level, ready = true
+                    from unnest(%s::timestamptz[], %s::float8[], %s::int[]) as v(target_ts, pop, level)
+                    where forecast.place_id = %s and forecast.target_ts = v.target_ts
+                    """,
+                    (
+                        [stamp.to_pydatetime() for stamp in part["hour"]],
+                        [float(value) for value in part["value"]],
+                        [None if pd.isna(level) else int(level) for level in part["level"]],
+                        place_id,
+                    ),
+                )
+        by_place: dict[str, list[tuple]] = {}
+        for place_id, target, pop, level in city_rows:
+            by_place.setdefault(place_id, []).append((target, float(pop), int(level)))
+        for place_id in sorted(by_place):
+            rows = sorted(by_place[place_id], key=lambda item: item[0])
+            cur.execute(
+                """
+                update forecast_hourly as forecast
+                set source = 'seoul', pop = v.pop, level = v.level, ready = true
+                from unnest(%s::timestamptz[], %s::float8[], %s::int[]) as v(target_ts, pop, level)
+                where forecast.place_id = %s
+                  and forecast.target_ts = v.target_ts
+                  and forecast.source <> 'live'
+                """,
+                ([row[0] for row in rows], [row[1] for row in rows], [row[2] for row in rows], place_id),
+            )
+    _measure_activity(conn, now, ids)
+    cutoff = now.astimezone(KST) - timedelta(minutes=90)
+    with conn.cursor() as cur:
+        for place_id in ids:
+            fresh = newest.get(place_id)
+            stale = fresh is None or fresh < cutoff
+            cur.execute(
+                "update forecast_hourly set stale = %s where place_id = %s",
+                (stale, place_id),
+            )
 
 
 def require_model_files(directory, version: str) -> None:
@@ -397,6 +435,7 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             """
             select id, tier from places
             where tier in ('A1', 'A2') and serve_state <> 'off' and serve_state <> 'experimental'
+            order by id
             """
         )
         places = cur.fetchall()
@@ -490,7 +529,9 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
                 )
                 if offset in (1, 3, 7) and 9 <= hour <= 23 and pop is not None and base is not None:
                     log_rows.append((place_id, today, target, offset, pop, float(base), version))
+    forecast_rows.sort(key=lambda row: (row[0], row[1]))
     with conn.pipeline(), conn.cursor() as cur:
+        lock_forecast_rows(cur, [row[0] for row in forecast_rows])
         cur.executemany(
             """
             insert into forecast_hourly (
@@ -512,14 +553,14 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             """,
             forecast_rows,
         )
-    apply_overlay(conn, started)
+    apply_overlay(conn, started, [place_id for place_id, _tier in places])
     return log_rows
 
 
 _P90_KEY = {"sight": 0, "food": 1, "shop": 2}
 
 
-def _measure_activity(conn, now: datetime) -> None:
+def _measure_activity(conn, now: datetime, place_ids: list[str]) -> None:
     """A1 hours with commerce today take measured activity and a_actual."""
     today = _today(now)
     start = datetime.combine(today, datetime.min.time()).replace(tzinfo=KST)
@@ -535,10 +576,11 @@ def _measure_activity(conn, now: datetime) -> None:
                      + coalesce((c.cat_counts->>'패션·뷰티')::float8, 0))
             from commerce_obs c
             join places p on p.id = c.place_id and p.tier = 'A1'
-            where c.ts >= %s and c.ts < %s
+            where c.ts >= %s and c.ts < %s and c.place_id = any(%s)
             group by 1, 2
+            order by 1, 2
             """,
-            (start, end),
+            (start, end, place_ids),
         )
         measured = cur.fetchall()
         cur.execute("select place_id, p90_all, p90_food, p90_shop from lively_norm")
@@ -552,6 +594,7 @@ def _measure_activity(conn, now: datetime) -> None:
             updated = activity_update("A1", True, float(value or 0), None if scale is None else float(scale))
             values.append(None if updated is None else updated[0])
         updates.append((values[0], values[1], values[2], place_id, stamp))
+    updates.sort(key=lambda row: (row[3], row[4]))
     if not updates:
         return
     with conn.cursor() as cur:
@@ -609,7 +652,9 @@ def _write_tier_b_forecasts(conn, started, today) -> None:
                         True,
                     )
                 )
+    rows.sort(key=lambda row: (row[0], row[1]))
     with conn.cursor() as cur:
+        lock_forecast_rows(cur, [row[0] for row in rows])
         cur.executemany(
             """
             insert into forecast_hourly (

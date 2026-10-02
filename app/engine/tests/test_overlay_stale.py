@@ -38,7 +38,7 @@ def test_stale_follows_the_newest_observation_both_ways():
             _place(conn, "OLD", now - timedelta(minutes=120), False, now)
             _place(conn, "FRESH", now - timedelta(minutes=10), True, now)
             conn.commit()
-            apply_overlay(conn, now)
+            apply_overlay(conn, now, ["OLD", "FRESH"])
             conn.commit()
             rows = dict(conn.execute("select place_id, stale from forecast_hourly").fetchall())
     assert rows["OLD"] is True

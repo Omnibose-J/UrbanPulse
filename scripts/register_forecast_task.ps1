@@ -29,7 +29,7 @@ if (-not (Test-Path -LiteralPath $CmdExe)) {
 }
 $Arg = '/c cd /d "' + $Repo + '" && "' + $Python + '" -m engine forecast >> "' + $Log + '" 2>&1'
 $Action = New-ScheduledTaskAction -Execute $CmdExe -Argument $Arg -WorkingDirectory $Repo
-$Trigger = New-ScheduledTaskTrigger -Daily -At "05:00"
+$Trigger = New-ScheduledTaskTrigger -Daily -At "05:10"
 $Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 60) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -WakeToRun
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Force | Out-Null
-Write-Output ("registered " + $TaskName + " at 05:00")
+Write-Output ("registered " + $TaskName + " at 05:10")

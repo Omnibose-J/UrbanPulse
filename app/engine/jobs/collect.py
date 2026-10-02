@@ -349,7 +349,7 @@ def run(
 
                     stored_ids = [row["id"] for row in results if row["outcome"] == "ok"]
                     with _connect(env["DATABASE_URL"]) as overlay_conn:
-                        apply_overlay(overlay_conn, run_ts)
+                        apply_overlay(overlay_conn, run_ts, stored_ids)
                         refresh_recommendations(
                             overlay_conn,
                             run_ts,
