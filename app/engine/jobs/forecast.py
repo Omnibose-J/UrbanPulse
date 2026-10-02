@@ -648,7 +648,11 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
         ]
         if place_ids is not None:
             wanted = set(place_ids)
-            places = [place for place in places if place["id"] in wanted]
+            places = [
+                place
+                for place in places
+                if place["id"] in wanted or (only_today and place["tier"] == "B")
+            ]
         cur.execute("select date, kind from holidays")
         kinds = {row[0]: row[1] for row in cur.fetchall()}
         cur.execute(

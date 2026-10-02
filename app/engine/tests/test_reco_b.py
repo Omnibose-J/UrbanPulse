@@ -39,6 +39,12 @@ def test_a_holiday_is_off_unverified():
     assert row["off_reason"] == "unverified"
 
 
+def test_a_station_today_skips_hours_already_over():
+    row = build_row(_place(), DAY, "moderate", "none", _hours(1), load(), "weekday", now_hour=15)
+    assert row["windows"]
+    assert all(hour >= 15 for window in row["windows"] for hour in window["hours"])
+
+
 def test_moderate_is_never_too_busy_when_levels_stop_at_two():
     row = build_row(_place(), DAY, "moderate", "none", _hours(2), load(), "weekday")
     assert all(cell["reason"] != "too_busy" for cell in row["hours"])
