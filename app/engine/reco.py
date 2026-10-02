@@ -6,6 +6,7 @@ cells with rating 1, which is narrower than the research lively-hour set.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from engine.flags import FlagFile
@@ -16,6 +17,17 @@ WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 ALLOWED_LEVEL = {"calm": 1, "moderate": 2, "busy_ok": 3}
 ACTIVITY_COLUMN = {"sight": "a_all", "food": "a_food", "shop": "a_shop"}
 PURPOSES = {"A1": ("sight", "food", "shop"), "A2": ("none",), "B": ("none",)}
+_SPAN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d$")
+
+
+class OpenHoursError(ValueError):
+    """An open_hours span is not HH:MM-HH:MM."""
+
+
+def require_open_span(value: str) -> str:
+    if _SPAN.fullmatch(value) is None:
+        raise OpenHoursError("open_hours must be HH:MM-HH:MM")
+    return value
 
 
 def group_of(tier: str, foreign_heavy: bool) -> str:
@@ -45,7 +57,7 @@ def open_hours_for(tier: str, open_hours: dict | None, day: date) -> set[int]:
     span = (open_hours.get("hours") or {}).get(WEEKDAYS[day.weekday()])
     if span is None:
         return set()
-    start_text, end_text = str(span).split("-")
+    start_text, end_text = require_open_span(str(span)).split("-")
     start, end = _minutes(start_text), _minutes(end_text)
     inside = {hour for hour in STRIP_HOURS if start <= hour * 60 and (hour + 1) * 60 <= end}
     return base & inside

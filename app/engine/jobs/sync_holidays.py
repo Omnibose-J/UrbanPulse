@@ -212,7 +212,7 @@ def run(client: httpx.Client | None = None, pause_s: float = PAUSE_S) -> int:
         rows = _with_english(day_off_rows(collected), table)
         if not rows:
             raise HolidayError("kasi returned no days off")
-        with db.connect(env["DATABASE_URL"]) as conn:
+        with db.ledger(env["DATABASE_URL"], JOB) as (conn, ctx):
             with conn.cursor() as cur:
                 cur.execute("set time zone 'Asia/Seoul'")
                 kept_dates = [row["date"] for row in rows]
@@ -228,7 +228,11 @@ def run(client: httpx.Client | None = None, pause_s: float = PAUSE_S) -> int:
                 cur.executemany(_UPSERT, rows)
                 written = cur.rowcount
             conn.commit()
+            ctx["detail"] = {"rows": len(rows), "written": written, "deleted": deleted}
     except HolidayError as exc:
+        with db.ledger(env["DATABASE_URL"], JOB) as (_conn, ctx):
+            ctx["status"] = "fail"
+            ctx["detail"] = {"error": str(exc)}
         log(JOB, "fail", reason=str(exc))
         return 1
     finally:

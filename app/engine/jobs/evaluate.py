@@ -158,12 +158,14 @@ def _reco_rows(logs: list[dict], tiers: dict[str, str], live: pd.DataFrame, comm
             if actual is None:
                 continue
             scored.append((cell, actual))
+        made = False
         if row["purpose"] != "none" and windows:
             in_window = [(cell, actual) for cell, actual in scored if cell["h"] in window_hours]
             if in_window:
                 reco_rows.append(_reco_tuple(row, in_window, scored))
-            else:
-                unscored += 1
+                made = True
+        if not made:
+            unscored += 1
         if not scored:
             continue
         strip_rows.append(_strip_tuple(row, tier, scored))

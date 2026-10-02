@@ -17,6 +17,7 @@ from psycopg.types.json import Jsonb
 
 from engine import db, settings
 from engine.log import log
+from engine.reco import OpenHoursError, require_open_span
 
 JOB = "load_places"
 HERITAGE = "고궁·문화유산"
@@ -115,6 +116,11 @@ def _hours_for(poi: str, tier: str, category: str | None, table: dict[str, Any])
         value = hours[day]
         if value is not None and not isinstance(value, str):
             raise RuntimeError(f"open_hours for {poi} {day} must be a string or null")
+        if isinstance(value, str):
+            try:
+                require_open_span(value)
+            except OpenHoursError:
+                raise OpenHoursError(f"open_hours for {poi} {day} must be HH:MM-HH:MM") from None
     if not spec.get("source") or not spec.get("checked"):
         raise RuntimeError(f"open_hours for {poi} needs source and checked")
     return {

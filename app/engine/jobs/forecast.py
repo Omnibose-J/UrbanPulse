@@ -644,6 +644,7 @@ def _write_tier_b_forecasts(conn, started, today) -> None:
                         started,
                         "profile",
                         None,
+                        rel,
                         level_from_rel(rel),
                         None,
                         None,
@@ -658,14 +659,15 @@ def _write_tier_b_forecasts(conn, started, today) -> None:
         cur.executemany(
             """
             insert into forecast_hourly (
-              place_id, target_ts, issued_ts, source, pop, level,
+              place_id, target_ts, issued_ts, source, pop, rel, level,
               a_all, a_food, a_shop, stale, ready, a_actual
             )
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false)
             on conflict (place_id, target_ts) do update set
               issued_ts = excluded.issued_ts,
               source = excluded.source,
               pop = excluded.pop,
+              rel = excluded.rel,
               level = excluded.level,
               a_all = excluded.a_all,
               a_food = excluded.a_food,
