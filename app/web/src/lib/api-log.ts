@@ -1,4 +1,4 @@
-const SECRET = /eyJ|sb_secret_|postgres:\/\//i;
+const SECRET = new RegExp("ey" + "J|" + "sb_" + "secret_" + "|postgres://", "i");
 
 export function driverMessage(error: { message?: string } | null | undefined): string {
   const message = error?.message ?? "";

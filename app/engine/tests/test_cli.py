@@ -1,13 +1,19 @@
-import pytest
+import re
+from pathlib import Path
 
-from engine.__main__ import NOT_YET
+from engine.__main__ import JOBS
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
-@pytest.mark.parametrize("job", sorted(NOT_YET))
-def test_unimplemented_jobs_exit_2_naming_their_work_unit(cli, job):
-    r = cli(job)
-    assert r.returncode == 2
-    assert NOT_YET[job] in r.stderr
+def test_every_mapped_job_parses(cli):
+    text = (ROOT / "docs" / "LLM_PROJECT_MAP.md").read_text(encoding="utf-8")
+    names = sorted(set(re.findall(r"python -m engine ([a-z0-9_]+)", text)))
+    assert names
+    assert set(names) <= set(JOBS)
+    for name in names:
+        result = cli(name, "--help")
+        assert result.returncode == 0, name
 
 
 def test_unknown_job_exits_2(cli):
