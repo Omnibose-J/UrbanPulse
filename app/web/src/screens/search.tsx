@@ -1,12 +1,13 @@
 "use client";
 
+import { Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-import { AppBar, Phone, PlaceName, StateBox } from "@/components/ui";
+import { AppBar, LevelDot, Phone, PlaceName, StateBox } from "@/components/ui";
 import { useLoad } from "@/lib/use-load";
 
-type Place = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
+type Place = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string; level: number | null };
 
 export function SearchScreen() {
   const t = useTranslations();
@@ -20,17 +21,19 @@ export function SearchScreen() {
   const loaded = useLoad<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(debounced)}`);
   return (
     <Phone>
-      <header className="flex h-14 items-center gap-2">
-        <AppBar backHref={`/${locale}`} />
-      </header>
-      <input
-        autoFocus
-        value={q}
-        onChange={(event) => setQ(event.target.value)}
-        placeholder={t("home.search")}
-        className="press body w-full rounded-[12px] bg-bg-soft px-0"
-        aria-label={t("home.search")}
-      />
+      <AppBar backHref={`/${locale}`}>
+        <label data-search className="flex h-11 items-center gap-2 rounded-[12px] bg-bg-soft px-3">
+          <Search size={16} aria-hidden data-search-icon />
+          <input
+            autoFocus
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            placeholder={t("home.search")}
+            className="body min-w-0 flex-1 bg-transparent outline-none"
+            aria-label={t("home.search")}
+          />
+        </label>
+      </AppBar>
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
       {loaded.loading ? <StateBox kind="skeleton" /> : null}
       {!q && loaded.data ? <h2 className="section mb-2 mt-4">{t("home.popular")}</h2> : null}
@@ -43,7 +46,12 @@ export function SearchScreen() {
                 <span className="body block font-semibold"><PlaceName name={place.name} nameEn={place.name_en} /></span>
                 <span className="caption text-text-3" lang="ko">{place.gu}</span>
               </span>
-              {place.tier === "B" ? <span className="label">{t("badge.experimental")}</span> : null}
+              {place.tier === "B" ? <span className="label">{t("badge.experimental")}</span> : place.level === null ? null : (
+                <span data-search-status className="caption flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold">
+                  <LevelDot level={place.level} />
+                  {t(`level.l${place.level}`)}
+                </span>
+              )}
             </a>
           </li>
         ))}

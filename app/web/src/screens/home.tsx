@@ -98,9 +98,9 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
             const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
             return (
             <a key={row.id} href={`/${locale}/p/${row.id}/${kstNow().date}`} data-quiet={row.level} className="flex w-[232px] shrink-0 snap-start flex-col gap-3 rounded-[16px] border border-line p-4 shadow-[var(--shadow-card)]">
-              <span className="flex items-start justify-between gap-2">
-                <span className="text-[17px] font-extrabold leading-snug"><PlaceName name={row.name} nameEn={row.name_en} /></span>
-                <span className="caption flex shrink-0 items-center gap-1.5 font-semibold" style={{ color: "var(--go-text)" }}>
+              <span className="flex min-w-0 items-start justify-between gap-2">
+                <span data-place-name className="min-w-0 truncate text-[17px] font-extrabold leading-snug"><PlaceName name={row.name} nameEn={row.name_en} /></span>
+                <span data-place-status className="caption flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold" style={{ color: "var(--go-text)" }}>
                   <LevelDot level={row.level} />
                   {t(`level.l${row.level}`)}
                 </span>

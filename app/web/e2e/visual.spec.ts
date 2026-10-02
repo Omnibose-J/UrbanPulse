@@ -86,6 +86,16 @@ test("home matches the mockup measurements", async ({ page }) => {
       const start = startHour(range);
       if (start !== null) expect(start).toBeGreaterThanOrEqual(hour);
     }
+    const card = page.locator("[data-quiet]").first();
+    if (await card.count()) {
+      const apart = await card.evaluate((node) => {
+        const name = node.querySelector("[data-place-name]")?.getBoundingClientRect();
+        const status = node.querySelector("[data-place-status]")?.getBoundingClientRect();
+        if (!name || !status) return false;
+        return name.right <= status.left + 0.5;
+      });
+      expect(apart).toBe(true);
+    }
     await shot(page, `${locale}-home`);
   }
   await page.route("**/api/home**", async (route) => {
@@ -127,6 +137,7 @@ test("week cards show one range and even rows", async ({ page, request }) => {
       const fits = await page.locator("[data-week-time]").evaluateAll((nodes) =>
         nodes.every((node) => {
           const cell = node as HTMLElement;
+          if (!cell.textContent?.trim()) return true;
           return cell.getClientRects().length === 1 && cell.scrollWidth <= cell.clientWidth + 1;
         }),
       );
@@ -230,6 +241,38 @@ test("day card, axis, and back label", async ({ page, request }) => {
   expect(errors).toEqual([]);
 });
 
+test("search field sits in the bar and an off day says its state once", async ({ page }) => {
+  const errors = watch(page);
+  await page.goto("/ko/search");
+  const field = page.locator("[data-search] input");
+  await expect(field).toBeVisible();
+  await expect(page.locator("[data-search-icon]")).toHaveCount(1);
+  const textX = await field.evaluate((node) => node.getBoundingClientRect().x);
+  expect(textX).toBeGreaterThanOrEqual(28);
+  const langRight = await page.locator("[data-lang]").evaluate((node) => node.getBoundingClientRect().right);
+  expect(390 - langRight).toBeLessThanOrEqual(16);
+  await shot(page, "ko-search");
+  await page.route("**/api/places/*/week**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        place: { id: "POI001", tier: "A1", name: "Sample", name_en: null, gu: "강남구", serve_state: "on", foreign_heavy: false },
+        now: null,
+        days: [
+          { date: "2026-10-02", state: "on", off_reason: null, windows: [{ hours: [13], score: 1, crowd: 1, act: "sight", act_level: "lively" }], no_window: false, hours: null, strip_mode: "windows_only", holiday: null },
+          { date: "2026-10-03", state: "off", off_reason: "preparing", windows: null, no_window: null, hours: null, strip_mode: null, holiday: null },
+        ],
+        combos: [{ purpose: "sight", tolerance: "moderate", state: "on" }],
+      }),
+    }),
+  );
+  await page.goto("/ko/p/POI001");
+  const off = page.locator("[data-row]", { hasText: "준비 중" });
+  await expect(off.getByText("준비 중")).toHaveCount(1);
+  await expect(off.locator("[data-week-time]")).toHaveText("");
+  expect(errors).toEqual([]);
+});
+
 test("map pins spread and the card button stays on screen", async ({ page }) => {
   test.setTimeout(90000);
   const errors = watch(page);
@@ -244,6 +287,8 @@ test("map pins spread and the card button stays on screen", async ({ page }) => 
       return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
     });
     console.log(`pin-bbox ${locale} ${Math.round(spread.width)}x${Math.round(spread.height)}`);
+    const pin = page.locator("[data-pin][data-selected='0']").first();
+    await expect(pin).toHaveAttribute("data-pin-size", "18");
     expect(spread.width).toBeGreaterThan(150);
     expect(spread.height).toBeGreaterThan(150);
     const canvas = page.locator("[data-map] canvas");

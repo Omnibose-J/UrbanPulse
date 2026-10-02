@@ -41,27 +41,31 @@ export function purposeFor(tier: string, purpose: string): string {
 
 export async function searchPlaces(q: string) {
   const sb = supabaseServer();
-  if (!q) {
-    return must(
-      sb
-        .from("places")
-        .select("id, tier, name, name_en, gu, serve_state")
-        .in("tier", ["A1", "A2"])
-        .eq("serve_state", "on")
-        .order("name")
-        .limit(200),
-    );
-  }
   const safe = q.replace(/[%_,]/g, " ");
-  return must(
-    sb
-      .from("places")
-      .select("id, tier, name, name_en, gu, serve_state")
-      .in("serve_state", ["on", "preparing", "experimental"])
-      .or(`name.ilike.%${safe}%,name_en.ilike.%${safe}%,gu.ilike.%${safe}%`)
-      .order("name")
-      .limit(50),
+  const places = await must(
+    q
+      ? sb
+          .from("places")
+          .select("id, tier, name, name_en, gu, serve_state")
+          .in("serve_state", ["on", "preparing", "experimental"])
+          .or(`name.ilike.%${safe}%,name_en.ilike.%${safe}%,gu.ilike.%${safe}%`)
+          .order("name")
+          .limit(50)
+      : sb
+          .from("places")
+          .select("id, tier, name, name_en, gu, serve_state")
+          .in("tier", ["A1", "A2"])
+          .eq("serve_state", "on")
+          .order("name")
+          .limit(200),
   );
+  const { date, hour } = kstNow();
+  const measured = await latestMeasured(date, hour);
+  const levelById = new Map(measured.map((row) => [row.place.id, row.level]));
+  return (places as { id: string; tier: string; serve_state: string }[]).map((place) => ({
+    ...place,
+    level: place.tier !== "B" && place.serve_state === "on" ? (levelById.get(place.id) ?? null) : null,
+  }));
 }
 
 export async function weekPayload(id: string, tolerance: string, purpose: string) {

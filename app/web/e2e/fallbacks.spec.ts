@@ -74,6 +74,7 @@ test("an off week row shows the preparing text and no strip", async ({ page }) =
   await page.goto("/ko/p/POI001");
   const off = page.locator("[data-row]", { hasText: "준비 중" });
   await expect(off).toBeVisible();
-  await expect(off.locator("[data-week-time]")).toHaveText("준비 중");
+  await expect(off.locator("[data-week-time]")).toHaveText("");
+  await expect(off.getByText("준비 중")).toHaveCount(1);
   await expect(off.locator("[data-mini-strip]")).toHaveCount(0);
 });
