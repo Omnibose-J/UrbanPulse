@@ -169,10 +169,48 @@ def upsert_station(cur, row: dict[str, Any]) -> int:
     return cur.rowcount
 
 
-def load_stations() -> int:
+def delete_unprofiled(conn) -> int:
+    """Remove tier B places that have no profile, and the rows that point at them."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select id from places p
+            where p.tier = 'B'
+              and not exists (select 1 from tier_b_profile t where t.place_id = p.id)
+            """
+        )
+        ids = [row[0] for row in cur.fetchall()]
+        if not ids:
+            return 0
+        for table in (
+            "live_obs",
+            "commerce_obs",
+            "city_fcst",
+            "level_thresholds",
+            "lively_profile",
+            "lively_norm",
+            "forecast_hourly",
+            "recommendations",
+            "forecast_log",
+            "recommendation_log",
+            "reco_eval_daily",
+            "strip_eval_daily",
+            "tier_b_profile",
+        ):
+            cur.execute(f"delete from {table} where place_id = any(%s)", (ids,))
+        cur.execute(
+            "delete from similar_places where place_id = any(%s) or other_id = any(%s)",
+            (ids, ids),
+        )
+        cur.execute("delete from places where id = any(%s)", (ids,))
+        return cur.rowcount
+
+
+def load_stations(rows: list[dict[str, Any]] | None = None, dropped: int | None = None) -> int:
     settings.load_env()
     url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
-    rows, dropped = build_rows()
+    if rows is None:
+        rows, dropped = build_rows()
     with db.job_run(url, JOB) as ctx:
         with db.connect(url) as conn:
             before = _counts(conn)

@@ -43,19 +43,14 @@ def _choose(oa: pd.Series | None, ridership: pd.Series | None, holidays) -> tupl
     return _relative(week_st if use_ridership else week_oa), use_ridership
 
 
-def build_profiles() -> int:
+def compute_profiles(places: list[tuple]) -> tuple[list[tuple], dict]:
+    """places are (id, name, geom geojson). A station with no tract overlap is listed, not stored."""
     import geopandas as gpd
     from shapely.geometry import shape
 
-    holidays = _holidays()
-    settings.load_env()
-    url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
-    with db.connect(url) as conn:
-        places = conn.execute(
-            "select id, name, geom from places where tier = 'B' and geom is not null order by id"
-        ).fetchall()
     if not places:
         raise RuntimeError("no tier B places")
+    holidays = _holidays()
     frame = gpd.GeoDataFrame(
         {"id": [row[0] for row in places]},
         geometry=[shape(row[2]) for row in places],
@@ -78,6 +73,18 @@ def build_profiles() -> int:
             used += 1
         for (dtype, hour), value in relative.items():
             rows.append((place_id, DAY_TYPE[str(dtype)], int(hour), float(value)))
+    detail = {
+        "places": len(places),
+        "profiles": len(rows) // 72,
+        "used_ridership": used,
+        "no_profile": missing,
+    }
+    return rows, detail
+
+
+def write_profiles(rows: list[tuple], detail: dict) -> int:
+    settings.load_env()
+    url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
     with db.job_run(url, JOB) as ctx:
         with db.connect(url) as conn:
             with conn.cursor() as cur:
@@ -86,12 +93,30 @@ def build_profiles() -> int:
                     "insert into tier_b_profile (place_id, day_type, hour, rel) values (%s, %s, %s, %s)",
                     rows,
                 )
+            from engine.tierb.stations import delete_unprofiled
+
+            removed = delete_unprofiled(conn)
+            detail = {**detail, "removed": removed}
             conn.commit()
-        ctx["detail"] = {
-            "places": len(places),
-            "profiles": len(rows) // 72,
-            "used_ridership": used,
-            "no_profile": missing,
-        }
-    log(JOB, "ok", places=len(places), profiles=len(rows) // 72, used_ridership=used, no_profile=len(missing))
+        ctx["detail"] = detail
+    log(
+        JOB,
+        "ok",
+        places=detail["places"],
+        profiles=detail["profiles"],
+        used_ridership=detail["used_ridership"],
+        no_profile=len(detail["no_profile"]),
+        removed=detail["removed"],
+    )
     return 0
+
+
+def build_profiles() -> int:
+    settings.load_env()
+    url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
+    with db.connect(url) as conn:
+        places = conn.execute(
+            "select id, name, geom from places where tier = 'B' and geom is not null order by id"
+        ).fetchall()
+    rows, detail = compute_profiles(places)
+    return write_profiles(rows, detail)

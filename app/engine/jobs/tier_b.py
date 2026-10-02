@@ -100,13 +100,21 @@ def check() -> int:
     return verdict_code((median, weak, agreement))
 
 
+def _geom_obj(value):
+    return value.obj if hasattr(value, "obj") else value
+
+
 def run(check_only: bool = False) -> int:
     if check_only:
         return check()
-    from engine.tierb.profile import build_profiles
-    from engine.tierb.stations import load_stations
+    from engine.tierb.profile import compute_profiles, write_profiles
+    from engine.tierb.stations import build_rows, load_stations
 
-    code = load_stations()
+    rows, dropped = build_rows()
+    places = [(row["id"], row["name"], _geom_obj(row["geom"])) for row in rows]
+    profile_rows, detail = compute_profiles(places)
+    kept_ids = {row[0] for row in profile_rows}
+    code = load_stations([row for row in rows if row["id"] in kept_ids], dropped)
     if code != 0:
         return code
-    return build_profiles()
+    return write_profiles(profile_rows, detail)
