@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 
 import { hours, place } from "./fixtures/place";
+import { kstDate } from "./helpers";
 
 const dayBody = (mode: "windows_only" | "two_step") => ({
   recommendation: {
@@ -23,12 +24,18 @@ test("windows_only does not state an unverified verdict", async ({ page }) => {
   await page.route("**/api/places/*/recommend**", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(dayBody("windows_only")) }),
   );
-  await page.goto("/ko/p/POI001/2026-12-15");
+  await page.goto(`/ko/p/POI001/${kstDate(2)}`);
   await page.locator("[data-hour='12']").click();
   const sentence = page.locator("[data-hour-sentence]");
   await expect(sentence).toHaveText("12시는 추천 시간이 아니에요.");
   await expect(page.getByText("피하는 게 좋아요")).toHaveCount(0);
   await expect(page.getByText("가도 괜찮아요")).toHaveCount(0);
+  // The recommended cell says how busy and how lively it is, not the two-step verdict.
+  await page.locator("[data-hour='13']").click();
+  await expect(sentence).toHaveText("13시는 추천 시간이에요. 사람은 적당하고 거리도 활기차요");
+  await expect(page.locator("[data-hour='13']")).toHaveAttribute("aria-label", "13시는 추천 시간이에요. 사람은 적당하고 거리도 활기차요");
+  await expect(page.getByText("가도 괜찮아요")).toHaveCount(0);
+  await page.locator("[data-hour='12']").click();
   fs.mkdirSync("e2e/screenshots/live", { recursive: true });
   await page.screenshot({ path: "e2e/screenshots/live/ko-day-not-pick.png", fullPage: true });
 
@@ -54,7 +61,7 @@ test("windows_only does not state an unverified verdict", async ({ page }) => {
       }),
     }),
   );
-  await page.goto("/ko/map?date=2026-12-15&hour=12");
+  await page.goto(`/ko/map?date=${kstDate(2)}&hour=12`);
   await expect(page.locator("[data-map-card] [data-hour-sentence]")).toHaveText("12시는 추천 시간이 아니에요.");
   await expect(page.locator("[data-map-card]").getByText("피하는 게 좋아요")).toHaveCount(0);
   await expect(page.locator("[data-map-card]").getByText("가도 괜찮아요")).toHaveCount(0);
@@ -65,10 +72,11 @@ test("two_step still states the verdict and a reason", async ({ page }) => {
   await page.route("**/api/places/*/recommend**", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(dayBody("two_step")) }),
   );
-  await page.goto("/ko/p/POI001/2026-12-15");
+  await page.goto(`/ko/p/POI001/${kstDate(2)}`);
   await page.locator("[data-hour='12']").click();
   const sentence = page.locator("[data-hour-sentence]");
-  await expect(sentence).toContainText("가도 괜찮아요");
-  await expect(sentence).toContainText(".");
-  await expect(sentence).not.toContainText("추천 시간이 아니에요");
+  await expect(sentence).toHaveText("12시는 가도 괜찮아요. 사람은 적당하고 거리도 활기차요");
+  await page.goto(`/en/p/POI001/${kstDate(2)}`);
+  await page.locator("[data-hour='13']").click();
+  await expect(page.locator("[data-hour-sentence]")).toHaveText("1 PM is a recommended time. It is moderately busy and the street is lively too");
 });

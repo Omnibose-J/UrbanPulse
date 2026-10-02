@@ -1,8 +1,10 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { hours, place, week } from "./fixtures/place";
+import { kstDate } from "./helpers";
 
-const day = "2026-12-15";
+// The day screen only opens dates the service can answer for, so the mocked day is always two days ahead.
+const day = kstDate(2);
 
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -17,8 +19,8 @@ async function mockVisitor(page: Page, overrides?: { week?: unknown; home?: unkn
       { id: "POI001", name: "Alpha", name_en: null, gu: "Gangnam", level: 3, window: { hours: [18] } },
       { id: "POI002", name: "Beta", name_en: null, gu: "Mapo", level: 2, window: { hours: [19] } },
       { id: "POI003", name: "Gamma", name_en: null, gu: "Jongno", level: 2, window: { hours: [13] } },
-      { id: "POI004", name: "Delta", name_en: null, gu: "Songpa", level: 1, window: null },
-      { id: "POI005", name: "Epsilon", name_en: null, gu: "Seocho", level: 0, window: { hours: [11] } },
+      { id: "POI004", name: "Delta", name_en: null, gu: "Songpa", level: 2, window: null },
+      { id: "POI005", name: "Epsilon", name_en: null, gu: "Seocho", level: 2, window: { hours: [11] } },
     ],
     open_quiet: [
       { id: "POI006", name: "Quiet A", name_en: null, gu: "Yongsan", level: 1, tier: "A1", window: { hours: [13] }, hours: hours(), strip_mode: "windows_only" },
@@ -37,7 +39,7 @@ async function mockVisitor(page: Page, overrides?: { week?: unknown; home?: unkn
     place,
     holiday: null,
     combos: week.combos,
-    alt_dates: [{ date: "2026-12-16", hours: [13], score: 0.9 }],
+    alt_dates: [{ date: kstDate(3), hours: [13], score: 0.9 }],
     alt_places: [{ place_id: "POI045", hours: [18], name: "Nearby", name_en: null, crowd: 1 }],
   };
   await page.route("**/api/home**", (route) => json(route, home));
@@ -58,6 +60,7 @@ async function mockVisitor(page: Page, overrides?: { week?: unknown; home?: unkn
           strip_mode: "windows_only",
         },
       ],
+      holidays: [],
     }),
   );
   await page.route("**/api/flags**", (route) => json(route, { rows: [] }));
@@ -100,12 +103,19 @@ test("D3 screenshots of each state", async ({ page }) => {
   await page.locator("[data-state=error]").screenshot({ path: "e2e/screenshots/error.png" });
 
   await page.unroute("**/api/places/*/week**");
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   await page.route("**/api/places/*/week**", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await held;
     await json(route, week);
   });
   await page.goto("/ko/p/POI001");
+  await expect(page.locator("[data-state=skeleton]")).toBeVisible();
   await page.locator("[data-state=skeleton]").screenshot({ path: "e2e/screenshots/skeleton.png" });
+  release();
+  await expect(page.locator("[data-answer-card]")).toBeVisible();
 
   await mockVisitor(page, {
     recommend: {
@@ -126,7 +136,7 @@ test("D3 screenshots of each state", async ({ page }) => {
       place,
       holiday: null,
       combos: week.combos,
-      alt_dates: [{ date: "2026-12-16", hours: [13], score: 0.4 }],
+      alt_dates: [{ date: kstDate(3), hours: [13], score: 0.4 }],
       alt_places: [],
     },
   });
@@ -168,7 +178,7 @@ test("D4 changing purpose moves off a tolerance that is not ready", async ({ pag
   await page.getByRole("button", { name: "바꾸기" }).click();
   await page.getByRole("radio", { name: "맛집" }).click();
   await expect(page.getByText("바꿨어요")).toBeVisible();
-  await page.getByRole("dialog").getByRole("button", { name: "바꾸기" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "닫기" }).click();
   await expect(page.getByRole("button", { name: /한적하게/ })).toBeVisible();
 });
 
@@ -241,32 +251,36 @@ test("D11 windows_only uses two tones", async ({ page }) => {
   expect(tones).not.toContain("ok");
 });
 
-test("D12 home rows follow the fixture order and quiet levels", async ({ page }) => {
+test("D12 home draws the rows in the order served, each with its level and pick", async ({ page }) => {
+  // Which rows are served is the API's rule: unit-tested in home-rules and shape tests, live-checked in api.spec.
   await mockVisitor(page);
   await page.goto("/ko");
-  await expect(page.getByRole("link", { name: "Alpha" })).toBeVisible();
-  const names = await page.locator("ol a").allTextContents();
-  expect(names[0]).toContain("Alpha");
-  expect(names[4]).toContain("Epsilon");
-  const quiet = await page.locator("[data-quiet]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-quiet")));
-  expect(quiet.every((level) => level === "0" || level === "1")).toBe(true);
+  const rows = page.locator("[data-busy] [data-row]");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(0)).toContainText("Alpha");
+  await expect(rows.nth(0)).toContainText("붐빔");
+  await expect(rows.nth(0)).toContainText("추천 18~19시");
+  await expect(rows.nth(3)).toContainText("오늘은 추천 없음");
+  await expect(rows.nth(4)).toContainText("Epsilon");
+  await expect(page.locator("[data-quiet]")).toHaveCount(2);
+  await expect(page.locator("[data-quiet]").first()).toContainText("오늘 추천13~14시");
 });
 
-test("D1 and live smoke walk the home list when a busy row exists", async ({ page }) => {
+test("live smoke: home answers, and a listed place opens its week", async ({ page }) => {
   const statuses: { url: string; status: number }[] = [];
   page.on("response", (response) => {
     if (response.url().includes("/api/")) statuses.push({ url: response.url(), status: response.status() });
   });
   await page.goto("/ko");
-  await expect(page.locator("[data-busy-empty], [data-busy] [data-row]").first()).toBeVisible();
-  const first = page.locator("[data-busy] [data-row]").first();
-  if (await first.count()) {
-    await first.click();
+  // Fresh data shows rows or the empty sentence; late data says it is late. Anything else is a failure.
+  const shown = page.locator("[data-busy] [data-row], [data-busy-empty], [data-state=stale]").first();
+  await expect(shown).toBeVisible();
+  const firstRow = page.locator("[data-busy] [data-row], [data-quiet]").first();
+  if (await firstRow.count()) {
+    await firstRow.click();
     await expect(page).toHaveURL(/\/ko\/p\//);
-    await page.locator("[data-answer-card]").click();
-    await expect(page).toHaveURL(/\/ko\/p\/.+\/\d{4}-\d{2}-\d{2}/);
-  } else {
-    await expect(page.locator("[data-busy-empty]")).toBeVisible();
+    await expect(page.locator("[data-answer-card], [data-state=comboOff], [data-state=preparing]").first()).toBeVisible();
   }
-  expect(statuses.every((item) => item.status === 200)).toBe(true);
+  expect(statuses.length).toBeGreaterThan(0);
+  expect(statuses.filter((item) => item.status !== 200)).toEqual([]);
 });
