@@ -80,29 +80,3 @@ python -m engine forecast    # 예측과 추천 다시 계산 (하루 한 번)
 ```
 
 Windows 작업 스케줄러에 등록하려면 `scripts/register_collect_task.ps1`, `register_forecast_task.ps1`, `register_evaluate_task.ps1`.
-
-## 테스트
-
-```powershell
-python -m pytest app/engine/tests -q    # 엔진
-ruff check app/engine scripts/cloud
-
-cd app/web
-npm run lint
-npm test                                # 단위
-npx playwright test                     # 화면 (로컬 DB에 데이터가 있어야 함)
-```
-
-## 작업할 때
-
-- 화면 문구는 `app/web/messages/ko.json`, `en.json`에만 둠. 디자인명세서의 문구 표와 같이 고침
-- 색·간격은 `app/web/src/styles/tokens.css`의 토큰만 사용
-- 화면에서는 계산하지 않음. 값은 엔진이 만들어 DB에 저장하고 화면은 읽기만 함
-- 어떤 조합을 켜고 끌지는 `app/engine/config/feature_flags.yaml`에서 정함
-- 커밋 메시지는 한국어
-
-## 남은 일
-
-- 클라우드 배포 (`docs/RUNBOOK.md` 순서대로. 계정 준비 필요)
-- 장소 영어 이름, 수집이 빠진 시간 표시, 작업 실패 알림
-- 10월 데이터가 쌓이면 추천 조합 재판정
