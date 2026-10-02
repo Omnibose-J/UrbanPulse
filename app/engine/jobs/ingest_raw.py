@@ -26,16 +26,26 @@ def run(date: str | None = None) -> int:
     env = settings.require(("DATABASE_URL",))
     day = _day(date)
     location = _raw_dir(env, None)
-    snapshots = raw_store.read_day(location, day)
-    if not snapshots:
-        log(JOB, "fail", reason="no raw folder", raw_dir=f"{day.isoformat()}")
-        return 1
     live = []
     commerce = []
     forecasts = []
     unknowns: list[tuple[str, ...]] = []
-    for place_id, body in snapshots:
-        snapshot = parse_citydata(place_id, body)
+    failed = []
+    folders: set[str] = set()
+    files = 0
+    saw_any = False
+    for folder, place_id, body, error in raw_store.iter_day(location, day):
+        saw_any = True
+        files += 1
+        folders.add(folder)
+        if error or body is None:
+            failed.append({"file": place_id, "error": error or "empty"})
+            continue
+        try:
+            snapshot = parse_citydata(place_id, body)
+        except (ValueError, KeyError, TypeError) as exc:
+            failed.append({"file": place_id, "error": type(exc).__name__})
+            continue
         if snapshot.live is None:
             continue
         live.append(snapshot.live)
@@ -44,19 +54,24 @@ def run(date: str | None = None) -> int:
         forecasts.extend(snapshot.forecasts)
         if snapshot.unknown_categories:
             unknowns.append(snapshot.unknown_categories)
-    log(JOB, "start", date=day.isoformat(), files=len(snapshots))
+    if not saw_any:
+        log(JOB, "fail", reason="no raw folder", raw_dir=day.isoformat())
+        return 1
+    log(JOB, "start", date=day.isoformat(), files=files, failed=len(failed))
     try:
         with _ledger(env["DATABASE_URL"], JOB) as ctx:
             affected = store_observations(env["DATABASE_URL"], live, commerce, forecasts)
             ctx["detail"] = {
-                "files": len(snapshots),
+                "folders": len(folders),
+                "files": files,
+                "failed": failed,
                 "live": len(live),
                 "commerce": len(commerce),
                 "unknown_categories": sorted(
                     {name for snapshot_unknown in unknowns for name in snapshot_unknown}
                 ),
             }
-            ctx["status"] = "ok"
+            ctx["status"] = "warn" if failed else "ok"
     except Exception as exc:
         log(JOB, "fail", reason=f"{type(exc).__name__}")
         return 1

@@ -46,31 +46,59 @@ def write(run_ts: datetime, place_code: str, body: dict[str, Any], raw_dir: str 
         from engine.raw_gcs import upload
 
         return upload(str(raw_dir), key, payload, client)
+    import os
+
     path = Path(raw_dir) / key
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("xb") as handle:
-        handle.write(payload)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_bytes(payload)
+    try:
+        os.link(temporary, path)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
+    temporary.unlink(missing_ok=True)
     return path
 
 
-def read_day(raw_dir: str | Path, day: date, client=None) -> list[tuple[str, dict]]:
-    """`(place code, body)` for one KST day, from a folder or a `gs://` prefix."""
+def _decode(name: str, data: bytes) -> tuple[str, dict | None, str | None]:
+    code = name.rsplit("/", 1)[-1].removesuffix(".json.gz")
+    try:
+        return code, json.loads(gzip.decompress(data)), None
+    except (OSError, EOFError, gzip.BadGzipFile, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return code, None, type(exc).__name__
+
+
+def iter_day(raw_dir: str | Path, day: date, client=None):
+    """Yield `(folder, code, body, error)`. A bad file does not stop the rest."""
     prefix = f"{day:%Y}/{day:%m}/{day:%d}/"
     if is_gcs(raw_dir):
         from engine.raw_gcs import read_prefix
 
-        blobs = read_prefix(str(raw_dir), prefix, client)
-        rows = []
-        for name, data in blobs:
-            code = name.rsplit("/", 1)[-1].removesuffix(".json.gz")
-            rows.append((code, json.loads(gzip.decompress(data))))
-        return rows
+        for name, data in read_prefix(str(raw_dir), prefix, client):
+            folder = name.rsplit("/", 2)[-2] if "/" in name else ""
+            code, body, error = _decode(name, data)
+            yield folder, code, body, error
+        return
     root = Path(raw_dir) / f"{day:%Y}" / f"{day:%m}" / f"{day:%d}"
     if not root.is_dir():
-        return []
-    found = []
+        return
     for folder in sorted(path for path in root.iterdir() if path.is_dir()):
         for path in sorted(folder.glob("*.json.gz")):
-            body = json.loads(gzip.decompress(path.read_bytes()))
-            found.append((path.name.removesuffix(".json.gz"), body))
-    return found
+            code = path.name.removesuffix(".json.gz")
+            try:
+                data = path.read_bytes()
+            except OSError as exc:
+                yield folder.name, code, None, type(exc).__name__
+                continue
+            decoded, body, error = _decode(path.name, data)
+            yield folder.name, decoded, body, error
+
+
+def read_day(raw_dir: str | Path, day: date, client=None) -> list[tuple[str, dict]]:
+    """Successfully parsed `(place code, body)` rows for one KST day."""
+    rows = []
+    for _folder, code, body, error in iter_day(raw_dir, day, client):
+        if error is None and body is not None:
+            rows.append((code, body))
+    return rows

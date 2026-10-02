@@ -100,6 +100,61 @@ def test_ingest_raw_reads_what_the_writer_wrote(monkeypatch):
     assert json.loads(json.dumps(body))["CITYDATA"]["AREA_CD"] == "POI001"
 
 
+def test_a_truncated_file_warns_and_the_other_file_is_stored(tmp_path, monkeypatch):
+    when = datetime(2026, 10, 1, 9, 20, tzinfo=KST)
+    body = {
+        "CITYDATA": {
+            "AREA_CD": "POI001",
+            "LIVE_PPLTN_STTS": [
+                {
+                    "PPLTN_TIME": "2026-10-01 09:00",
+                    "AREA_PPLTN_MIN": "1",
+                    "AREA_PPLTN_MAX": "2",
+                    "AREA_CONGEST_LVL": "여유",
+                }
+            ],
+        }
+    }
+    raw_store.write(when, "POI001", body, tmp_path)
+    bad = tmp_path / "2026" / "10" / "01" / "0920" / "POI002.json.gz"
+    bad.write_bytes(b"not-gzip")
+    monkeypatch.setenv("ENGINE_SKIP_DOTENV", "1")
+    monkeypatch.setenv("RAW_DIR", str(tmp_path))
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example")
+    seen = {}
+
+    def remember(_url, live, _commerce, _forecasts):
+        seen["ids"] = [row["place_id"] for row in live]
+        return 1
+
+    monkeypatch.setattr(ingest_raw, "store_observations", remember)
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def ledger(_url, _job):
+        ctx = {"status": "ok", "detail": None}
+        yield ctx
+        seen["status"] = ctx["status"]
+        seen["failed"] = ctx["detail"]["failed"]
+        seen["folders"] = ctx["detail"]["folders"]
+
+    monkeypatch.setattr(ingest_raw, "_ledger", ledger)
+    assert ingest_raw.run("2026-10-01") == 0
+    assert seen["status"] == "warn"
+    assert seen["ids"] == ["POI001"]
+    assert seen["failed"][0]["file"] == "POI002"
+    assert seen["folders"] == 1
+
+
+def test_an_existing_final_name_is_not_replaced_and_leaves_no_temp(tmp_path):
+    when = datetime(2026, 10, 1, 9, 20, tzinfo=KST)
+    raw_store.write(when, "POI001", {"CITYDATA": {}}, tmp_path)
+    with pytest.raises(OSError):
+        raw_store.write(when, "POI001", {"CITYDATA": {"again": True}}, tmp_path)
+    assert list((tmp_path / "2026" / "10" / "01" / "0920").glob("*.tmp")) == []
+
+
 def test_a_local_raw_dir_still_round_trips(tmp_path):
     when = datetime(2026, 10, 1, 9, 20, tzinfo=KST)
     body = {"CITYDATA": {"AREA_CD": "POI009"}}

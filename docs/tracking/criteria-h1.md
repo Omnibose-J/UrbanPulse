@@ -8,8 +8,8 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 | A2 | A failed job leaves a fail row and no partial writes | temp-schema: SQL error and SystemExit | 0 | both cases: one fail row, places count 0 |
 | A3 | One run's web-visible writes commit together | failure before recommendations leaves seven tables unchanged | 0 | serve_state stayed on; thresholds 1; forecast hours 1; profiles, norms, similar, recommendations 0 |
 | A4 | rejudge records string keys and applies only a diff | temp schema 30×12; file bytes unchanged without --apply | 0 | without --apply bytes unchanged; detail key a1/sight/calm is on; apply changes that line only |
-| A5 | A bad raw file does not block the day | truncated json.gz → warn, other files stored | | |
-| A6 | A killed raw write can be rewritten | existing final name → error, no temp left | | |
+| A5 | A bad raw file does not block the day | truncated json.gz → warn, other files stored | 0 | warn; POI001 stored; POI002 in detail.failed; folders 1 |
+| A6 | A killed raw write can be rewritten | existing final name → error, no temp left | 0 | second write raises; the folder has no .tmp |
 | A7 | Collect fails loud and meets its deadline | all no_data → fail; hang ends at the deadline; one raw-write error | | |
 | A8 | A bad database URL does not leak the password | raised text and stderr omit the dummy password | | |
 | A9 | Archive does not delete unless a future decision says so | no flag, --dry-run, --execute | | |
