@@ -277,14 +277,12 @@ def _build(conn, started: datetime, today) -> dict:
                 """,
                 row,
             )
-    conn.commit()
     timing["refresh"] = round(timing["refresh"] + (time.perf_counter() - mark[0]), 1)
     mark[0] = time.perf_counter()
     _write_profiles(conn, today)
     _lap(mark, timing, "profile")
-    log_seconds = _write_forecasts(conn, started, today, model, set(passing), version, ready_ids)
-    timing["forecast_hourly"] = round(time.perf_counter() - mark[0] - log_seconds, 1)
-    timing["log"] = round(log_seconds, 1)
+    forecast_logs = _write_forecasts(conn, started, today, model, set(passing), version, ready_ids)
+    timing["forecast_hourly"] = round(time.perf_counter() - mark[0], 1)
     mark[0] = time.perf_counter()
     _write_tier_b_forecasts(conn, started, today)
     drop_past_forecasts(conn, today)
@@ -292,6 +290,10 @@ def _build(conn, started: datetime, today) -> dict:
     similar = replace_similar(conn, today)
     reco = refresh_recommendations(conn, started, today)
     conn.commit()
+    log_started = time.perf_counter()
+    reco["logged"] = _insert_logs(conn, forecast_logs, reco.pop("log_rows"))
+    conn.commit()
+    timing["log"] = round(time.perf_counter() - log_started, 1)
     _lap(mark, timing, "recommendations")
     return {
         "transitions": transitions,
@@ -358,10 +360,9 @@ def _write_profiles(conn, today) -> None:
             """,
             norm_rows,
         )
-    conn.commit()
 
 
-def _write_forecasts(conn, started, today, model, passing, version: str, ready_ids: set) -> float:
+def _write_forecasts(conn, started, today, model, passing, version: str, ready_ids: set) -> list:
     start = datetime.combine(today, datetime.min.time()).replace(tzinfo=KST)
     with conn.cursor() as cur:
         cur.execute(
@@ -475,20 +476,8 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             """,
             forecast_rows,
         )
-        log_started = time.perf_counter()
-        cur.executemany(
-            """
-            insert into forecast_log
-              (place_id, issued_date, target_ts, horizon_d, pred, baseline, model_version)
-            values (%s, %s, %s, %s, %s, %s, %s)
-            on conflict do nothing
-            """,
-            log_rows,
-        )
-        log_seconds = time.perf_counter() - log_started
     apply_overlay(conn, started)
-    conn.commit()
-    return log_seconds
+    return log_rows
 
 
 _P90_KEY = {"sight": 0, "food": 1, "shop": 2}
@@ -733,21 +722,9 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
             """,
             payload,
         )
-        logged = 0
+        log_rows = []
         if not only_today:
-            cur.execute("select count(*) from recommendation_log")
-            before = cur.fetchone()[0]
-            cur.executemany(
-                """
-                insert into recommendation_log (
-                  place_id, issued_date, date, tolerance, purpose, state, windows, hours, p90, lively_min
-                ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                on conflict do nothing
-                """,
-                [_log_tuple(row, today) for row in log_candidates(built, today)],
-            )
-            cur.execute("select count(*) from recommendation_log")
-            logged = cur.fetchone()[0] - before
+            log_rows = [_log_tuple(row, today) for row in log_candidates(built, today)]
             cur.execute("delete from recommendations where date < %s", (today,))
     off_by: dict[str, int] = {}
     on = reference = no_window = 0
@@ -766,8 +743,38 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
         "reference": reference,
         "off_by_reason": off_by,
         "no_window": no_window,
-        "logged": logged,
+        "logged": 0,
+        "log_rows": log_rows,
     }
+
+
+def _insert_logs(conn, forecast_logs: list, recommendation_logs: list) -> int:
+    """Append-only logs, after the web-visible tables have committed."""
+    with conn.cursor() as cur:
+        if forecast_logs:
+            cur.executemany(
+                """
+                insert into forecast_log
+                  (place_id, issued_date, target_ts, horizon_d, pred, baseline, model_version)
+                values (%s, %s, %s, %s, %s, %s, %s)
+                on conflict do nothing
+                """,
+                forecast_logs,
+            )
+        cur.execute("select count(*) from recommendation_log")
+        before = cur.fetchone()[0]
+        if recommendation_logs:
+            cur.executemany(
+                """
+                insert into recommendation_log (
+                  place_id, issued_date, date, tolerance, purpose, state, windows, hours, p90, lively_min
+                ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                on conflict do nothing
+                """,
+                recommendation_logs,
+            )
+        cur.execute("select count(*) from recommendation_log")
+        return cur.fetchone()[0] - before
 
 
 def _recommendation_tuple(row: dict, started: datetime):

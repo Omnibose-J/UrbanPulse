@@ -6,7 +6,7 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 |---|---|---|---|---|
 | A1 | Image loads the model or exits 1 | docker build; container prints 111; unit test missing dir → exit 1 | 0 | docker build exit 0; container printed 111; missing dir exits 1 |
 | A2 | A failed job leaves a fail row and no partial writes | temp-schema: SQL error and SystemExit | 0 | both cases: one fail row, places count 0 |
-| A3 | One run's web-visible writes commit together | failure before recommendations leaves seven tables unchanged | | |
+| A3 | One run's web-visible writes commit together | failure before recommendations leaves seven tables unchanged | 0 | serve_state stayed on; thresholds 1; forecast hours 1; profiles, norms, similar, recommendations 0 |
 | A4 | rejudge records string keys and applies only a diff | temp schema 30×12; file bytes unchanged without --apply | | |
 | A5 | A bad raw file does not block the day | truncated json.gz → warn, other files stored | | |
 | A6 | A killed raw write can be rewritten | existing final name → error, no temp left | | |
