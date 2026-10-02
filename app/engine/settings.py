@@ -18,12 +18,21 @@ from engine import ROOT_ENV_FILE
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def load_env() -> None:
-    """Seed os.environ from `<repo root>/.env` when present. Existing variables win."""
+def env_file() -> Path | None:
+    """The env file load_env would read. Skip wins; ENGINE_ENV_FILE replaces the default `.env`."""
     if os.environ.get("ENGINE_SKIP_DOTENV") == "1":
-        return
-    path = REPO_ROOT / ROOT_ENV_FILE
-    if path.exists():
+        return None
+    name = os.environ.get("ENGINE_ENV_FILE") or ROOT_ENV_FILE
+    path = Path(name)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    return path
+
+
+def load_env() -> None:
+    """Seed os.environ from the env file when it exists. Existing variables win."""
+    path = env_file()
+    if path is not None and path.exists():
         load_dotenv(path, override=False)
 
 
