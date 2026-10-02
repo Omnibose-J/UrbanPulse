@@ -11,7 +11,11 @@ from psycopg.types.json import Jsonb
 
 
 def connect(database_url: str) -> psycopg.Connection:
-    return psycopg.connect(database_url, autocommit=False, connect_timeout=5)
+    """Connect with a 5s timeout. A failure is a fixed message, never the URL."""
+    try:
+        return psycopg.connect(database_url, autocommit=False, connect_timeout=5)
+    except psycopg.Error:
+        raise psycopg.OperationalError("database connection failed") from None
 
 
 def abandon_stale(database_url: str, job: str) -> None:

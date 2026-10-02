@@ -81,8 +81,7 @@ _CODES = Path(__file__).resolve().parents[1] / "config" / "place_codes.yaml"
 
 
 def _connect(database_url: str) -> psycopg.Connection:
-    """Fail within 5 s. The caller must not log the exception: it can carry the database URL."""
-    return psycopg.connect(database_url, autocommit=False, connect_timeout=5)
+    return db.connect(database_url)
 
 
 def load_place_codes(path: Path | None = None) -> list[str]:
