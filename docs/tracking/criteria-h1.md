@@ -10,7 +10,7 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 | A4 | rejudge records string keys and applies only a diff | temp schema 30×12; file bytes unchanged without --apply | 0 | without --apply bytes unchanged; detail key a1/sight/calm is on; apply changes that line only |
 | A5 | A bad raw file does not block the day | truncated json.gz → warn, other files stored | 0 | warn; POI001 stored; POI002 in detail.failed; folders 1 |
 | A6 | A killed raw write can be rewritten | existing final name → error, no temp left | 0 | second write raises; the folder has no .tmp |
-| A7 | Collect fails loud and meets its deadline | all no_data → fail; hang ends at the deadline; one raw-write error | | |
+| A7 | Collect fails loud and meets its deadline | all no_data → fail; hang ends at the deadline; one raw-write error | 0 | 21 no_data → fail; hang within 2s, POI001 deadline; POI002 raw write, other two stored; one storage client |
 | A8 | A bad database URL does not leak the password | raised text and stderr omit the dummy password | | |
 | A9 | Archive does not delete unless a future decision says so | no flag, --dry-run, --execute | | |
 | A10 | Off places disappear from the forecast tables | a place switched to off has no rows after the run | | |

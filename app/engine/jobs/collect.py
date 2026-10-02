@@ -1,13 +1,14 @@
 """Collect one Seoul citydata snapshot for every place. `python -m engine collect`.
 
-Raw bodies are written before parsing and are never rewritten. More than 20 failures among places
-whose serve_state is not off ends the run as fail. After a successful store, today's forecast rows
-are overlaid from live observations and the city forecast.
+Raw bodies are written before parsing and are never rewritten. More than 20 failures or empty
+snapshots among places whose serve_state is not off ends the run as fail. After a successful store,
+today's forecast rows are overlaid from live observations and the city forecast.
 """
 
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from datetime import datetime
@@ -141,13 +142,22 @@ def _one(
     key: str,
     run_ts: datetime,
     raw_dir: str | Path,
+    storage_client: Any = None,
 ) -> dict[str, Any]:
     place_id = place["id"]
     try:
         body = fetch(place_id, client, key)
     except SeoulError as exc:
         return {"id": place_id, "serve_state": place["serve_state"], "outcome": "failed", "error": str(exc)}
-    raw_store.write(run_ts, place_id, body, raw_dir)
+    try:
+        raw_store.write(run_ts, place_id, body, raw_dir, storage_client)
+    except Exception:
+        return {
+            "id": place_id,
+            "serve_state": place["serve_state"],
+            "outcome": "failed",
+            "error": "raw write",
+        }
     try:
         snapshot = parse_citydata(place_id, body)
     except (ValueError, KeyError, TypeError) as exc:
@@ -203,12 +213,14 @@ def store_observations(
 
 
 def _status(results: list[dict[str, Any]]) -> str:
-    non_off_failed = sum(
-        1 for row in results if row["outcome"] == "failed" and row["serve_state"] != "off"
+    bad = sum(
+        1
+        for row in results
+        if row["outcome"] in ("failed", "no_data") and row["serve_state"] != "off"
     )
-    if non_off_failed > FAIL_AFTER:
+    if bad > FAIL_AFTER:
         return "fail"
-    if non_off_failed >= 1:
+    if bad >= 1:
         return "warn"
     return "ok"
 
@@ -221,6 +233,7 @@ def run(
     ledger: Ledger | None = None,
     store: Store | None = None,
     now: datetime | None = None,
+    deadline_s: float = 6 * 60,
 ) -> int:
     if env is None:
         settings.load_env()
@@ -253,14 +266,43 @@ def run(
         raw_rel = raw_store.relative_folder(run_ts)
     else:
         raw_rel = _relative(raw_store.folder_for(run_ts, raw_dir))
+    storage = None
+    if raw_store.is_gcs(raw_dir):
+        from engine.raw_gcs import storage_client
+
+        storage = storage_client()
     try:
-        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import ThreadPoolExecutor, wait
+
+        deadline_at = time.monotonic() + deadline_s
 
         def work(place: dict[str, str]) -> dict[str, Any]:
-            return _one(place, client, env["SEOUL_API_KEY"], run_ts, raw_dir)
+            if time.monotonic() >= deadline_at:
+                return {
+                    "id": place["id"],
+                    "serve_state": place["serve_state"],
+                    "outcome": "failed",
+                    "error": "deadline",
+                }
+            return _one(place, client, env["SEOUL_API_KEY"], run_ts, raw_dir, storage)
 
-        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            results = list(pool.map(work, places))
+        pool = ThreadPoolExecutor(max_workers=WORKERS)
+        try:
+            futures = {pool.submit(work, place): place for place in places}
+            done, pending = wait(futures, timeout=deadline_s)
+            results = [future.result() for future in done]
+            for future in pending:
+                place = futures[future]
+                results.append(
+                    {
+                        "id": place["id"],
+                        "serve_state": place["serve_state"],
+                        "outcome": "failed",
+                        "error": "deadline",
+                    }
+                )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
     finally:
         if own_client:
             client.close()
@@ -326,6 +368,11 @@ def run(
                     "ok": ok,
                     "no_data": no_data,
                     "failed": failed,
+                    "failed_places": {
+                        row["id"]: row.get("error", row["outcome"])
+                        for row in results
+                        if row["outcome"] == "failed"
+                    },
                     "raw_dir": raw_rel,
                     "unknown_categories": sorted(
                         {

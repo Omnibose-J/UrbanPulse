@@ -1,6 +1,8 @@
 """collect against mocked HTTP. No network, no database, no real key."""
 
 import json
+import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -175,3 +177,102 @@ def test_database_down_writes_raw_and_exits_1(tmp_path, monkeypatch, capsys):
     assert code == 1
     assert len(list(tmp_path.rglob("*.json.gz"))) == 3
     assert "database unavailable" in capsys.readouterr().out
+
+
+def _run_places(tmp_path, places, client, **kwargs):
+    runs = _Runs()
+    code = collect.run(
+        env=ENV,
+        client=client,
+        places=places,
+        raw_dir=kwargs.pop("raw_dir", tmp_path),
+        ledger=runs.job_run,
+        store=lambda live, commerce, forecasts: None,
+        now=datetime(2026, 10, 1, 9, 20, tzinfo=KST),
+        **kwargs,
+    )
+    return code, runs.rows[-1]
+
+
+def test_every_non_off_place_with_no_data_fails(tmp_path):
+    from engine.seoul_api import TIMEOUT
+
+    assert TIMEOUT.connect == 5.0
+    assert TIMEOUT.read == 20.0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"CITYDATA": {"AREA_CD": "POI001"}})
+
+    places = [{"id": f"POI{number:03d}", "serve_state": "on"} for number in range(1, 22)]
+    code, row = _run_places(tmp_path, places, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert code == 1
+    assert row["status"] == "fail"
+    assert row["detail"]["no_data"] == 21
+    assert row["detail"]["ok"] == 0
+
+
+def test_a_hanging_place_ends_within_the_deadline(tmp_path):
+    release = threading.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        release.wait(5)
+        code = request.url.path.rstrip("/").split("/")[-1]
+        return httpx.Response(200, json=_ok_body(code))
+
+    places = [{"id": "POI001", "serve_state": "on"}]
+    started = time.monotonic()
+    try:
+        code, row = _run_places(
+            tmp_path,
+            places,
+            httpx.Client(transport=httpx.MockTransport(handler)),
+            deadline_s=0.4,
+        )
+    finally:
+        release.set()
+    assert time.monotonic() - started < 2
+    assert row["detail"]["failed_places"] == {"POI001": "deadline"}
+    assert code == 0
+    assert row["status"] == "warn"
+
+
+def test_a_raw_write_error_fails_that_place_only(tmp_path, monkeypatch):
+    real = collect.raw_store.write
+
+    def write(run_ts, place_code, body, raw_dir, client=None):
+        if place_code == "POI002":
+            raise OSError("disk full")
+        return real(run_ts, place_code, body, raw_dir, client)
+
+    monkeypatch.setattr(collect.raw_store, "write", write)
+    places = [{"id": f"POI{number:03d}", "serve_state": "on"} for number in range(1, 4)]
+    code, row = _run_places(tmp_path, places, _client(0))
+    assert code == 0
+    assert row["status"] == "warn"
+    assert row["detail"]["failed_places"] == {"POI002": "raw write"}
+    assert {path.name for path in tmp_path.rglob("*.json.gz")} == {"POI001.json.gz", "POI003.json.gz"}
+
+
+def test_one_storage_client_per_run(tmp_path, monkeypatch):
+    created: list[object] = []
+
+    def fake_client(client=None):
+        if client is not None:
+            return client
+        created.append(object())
+        return created[-1]
+
+    seen: list[object] = []
+
+    def fake_write(run_ts, place_code, body, raw_dir, client=None):
+        seen.append(client)
+        return "stored"
+
+    monkeypatch.setattr("engine.raw_gcs.storage_client", fake_client)
+    monkeypatch.setattr(collect.raw_store, "write", fake_write)
+    places = [{"id": f"POI{number:03d}", "serve_state": "on"} for number in range(1, 4)]
+    code, row = _run_places(tmp_path, places, _client(0), raw_dir="gs://bucket/raw")
+    assert code == 0
+    assert row["status"] == "ok"
+    assert len(created) == 1
+    assert seen == [created[0], created[0], created[0]]

@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 
 SEOUL_URL = "http://openapi.seoul.go.kr:8088/{key}/json/citydata/1/5/{code}"
-TIMEOUT = 20.0
+TIMEOUT = httpx.Timeout(20.0, connect=5.0)
 # Three attempts. Sleep 1s before the second and 2s before the third.
 BACKOFF_S = (0.0, 1.0, 2.0)
 
