@@ -71,6 +71,27 @@ def test_split_cuts_are_monotone():
         assert t1 <= t2 <= t3
 
 
+def test_split_matches_a_direct_error_count():
+    rng = random.Random(2)
+    frame = pd.DataFrame(
+        {
+            "ts": pd.date_range("2026-01-01", periods=80, freq="h"),
+            "value": [rng.uniform(1, 100) for _ in range(80)],
+            "level": [rng.randint(0, 3) for _ in range(80)],
+        }
+    )
+    hi = frame.loc[frame["level"] >= 1, "value"]
+    lo = frame.loc[frame["level"] < 1, "value"]
+    best_value = None
+    best_errors = None
+    for candidate in sorted(set(hi).union(set(lo))):
+        errors = int((hi < candidate).sum() + (lo >= candidate).sum())
+        if best_errors is None or errors < best_errors:
+            best_errors = errors
+            best_value = float(candidate)
+    assert thresholds_for(frame)[0] == best_value
+
+
 def test_level_of_is_monotone_in_pop():
     rng = random.Random(0)
     for _ in range(50):

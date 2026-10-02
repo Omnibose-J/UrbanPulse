@@ -39,18 +39,23 @@ def hourly_frame(rows: pd.DataFrame, grid: str) -> pd.DataFrame:
     if rows.empty:
         return pd.DataFrame(columns=["place_id", "hour", "value", "level"])
     frame = rows.copy()
-    frame["ts"] = frame["ts"].map(as_kst)
+    stamps = pd.to_datetime(frame["ts"])
+    if stamps.dt.tz is None:
+        stamps = stamps.dt.tz_localize(KST)
+    else:
+        stamps = stamps.dt.tz_convert(KST)
+    frame["ts"] = stamps
     frame = frame.sort_values(["place_id", "ts"])
     if grid == "research":
         frame = frame.drop_duplicates(["place_id", "ts"], keep="first")
-        frame["hour"] = frame["ts"].map(research_hour)
+        frame["hour"] = frame["ts"].dt.round("h")
         grouped = frame.groupby(["place_id", "hour"], as_index=False).agg(
             value=("value", "mean"), level=("level", "last")
         )
         return grouped
     if grid != "floor":
         raise ValueError(f"unknown grid: {grid}")
-    frame["hour"] = frame["ts"].map(floor_hour)
+    frame["hour"] = frame["ts"].dt.floor("h")
     latest = frame.groupby(["place_id", "hour"], as_index=False).tail(1)[["place_id", "hour", "level"]]
     means = frame.groupby(["place_id", "hour"], as_index=False).agg(value=("value", "mean"))
     return means.merge(latest, on=["place_id", "hour"])

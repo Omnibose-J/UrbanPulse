@@ -41,6 +41,20 @@ def test_version_mismatch_refuses_to_load(tmp_path):
     assert caught.value.code == 1
 
 
+def test_batched_hours_match_one_call_each(tmp_path):
+    _write(tmp_path / "model", sklearn.__version__, {"POI001": 0})
+    model = load(tmp_path / "model")
+
+    def predict(frame):
+        return frame["hour"].to_numpy()
+
+    model.model.predict = predict
+    stamps = ["2026-08-15 09:00", "2026-08-15 18:00"]
+    batched = [float(value) for value in model.ratio("POI001", stamps, 1)]
+    single = [float(model.ratio("POI001", [stamp], 1)[0]) for stamp in stamps]
+    assert batched == single
+
+
 def test_unknown_place_returns_none(tmp_path):
     _write(tmp_path / "model", sklearn.__version__, {"POI001": 0})
     model = load(tmp_path / "model")

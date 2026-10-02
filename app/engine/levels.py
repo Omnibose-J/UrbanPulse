@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 
 from engine.parsers import KST
@@ -44,14 +45,13 @@ def _cut(frame: pd.DataFrame, level: int, rule: str) -> float:
     lo = frame.loc[frame["level"] < level, "value"]
     if lo.empty:
         return float(hi.min())
-    best_value = None
-    best_errors = None
-    for candidate in sorted(set(hi).union(set(lo))):
-        errors = int((hi < candidate).sum() + (lo >= candidate).sum())
-        if best_errors is None or errors < best_errors:
-            best_errors = errors
-            best_value = float(candidate)
-    return float(best_value)
+    hi_sorted = np.sort(hi.to_numpy(dtype=float))
+    lo_sorted = np.sort(lo.to_numpy(dtype=float))
+    candidates = np.unique(np.concatenate([hi_sorted, lo_sorted]))
+    hi_below = np.searchsorted(hi_sorted, candidates, side="left")
+    lo_at_or_above = lo_sorted.size - np.searchsorted(lo_sorted, candidates, side="left")
+    errors = hi_below + lo_at_or_above
+    return float(candidates[int(np.argmin(errors))])
 
 
 def window_start(today: date) -> date:

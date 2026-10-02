@@ -7,6 +7,7 @@ Refreshes place state, thresholds and activity profiles, then writes today's 8-d
 from __future__ import annotations
 
 import math
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -73,47 +74,28 @@ def drop_past_forecasts(conn, today) -> None:
         cur.execute("delete from forecast_hourly where target_ts < %s", (issued_midnight(today),))
 
 
-def drop_unprofiled_tier_b(conn) -> None:
-    """A tier B place with no profile keeps no forecast and no recommendation."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            delete from forecast_hourly f
-            using places p
-            where f.place_id = p.id
-              and p.tier = 'B'
-              and not exists (select 1 from tier_b_profile t where t.place_id = p.id)
-            """
-        )
-        cur.execute(
-            """
-            delete from recommendations r
-            using places p
-            where r.place_id = p.id
-              and p.tier = 'B'
-              and not exists (select 1 from tier_b_profile t where t.place_id = p.id)
-            """
-        )
-
-
 def apply_overlay(conn, now: datetime) -> None:
     """Hours with a live observation become `live`; later hours covered by city_fcst become `seoul`."""
+    issued = issued_midnight(_today(now))
+    hour_start = now.astimezone(KST).replace(minute=0, second=0, microsecond=0)
     with conn.cursor() as cur:
         cur.execute("set time zone 'Asia/Seoul'")
         cur.execute(
             """
             select place_id, ts, (pop_min + pop_max) / 2.0, level
             from live_obs
-            where ts >= date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'
-            """
+            where ts >= %s and ts < %s
+            """,
+            (issued, issued + timedelta(days=1)),
         )
         live_rows = pd.DataFrame(cur.fetchall(), columns=["place_id", "ts", "value", "level"])
         cur.execute(
             """
             select place_id, target_ts, (pop_min + pop_max) / 2.0, level
             from city_fcst
-            where target_ts >= date_trunc('hour', now())
-            """
+            where target_ts >= %s and target_ts < %s
+            """,
+            (hour_start, issued + timedelta(days=1)),
         )
         city_rows = cur.fetchall()
     if not live_rows.empty:
@@ -206,7 +188,15 @@ def run() -> int:
     return 0
 
 
+def _lap(mark: list[float], timing: dict, name: str) -> None:
+    now = time.perf_counter()
+    timing[name] = round(now - mark[0], 1)
+    mark[0] = now
+
+
 def _build(conn, started: datetime, today) -> dict:
+    timing: dict[str, float] = {}
+    mark = [time.perf_counter()]
     model, passing = _active_model(conn)
     place_index = set(model.place_index) if model else set()
     version = model.meta["created_at"] if model else "none"
@@ -243,6 +233,8 @@ def _build(conn, started: datetime, today) -> dict:
             (commerce_since, live_since),
         )
         flags = {row[0]: row[1:] for row in cur.fetchall()}
+    _lap(mark, timing, "refresh")
+    with conn.cursor() as cur:
         cur.execute(
             """
             select place_id, ts, (pop_min + pop_max) / 2.0, level
@@ -261,6 +253,7 @@ def _build(conn, started: datetime, today) -> dict:
                 ready_ids.add(place_id)
             if t1 <= t2 <= t3:
                 threshold_rows.append((place_id, t1, t2, t3, days))
+    _lap(mark, timing, "thresholds")
     transitions = {}
     with conn.cursor() as cur:
         for place_id, tier, state in places:
@@ -292,14 +285,21 @@ def _build(conn, started: datetime, today) -> dict:
                 row,
             )
     conn.commit()
+    timing["refresh"] = round(timing["refresh"] + (time.perf_counter() - mark[0]), 1)
+    mark[0] = time.perf_counter()
     _write_profiles(conn, today)
-    _write_forecasts(conn, started, today, model, set(passing), version, ready_ids)
+    _lap(mark, timing, "profile")
+    log_seconds = _write_forecasts(conn, started, today, model, set(passing), version, ready_ids)
+    timing["forecast_hourly"] = round(time.perf_counter() - mark[0] - log_seconds, 1)
+    timing["log"] = round(log_seconds, 1)
+    mark[0] = time.perf_counter()
     _write_tier_b_forecasts(conn, started, today)
-    drop_unprofiled_tier_b(conn)
     drop_past_forecasts(conn, today)
+    _lap(mark, timing, "tier B")
     similar = replace_similar(conn, today)
     reco = refresh_recommendations(conn, started, today)
     conn.commit()
+    _lap(mark, timing, "recommendations")
     return {
         "transitions": transitions,
         "places": len(places),
@@ -307,6 +307,7 @@ def _build(conn, started: datetime, today) -> dict:
         "similar": similar,
         "reco": reco,
         "levels_rule": "split",
+        "timing": timing,
     }
 
 def _write_profiles(conn, today) -> None:
@@ -367,7 +368,7 @@ def _write_profiles(conn, today) -> None:
     conn.commit()
 
 
-def _write_forecasts(conn, started, today, model, passing, version: str, ready_ids: set) -> None:
+def _write_forecasts(conn, started, today, model, passing, version: str, ready_ids: set) -> float:
     start = datetime.combine(today, datetime.min.time()).replace(tzinfo=KST)
     with conn.cursor() as cur:
         cur.execute(
@@ -419,9 +420,11 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
         for offset in range(8):
             day = today + timedelta(days=offset)
             dtype = day_type(day, kinds)
-            for hour in range(24):
-                target = datetime.combine(day, datetime.min.time()).replace(tzinfo=KST)
-                target = target + timedelta(hours=hour)
+            midnight = datetime.combine(day, datetime.min.time()).replace(tzinfo=KST)
+            targets = [midnight + timedelta(hours=hour) for hour in range(24)]
+            use_model = model is not None and place_id in model.place_index and offset in passing
+            ratios = model.ratio(place_id, targets, offset) if use_model else None
+            for hour, target in enumerate(targets):
                 base = baseline(place_series, pd.Timestamp(target), offset)
                 activity = activity_for(
                     tier, profiles.get((place_id, dtype, hour), (None, None, None))
@@ -431,9 +434,8 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
                 ready = False
                 source = "profile"
                 if base is not None:
-                    if model is not None and place_id in model.place_index and offset in passing:
-                        ratio = model.ratio(place_id, [target], offset)
-                        pop = float(base) * math.exp(float(ratio[0]))
+                    if ratios is not None:
+                        pop = float(base) * math.exp(float(ratios[hour]))
                         source = "model"
                     else:
                         pop = float(base)
@@ -458,7 +460,7 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
                 )
                 if offset in (1, 3, 7) and 9 <= hour <= 23 and pop is not None and base is not None:
                     log_rows.append((place_id, today, target, offset, pop, float(base), version))
-    with conn.cursor() as cur:
+    with conn.pipeline(), conn.cursor() as cur:
         cur.executemany(
             """
             insert into forecast_hourly (
@@ -480,6 +482,7 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             """,
             forecast_rows,
         )
+        log_started = time.perf_counter()
         cur.executemany(
             """
             insert into forecast_log
@@ -489,8 +492,10 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             """,
             log_rows,
         )
-        apply_overlay(conn, started)
+        log_seconds = time.perf_counter() - log_started
+    apply_overlay(conn, started)
     conn.commit()
+    return log_seconds
 
 
 _P90_KEY = {"sight": 0, "food": 1, "shop": 2}
