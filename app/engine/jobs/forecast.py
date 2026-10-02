@@ -141,6 +141,21 @@ def apply_overlay(conn, now: datetime) -> None:
                     (float(pop), int(level), place_id, target),
                 )
     _measure_activity(conn, now)
+    cutoff = now.astimezone(KST) - timedelta(minutes=90)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            update forecast_hourly as forecast
+            set stale = age.newest is null or age.newest < %s
+            from (
+                select place_id, max(ts) as newest
+                from live_obs
+                group by place_id
+            ) as age
+            where forecast.place_id = age.place_id
+            """,
+            (cutoff,),
+        )
 
 
 def require_model_files(directory, version: str) -> None:
