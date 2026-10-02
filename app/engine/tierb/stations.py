@@ -51,6 +51,12 @@ where places.tier is distinct from excluded.tier
 """
 
 
+def station_ids(keys: list[str]) -> list[str]:
+    """STN001… in normalised-name order. The same keys always get the same ids."""
+    ordered = sorted(set(keys))
+    return [f"STN{index:03d}" for index, _key in enumerate(ordered, start=1)]
+
+
 def covered(fraction: float) -> bool:
     """True when at least half of the station circle lies inside the 121 areas."""
     return fraction >= 0.5
@@ -105,6 +111,7 @@ def build_rows() -> tuple[list[dict[str, Any]], int]:
         else:
             kept_keys.append(str(row.station))
     kept_keys = sorted(set(kept_keys))
+    id_by_key = dict(zip(kept_keys, station_ids(kept_keys), strict=True))
     numeric = grouped.assign(LAT=grouped.LAT.astype(float), LOT=grouped.LOT.astype(float))
     means = numeric.groupby("key")[["LAT", "LOT"]].mean()
     codes = grouped.groupby("key")["BLDN_ID"].agg(lambda values: sorted(set(values)))
@@ -133,12 +140,12 @@ def build_rows() -> tuple[list[dict[str, Any]], int]:
         raise RuntimeError(f"station point falls in more than one dong: {tied}")
     gu_by_key = dict(zip(joined["key"].astype(str), joined[GU_FIELD], strict=True))
     rows = []
-    for index, key in enumerate(kept_keys, start=1):
+    for key in kept_keys:
         gu = gu_by_key.get(key)
         gu_text = None if gu is None or str(gu) in {"None", "nan"} else str(gu)
         rows.append(
             {
-                "id": f"STN{index:03d}",
+                "id": id_by_key[key],
                 "name": names[key],
                 "category": CATEGORY,
                 "gu": gu_text,
@@ -157,6 +164,11 @@ def _counts(conn) -> list[tuple]:
     ).fetchall()
 
 
+def upsert_station(cur, row: dict[str, Any]) -> int:
+    cur.execute(_UPSERT, row)
+    return cur.rowcount
+
+
 def load_stations() -> int:
     settings.load_env()
     url = settings.require(("DATABASE_URL",))["DATABASE_URL"]
@@ -167,8 +179,7 @@ def load_stations() -> int:
             changed = 0
             with conn.cursor() as cur:
                 for row in rows:
-                    cur.execute(_UPSERT, row)
-                    changed += cur.rowcount
+                    changed += upsert_station(cur, row)
             after = _counts(conn)
             if before != after:
                 raise RuntimeError("A1/A2 place counts changed")
