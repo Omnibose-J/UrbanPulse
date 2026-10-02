@@ -161,7 +161,12 @@
     "on": "On",
     "reference": "Reference",
     "preparing": "Preparing",
-    "off": "Off"
+    "off": "Off",
+    "tierA1": "Shopping districts",
+    "tierA2": "Parks and palaces",
+    "tierB": "Station areas",
+    "foreign": "many foreign visitors",
+    "places": "{count} places"
   },
   "nav": {
     "logo": "UrbanPulse",

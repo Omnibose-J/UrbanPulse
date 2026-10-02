@@ -20,12 +20,20 @@ export function AboutScreen() {
       <table className="w-full text-left">
         <tbody>
           {(loaded.data?.rows ?? []).map((row) => (
-            <tr key={`${row.tier}-${row.foreign_heavy}-${row.purpose}-${row.tolerance}-${row.state}`} className="row">
-              <td className="caption">{row.tier}</td>
-              <td className="caption">{row.purpose}</td>
-              <td className="caption">{row.tolerance}</td>
-              <td className="caption">{t(`about.${row.state === "on" ? "on" : row.state === "reference" ? "reference" : row.state === "off" ? "off" : "preparing"}`)}</td>
-              <td className="caption text-right">{row.count}</td>
+            <tr key={`${row.tier}-${row.foreign_heavy}-${row.purpose}-${row.tolerance}-${row.state}`} className="border-b border-line">
+              <td className="label py-2.5 pr-3">
+                <span className="block font-semibold">
+                  {t(`about.tier${row.tier}`)}
+                  {row.foreign_heavy ? ` · ${t("about.foreign")}` : ""}
+                </span>
+                <span className="block text-text-3">
+                  {row.purpose === "none" ? t(`tol.${row.tolerance}`) : `${t(`purpose.${row.purpose}`)} · ${t(`tol.${row.tolerance}`)}`}
+                </span>
+              </td>
+              <td className="label whitespace-nowrap pr-3" style={{ color: row.state === "on" ? "var(--go-text)" : "var(--text-3)" }}>
+                {t(`about.${row.state === "on" ? "on" : row.state === "reference" ? "reference" : row.state === "off" ? "off" : "preparing"}`)}
+              </td>
+              <td className="caption whitespace-nowrap text-right text-text-2">{t("about.places", { count: row.count })}</td>
             </tr>
           ))}
         </tbody>

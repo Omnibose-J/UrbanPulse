@@ -43,7 +43,7 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
       <div className="mt-3 flex flex-col gap-4">
         <h1 className="display">{t("home.title")}</h1>
         <p className="body text-text-2">{t("home.subtitle")}</p>
-        <Link prefetch={false} href={`/${locale}/search`} data-press className="press body flex items-center gap-2.5 rounded-[12px] border border-line px-4 text-text-3 shadow-[var(--shadow-card)]">
+        <Link prefetch={false} href={`/${locale}/search`} data-press className="press body flex items-center gap-2.5 rounded-[12px] border border-line px-4 text-text-3">
           <Search size={16} aria-hidden />
           <span>{t("home.search")}</span>
         </Link>
@@ -101,7 +101,7 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
           {quiet.map((row) => {
             const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
             return (
-            <Link prefetch={false} key={row.id} href={`/${locale}/p/${row.id}/${kstNow().date}`} data-quiet={row.level} className="flex w-[232px] shrink-0 snap-start flex-col gap-3 rounded-[16px] border border-line p-4 shadow-[var(--shadow-card)]">
+            <Link prefetch={false} key={row.id} href={`/${locale}/p/${row.id}/${kstNow().date}`} data-quiet={row.level} className="flex w-[232px] shrink-0 snap-start flex-col gap-3 rounded-[16px] border border-line p-4">
               <span className="flex min-w-0 items-start justify-between gap-2">
                 <span data-place-name className="min-w-0 truncate text-[17px] font-extrabold leading-snug"><PlaceName name={row.name} nameEn={row.name_en} /></span>
                 <span data-place-status className="caption flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold" style={{ color: "var(--go-text)" }}>

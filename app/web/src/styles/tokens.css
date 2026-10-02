@@ -30,6 +30,8 @@
   --r-pill: 999px;
   --shadow-card: 0 1px 2px rgb(15 24 34 / 6%), 0 6px 16px rgb(15 24 34 / 6%);
   --shadow-sheet: 0 -8px 32px rgb(15 24 34 / 18%);
+  --scroll-thumb: #c4c9d0;
+  --scroll-thumb-hover: #8c9095;
   --ink-48: rgb(15 24 34 / 48%);
   --on-ink-12: rgb(255 255 255 / 12%);
 }

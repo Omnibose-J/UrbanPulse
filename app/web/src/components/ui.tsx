@@ -197,7 +197,6 @@ export function AnswerCard({
   const nameClass = variant === "week" || weekNone ? "title" : "label text-on-ink-2";
   const body = (
     <div data-answer-card className="relative flex flex-col gap-4 overflow-hidden rounded-[20px] bg-ink p-5 text-on-ink">
-      <span className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full" style={{ background: "radial-gradient(circle, rgb(70 224 160 / 22%), transparent 70%)" }} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           {dateLine ? <p className="label truncate font-semibold text-on-ink-3">{dateLine}</p> : null}
@@ -295,7 +294,7 @@ export function WeekList({
   const t = useTranslations();
   const mark = marks(t);
   return (
-    <section>
+    <section className="mt-6">
       <h2 className="section mb-2">{t("week.glance")}</h2>
       <ul>
         {days.map((day) => {
@@ -367,7 +366,7 @@ export function DayStrip({
   if (hidden) return <p className="body">{t("state.foreignStrip")}</p>;
   const labels = hours.map((cell) => say({ mode, hour: cell.h, cell, locale, tier, purpose }));
   return (
-    <section>
+    <section className="mt-6">
       <h2 className="section mb-2">{t("day.byHour")}</h2>
       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
         {hours.map((cell, index) => {

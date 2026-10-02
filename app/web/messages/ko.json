@@ -161,7 +161,12 @@
     "on": "켜짐",
     "reference": "참고용",
     "preparing": "준비 중",
-    "off": "꺼짐"
+    "off": "꺼짐",
+    "tierA1": "상권",
+    "tierA2": "공원·고궁",
+    "tierB": "역세권",
+    "foreign": "외국인 많은 곳",
+    "places": "{count}곳"
   },
   "nav": {
     "logo": "UrbanPulse",
