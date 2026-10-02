@@ -713,7 +713,8 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
                     if place["tier"] == "A1" and scales is not None and purpose in _P90_KEY:
                         row["p90"] = scales[_P90_KEY[purpose]]
                     built.append(row)
-    fill_alternatives(built, built + stored, neighbours, coords)
+    pool = built + stored
+    fill_alternatives(pool, pool, neighbours, coords)
     payload = [_recommendation_tuple(row, started) for row in built]
     with conn.cursor() as cur:
         cur.executemany(
@@ -735,6 +736,26 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
             """,
             payload,
         )
+        dated = [row for row in stored if row["state"] != "off"]
+        if dated:
+            cur.executemany(
+                """
+                update recommendations
+                set alt_dates = %s, alt_places = %s
+                where place_id = %s and date = %s and tolerance = %s and purpose = %s
+                """,
+                [
+                    (
+                        Jsonb(row["alt_dates"]),
+                        Jsonb(row["alt_places"]),
+                        row["place_id"],
+                        row["date"],
+                        row["tolerance"],
+                        row["purpose"],
+                    )
+                    for row in dated
+                ],
+            )
         log_rows = []
         if not only_today:
             log_rows = [_log_tuple(row, today) for row in log_candidates(built, today)]

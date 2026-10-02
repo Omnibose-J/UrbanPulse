@@ -126,10 +126,15 @@ def fill_alternatives(
 ) -> None:
     """Fill alt_dates and alt_places on `rows`. `similar` lists other places in rank order."""
     index = {(row["place_id"], row["date"], row["tolerance"], row["purpose"]): row for row in pool}
+    groups: dict[tuple, list[dict]] = {}
+    for other in pool:
+        key = (other["place_id"], other["tolerance"], other["purpose"])
+        groups.setdefault(key, []).append(other)
     for row in rows:
         if row["state"] == "off":
             continue
-        row["alt_dates"] = _alt_dates(row, pool)
+        key = (row["place_id"], row["tolerance"], row["purpose"])
+        row["alt_dates"] = _alt_dates(row, groups.get(key, []))
         if row["tier"] in ("A2", "B"):
             row["alt_places"] = []
             continue
