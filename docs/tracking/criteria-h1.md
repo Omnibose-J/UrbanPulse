@@ -18,7 +18,7 @@ Written 2026-10-02 before the first edit. Result cells are filled only after run
 | A12 | Stale follows the newest observation | both directions | 0 | obs 120 min old → stale true; obs 10 min old → stale false |
 | A13 | The model uses the holidays table | a newly added date changes hol | 0 | 2026-10-05 added to the table → hol 1; meta-only list → hol 0 |
 | A14 | Forecast starts at 05:10 and locks in one order | forecast task trigger 05:10 | 0 | trigger 2026-10-02T05:10:00+09:00; deadlock itself not reproduced; overlay locks place_id, target_ts and updates one statement per stored place |
-| A15 | rel, open hours, holiday ledger, unscored count | tests for each | | |
+| A15 | rel, open hours, holiday ledger, unscored count | tests for each | 0 | rel 0.42 stored; bad span raises OpenHoursError; sync_holidays writes one ok row; two dropped branches count as unscored |
 | B1 | A window cell does not say the unverified verdict | e2e window cell and map card; unknown code throws | | |
 | B2 | An A2 sentence is complete | e2e ends with 요 / no trailing and | | |
 | B3 | Counts are not cut at 1,000 | sum of /api/flags = today's recommendation rows | | |
