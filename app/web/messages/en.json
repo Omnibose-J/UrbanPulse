@@ -93,6 +93,7 @@
     "window": "This is a recommended time",
     "ok": "OK to go",
     "avoid": "Better to avoid",
+    "notPick": "{hour} is not one of the best times.",
     "cell": "{hour}: {verdict}. {why}"
   },
   "now": {

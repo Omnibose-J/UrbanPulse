@@ -5,7 +5,7 @@ import { AttributionControl, LngLatBounds, Map, Marker, setWorkerUrl } from "map
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
-import { AppBar, StateBox } from "@/components/ui";
+import { AppBar, HourSentence, StateBox } from "@/components/ui";
 import { useLoad } from "@/lib/use-load";
 import { formatShortDate, formatShortWeekday, formatStoredWindows, kstParts } from "@/lib/format";
 import { addDays, kstNow } from "@/lib/kst";
@@ -63,12 +63,6 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const places = loaded.data ? loaded.data.places : [];
   const holidays = loaded.data?.holidays ?? [];
   useEffect(() => {
-    const first = loaded.data?.places[0]?.id;
-    if (!first) return;
-    setSelected((current) => current ?? first);
-  }, [loaded.data]);
-
-  useEffect(() => {
     const node = box.current;
     if (!node || mapError) return;
     setWorkerUrl(new URL("/vendor/maplibre/maplibre-gl-worker.mjs", window.location.origin).href);
@@ -122,9 +116,11 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.pin = "";
+      button.dataset.selected = on ? "1" : "0";
       button.dataset.tone = tone;
       button.setAttribute("aria-label", place.name);
-      const size = on ? 38 : 28;
+      const size = on ? 38 : map.getZoom() >= 12 ? 28 : 18;
+      button.dataset.pinSize = String(size);
       button.style.width = `${size}px`;
       button.style.height = `${size}px`;
       button.style.borderRadius = "999px";
@@ -157,12 +153,21 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       fitted.current = key;
     }
     const onZoom = () => {
-      const showAll = map.getZoom() >= 13;
+      const zoom = map.getZoom();
+      map.getContainer().querySelectorAll<HTMLElement>("[data-pin]").forEach((node) => {
+        const selectedPin = node.dataset.selected === "1";
+        const size = selectedPin ? 38 : zoom >= 12 ? 28 : 18;
+        node.dataset.pinSize = String(size);
+        node.style.width = `${size}px`;
+        node.style.height = `${size}px`;
+      });
+      const showAll = zoom >= 13;
       map.getContainer().querySelectorAll<HTMLElement>("[data-pin-label]").forEach((node) => {
         node.style.display = showAll || node.dataset.selected === "1" ? "block" : "none";
       });
     };
     map.on("zoom", onZoom);
+    onZoom();
     return () => {
       map.off("zoom", onZoom);
     };
@@ -173,7 +178,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const weekdays = t.raw("time.weekdays") as string[];
   const suffix = t("time.hour");
   const tone = current ? placeTone(current, clock) : "bad";
-  const verdict = tone === "go" ? t("reason.window") : tone === "ok" ? t("reason.ok") : t("reason.avoid");
+  const clockCell = current?.hours?.find((cell) => cell.h === clock) ?? null;
   const pick = current ? formatStoredWindows(current.windows, locale, suffix)[0] : "";
   const dateLabel = day === today ? t("time.today") : formatShortDate(day);
   const card = current ? (
@@ -184,7 +189,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     >
       <span className="text-[18px] font-extrabold" lang="ko">{current.name}</span>
       <span className="text-[14px] text-text-2">
-        <b className="text-text">{t("map.hourLine", { hour: String(clock), verdict })}</b>
+        <b className="text-text" data-hour-sentence>{current ? <HourSentence mode={current.strip_mode} hour={clock} cell={clockCell ?? { in_window: tone === "go", rating: tone === "ok" ? 1 : 0, reason: "ok" }} locale={locale === "en" ? "en" : "ko"} /> : null}</b>
       </span>
       <span className="text-[14px] text-text-2">
         {pick ? t("map.dayPick", { date: dateLabel, time: pick }) : day === today ? t("home.noPickToday") : `${dateLabel} ${t("week.none")}`}
@@ -230,8 +235,8 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
         ) : null}
         <div ref={box} data-map className="relative min-h-[420px] flex-1" style={{ height: "calc(100dvh - 220px)", background: "var(--map-land)", display: loaded.error || mapError ? "none" : undefined }}>
           <div className="absolute left-4 top-3 z-10 flex items-center gap-2 rounded-[var(--r-pill)] bg-bg px-3 py-1.5 text-[11px] font-semibold text-text-2 shadow-[var(--shadow-card)]">
-            {(["win", "1", "0"] as const).map((key) => (
-              <span key={key} className="inline-flex items-center gap-1">
+            {(current?.strip_mode === "two_step" ? (["win", "1", "0"] as const) : (["win"] as const)).map((key) => (
+              <span key={key} data-legend className="inline-flex items-center gap-1">
                 <i className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: key === "win" ? "var(--go)" : key === "1" ? "var(--ok)" : "var(--bad-pin)" }} />
                 {t(`rate.${key}`)}
               </span>

@@ -93,6 +93,7 @@
     "window": "추천 시간이에요",
     "ok": "가도 괜찮아요",
     "avoid": "피하는 게 좋아요",
+    "notPick": "{hour}시는 추천 시간이 아니에요.",
     "cell": "{hour}시는 {verdict}. {why}"
   },
   "now": {

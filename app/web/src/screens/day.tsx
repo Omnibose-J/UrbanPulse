@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, Legend, Phone, StateBox } from "@/components/ui";
+import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, HourSentence, Legend, Phone, StateBox } from "@/components/ui";
 import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
@@ -121,7 +121,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
         <div>
           <DayStrip hours={rec.hours} mode={rec.strip_mode} selected={picked?.h} onPick={setPicked} />
           <Legend mode={rec.strip_mode} />
-          <p className="body mt-4 min-h-12 rounded-[12px] bg-bg-soft p-3">{picked ? t("reason.cell", { hour: String(picked.h), verdict: picked.in_window ? t("reason.window") : t("reason.avoid"), why: t(`reason.${picked.reason === "too_busy" ? "tooBusy" : picked.reason === "closed" ? "closed" : picked.reason === "outside_hours" ? "outsideHours" : "ok"}`) }) : t("day.tapHint")}</p>
+          <p data-hour-sentence className="body mt-4 min-h-12 rounded-[12px] bg-bg-soft p-3">{picked ? <HourSentence mode={rec.strip_mode} hour={picked.h} cell={picked} locale={locale} /> : t("day.tapHint")}</p>
         </div>
       ) : null}
       {myeongjeol ? <div className="hatch mt-4 h-12 rounded-[6px]" data-state="myeongjeol" /> : null}

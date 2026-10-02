@@ -5,9 +5,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { formatHourRange, formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
+import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import type { HourCell } from "@/lib/strip";
-import { cellTone, toneColor } from "@/lib/strip";
+import { cellSentence, cellTone, toneColor } from "@/lib/strip";
 import type { Favorite, Purpose, Tolerance } from "@/lib/storage";
 
 export function PlaceName({ name, nameEn }: { name: string; nameEn?: string | null }) {
@@ -27,6 +27,7 @@ export function AppBar({
   star,
   onStar,
   mapHref,
+  children,
 }: {
   backHref?: string;
   backLabel?: string;
@@ -34,6 +35,7 @@ export function AppBar({
   star?: boolean;
   onStar?: () => void;
   mapHref?: string;
+  children?: React.ReactNode;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -43,7 +45,7 @@ export function AppBar({
   const query = params.toString();
   const switched = pathname.replace(/^\/(ko|en)/, `/${other}`) + (query ? `?${query}` : "");
   return (
-    <header className="flex h-14 items-center justify-between">
+    <header className={`flex h-14 items-center gap-2 ${children ? "w-full" : "justify-between"}`}>
       <div className="flex items-center gap-1">
         {backHref ? (
           <>
@@ -64,7 +66,8 @@ export function AppBar({
           </span>
         )}
       </div>
-      <div className="flex items-center">
+      {children ? <div className="min-w-0 flex-1">{children}</div> : null}
+      <div className={`${children ? "ml-auto" : ""} flex items-center`}>
         {mapHref ? (
           <a href={mapHref} className="icon-hit flex items-center justify-center" aria-label={t("map.title")}>
             <Map />
@@ -75,7 +78,7 @@ export function AppBar({
             <Star fill={star ? "var(--star)" : "none"} color="var(--star)" />
           </button>
         ) : null}
-        <a href={switched} className="label px-2 font-bold" aria-label={t("nav.language")}>
+        <a href={switched} data-lang className="label shrink-0 px-2 font-bold" aria-label={t("nav.language")}>
           KO · EN
         </a>
       </div>
@@ -271,7 +274,7 @@ export function WeekList({
         {days.map((day) => {
           const best = day.state !== "off" && day.windows && day.windows.length > 0;
           const offLabel = day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("about.preparing");
-          const time = day.state === "off" ? offLabel : best ? formatStoredWindows(day.windows, locale, mark.suffix)[0] : t("week.none");
+          const time = day.state === "off" ? "" : best ? formatStoredWindows(day.windows, locale, mark.suffix)[0] : t("week.none");
           const holiday = day.holiday
             ? locale === "en"
               ? day.holiday.name_en || day.holiday.name
@@ -329,7 +332,6 @@ export function DayStrip({
 }) {
   const t = useTranslations();
   const locale = useLocale() as "ko" | "en";
-  const suffix = t("time.hour");
   if (hidden) return <p className="body">{t("state.foreignStrip")}</p>;
   return (
     <section>
@@ -337,17 +339,28 @@ export function DayStrip({
       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
         {hours.map((cell) => {
           const tone = cellTone(cell, mode);
-          const verdict = cell.in_window ? t("reason.window") : cell.rating === 1 && mode === "two_step" ? t("reason.ok") : t("reason.avoid");
+          const sentence = cellSentence({
+            mode,
+            inWindow: cell.in_window,
+            rating: cell.rating,
+            reason: cell.reason,
+            hour: cell.h,
+            locale,
+          });
+          const label = sentence.kind === "notPick"
+            ? t("reason.notPick", { hour: sentence.hour })
+            : t("reason.cell", { hour: sentence.hour, verdict: t(`reason.${sentence.verdict}`), why: t(`reason.${sentence.why}`) });
           const on = selected === cell.h;
           return (
             <button
               key={cell.h}
               type="button"
               data-cell
+              data-hour={cell.h}
               data-tone={tone}
               className="h-12 rounded-[6px]"
               style={{ background: toneColor(tone), outline: on ? "2px solid var(--ink)" : undefined, outlineOffset: on ? "2px" : undefined }}
-              aria-label={t("reason.cell", { hour: formatHourRange(cell.h, cell.h, locale, suffix), verdict, why: "" })}
+              aria-label={label}
               onClick={() => onPick(on ? null : cell)}
               aria-pressed={on}
             />
@@ -373,6 +386,30 @@ export function DayStrip({
       </table>
     </section>
   );
+}
+
+export function HourSentence({
+  mode,
+  hour,
+  cell,
+  locale,
+}: {
+  mode: string | null;
+  hour: number;
+  cell: { in_window?: boolean; rating?: number; reason?: string } | null;
+  locale: "ko" | "en";
+}) {
+  const t = useTranslations();
+  const sentence = cellSentence({
+    mode,
+    inWindow: Boolean(cell?.in_window),
+    rating: cell?.rating ?? 0,
+    reason: cell?.reason ?? "ok",
+    hour,
+    locale,
+  });
+  if (sentence.kind === "notPick") return t("reason.notPick", { hour: sentence.hour });
+  return t("reason.cell", { hour: sentence.hour, verdict: t(`reason.${sentence.verdict}`), why: t(`reason.${sentence.why}`) });
 }
 
 export function ConditionField({ label, onClick }: { label: string; onClick: () => void }) {
