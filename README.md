@@ -66,14 +66,11 @@ npm run dev                 # http://localhost:3000
 
 ### 데이터
 
-저장소에는 데이터가 없고, API 키만으로는 채울 수 없음. 장소 목록과 8~9월 과거 데이터가 있어야 예측이 나오는데 이 원본(6GB)은 올리지 않았음. 대신 DB를 파일 하나(약 6MB)로 주고받음.
+API 키만으로는 DB를 채울 수 없음. 장소 목록과 8~9월 과거 데이터가 있어야 예측이 나오는데 그 원본(6GB)은 저장소에 없음. 대신 DB를 통째로 담은 파일(`app/supabase/seed/urbanpulse-db.dump`, 약 6MB)이 저장소에 들어 있음.
 
 ```powershell
-# 주는 사람: data\urbanpulse-db.dump 가 생김. 깃 말고 메신저나 드라이브로 전달
-powershell -File scripts\db_export.ps1
-
-# 받는 사람: supabase start 를 한 뒤, 받은 파일을 넣음
-powershell -File scripts\db_import.ps1 -File <받은 파일 경로>
+# supabase start 를 한 뒤, 저장소에 든 DB 파일을 넣음
+powershell -File scripts\db_import.ps1
 
 # 그다음 최신 상태로 맞춤
 python -m engine collect     # 지금 데이터 수집
@@ -81,6 +78,7 @@ python -m engine forecast    # 예측과 추천 다시 계산
 ```
 
 - `db_import`는 빈 DB에만 넣음. 이미 데이터가 있으면 아무것도 하지 않고 멈춤
-- 30분 수집은 한 PC에서만 돌리는 것을 권장 (API 호출 한도를 같이 씀). 나머지는 필요할 때 파일을 다시 받으면 됨
+- DB 파일은 만든 시점의 상태임. 새로 만들려면 `powershell -File scripts\db_export.ps1` 후 커밋 (자주 하면 저장소가 커지니 필요할 때만)
+- 30분 수집은 한 PC에서만 돌리는 것을 권장 (API 호출 한도를 같이 씀)
 
 Windows 작업 스케줄러에 등록하려면 `scripts/register_collect_task.ps1`, `register_forecast_task.ps1`, `register_evaluate_task.ps1`.

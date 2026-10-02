@@ -1,6 +1,6 @@
 # Write the local database's data to one file a teammate can load with db_import.ps1.
 # Data of the public schema only; the schema itself comes from the migrations. ASCII. PowerShell 5.1.
-param([string]$Out = "data\urbanpulse-db.dump", [string]$Container = "supabase_db_urbanpulse")
+param([string]$Out = "app\supabase\seed\urbanpulse-db.dump", [string]$Container = "supabase_db_urbanpulse")
 $Repo = Split-Path -Parent $PSScriptRoot
 $target = $Out
 if (-not [System.IO.Path]::IsPathRooted($target)) { $target = Join-Path $Repo $Out }
@@ -15,4 +15,4 @@ if ($LASTEXITCODE -ne 0) { Write-Output "could not copy the dump out of the cont
 
 $size = [math]::Round((Get-Item -LiteralPath $target).Length / 1MB, 1)
 Write-Output ("wrote " + $Out + " (" + $size + " MB)")
-Write-Output "send this file outside git; the receiver runs scripts\db_import.ps1 <file>"
+Write-Output "commit it to share; the receiver runs scripts\db_import.ps1"

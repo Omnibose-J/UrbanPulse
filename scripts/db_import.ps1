@@ -1,7 +1,9 @@
 # Load a file written by db_export.ps1 into the local database.
 # Run after `cd app; supabase start` on a fresh clone. Refuses a database that already holds places: rows are never merged.
 # ASCII. PowerShell 5.1.
-param([Parameter(Mandatory = $true)][string]$File, [string]$Container = "supabase_db_urbanpulse")
+param([string]$File = "", [string]$Container = "supabase_db_urbanpulse")
+# Default: the snapshot tracked in the repo.
+if ($File.Length -eq 0) { $File = Join-Path (Split-Path -Parent $PSScriptRoot) "app\supabase\seed\urbanpulse-db.dump" }
 if (-not (Test-Path -LiteralPath $File)) { Write-Output ("no such file: " + $File); exit 1 }
 
 $count = (& docker exec $Container psql -U postgres -d postgres -At -c "select count(*) from public.places" | Out-String).Trim()
