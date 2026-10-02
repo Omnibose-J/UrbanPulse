@@ -51,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--apply", action="store_true")
         if name == "archive":
             command.add_argument("--dry-run", action="store_true")
+            command.add_argument("--execute", action="store_true")
         if name == "tier_b":
             command.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
@@ -67,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.job == "rejudge":
         return rejudge.run(apply=args.apply)
     if args.job == "archive":
-        return archive.run(dry_run=args.dry_run)
+        return archive.run(dry_run=args.dry_run, execute=args.execute)
     if args.job == "tier_b":
         return tier_b.run(check_only=args.check)
     return JOBS[args.job]()

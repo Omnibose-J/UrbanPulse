@@ -1,10 +1,9 @@
-"""Move old observations aside. This SOW runs it only with --dry-run."""
+"""Count old observations. Deletion stays off until a retention decision."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-import pandas as pd
 from psycopg.types.json import Jsonb
 
 from engine import db, settings
@@ -14,7 +13,13 @@ from engine.parsers import KST
 JOB = "archive"
 
 
-def run(dry_run: bool = False) -> int:
+def run(dry_run: bool = False, execute: bool = False) -> int:
+    if execute:
+        print("retention decision pending")
+        return 2
+    if not dry_run:
+        print("deletion is not enabled")
+        return 2
     settings.load_env()
     env = settings.require(("DATABASE_URL",))
     today = datetime.now(KST).date()
@@ -31,32 +36,11 @@ def run(dry_run: bool = False) -> int:
                 stamp = datetime.combine(cut, datetime.min.time()).replace(tzinfo=KST)
                 cur.execute(f"select count(*) from {table} where {column} < %s", (stamp,))
                 counts[table] = cur.fetchone()[0]
-        if dry_run:
-            for table, count in counts.items():
-                print(f"{table} {count}")
-            _record(conn, {"dry_run": True, "counts": counts})
-            conn.commit()
-            log(JOB, "done", dry_run=True)
-            return 0
-        root = settings.REPO_ROOT / "data" / "archive"
-        for table, (column, cut) in cuts.items():
-            folder = root / table
-            folder.mkdir(parents=True, exist_ok=True)
-            target = folder / f"{today.isoformat()}.parquet"
-            if target.exists():
-                log(JOB, "fail", reason=f"{target.name} already exists")
-                return 1
-            stamp = datetime.combine(cut, datetime.min.time()).replace(tzinfo=KST)
-            frame = pd.read_sql_query(f"select * from {table} where {column} < %s", conn, params=(stamp,))
-            frame.to_parquet(target, index=False)
-            written = len(pd.read_parquet(target))
-            if written != counts[table]:
-                log(JOB, "fail", reason=f"{table} count {counts[table]} file {written}")
-                return 1
-            with conn.cursor() as cur:
-                cur.execute(f"delete from {table} where {column} < %s", (stamp,))
-            conn.commit()
-    log(JOB, "done")
+        for table, count in counts.items():
+            print(f"{table} {count}")
+        _record(conn, {"dry_run": True, "counts": counts})
+        conn.commit()
+    log(JOB, "done", dry_run=True)
     return 0
 
 
