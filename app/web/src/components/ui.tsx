@@ -320,12 +320,16 @@ export function WeekList({
 export function DayStrip({
   hours,
   mode,
+  tier,
+  purpose,
   hidden,
   selected,
   onPick,
 }: {
   hours: HourCell[];
   mode: string | null;
+  tier?: string;
+  purpose?: string;
   hidden?: boolean;
   selected?: number | null;
   onPick: (cell: HourCell | null) => void;
@@ -346,10 +350,18 @@ export function DayStrip({
             reason: cell.reason,
             hour: cell.h,
             locale,
+            tier,
+            purpose,
+            crowd: cell.crowd,
+            act: cell.act,
           });
           const label = sentence.kind === "notPick"
             ? t("reason.notPick", { hour: sentence.hour })
-            : t("reason.cell", { hour: sentence.hour, verdict: t(`reason.${sentence.verdict}`), why: t(`reason.${sentence.why}`) });
+            : t("reason.cell", {
+                hour: sentence.hour,
+                verdict: t(`reason.${sentence.verdict}`),
+                why: sentence.whys.map((id) => t(id)).join(" "),
+              });
           const on = selected === cell.h;
           return (
             <button
@@ -393,23 +405,35 @@ export function HourSentence({
   hour,
   cell,
   locale,
+  tier,
+  purpose,
 }: {
   mode: string | null;
   hour: number;
-  cell: { in_window?: boolean; rating?: number; reason?: string } | null;
+  cell: { in_window?: boolean; rating?: number; reason?: string; crowd?: number; act?: string | null } | null;
   locale: "ko" | "en";
+  tier?: string;
+  purpose?: string;
 }) {
   const t = useTranslations();
   const sentence = cellSentence({
     mode,
     inWindow: Boolean(cell?.in_window),
     rating: cell?.rating ?? 0,
-    reason: cell?.reason ?? "ok",
+    reason: cell?.reason ?? "",
     hour,
     locale,
+    tier,
+    purpose,
+    crowd: cell?.crowd,
+    act: cell?.act,
   });
   if (sentence.kind === "notPick") return t("reason.notPick", { hour: sentence.hour });
-  return t("reason.cell", { hour: sentence.hour, verdict: t(`reason.${sentence.verdict}`), why: t(`reason.${sentence.why}`) });
+  return t("reason.cell", {
+    hour: sentence.hour,
+    verdict: t(`reason.${sentence.verdict}`),
+    why: sentence.whys.map((id) => t(id)).join(" "),
+  });
 }
 
 export function ConditionField({ label, onClick }: { label: string; onClick: () => void }) {

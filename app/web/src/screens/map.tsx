@@ -177,7 +177,6 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const days = Array.from({ length: 8 }, (_, index) => addDays(today, index));
   const weekdays = t.raw("time.weekdays") as string[];
   const suffix = t("time.hour");
-  const tone = current ? placeTone(current, clock) : "bad";
   const clockCell = current?.hours?.find((cell) => cell.h === clock) ?? null;
   const pick = current ? formatStoredWindows(current.windows, locale, suffix)[0] : "";
   const dateLabel = day === today ? t("time.today") : formatShortDate(day);
@@ -189,7 +188,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
     >
       <span className="text-[18px] font-extrabold" lang="ko">{current.name}</span>
       <span className="text-[14px] text-text-2">
-        <b className="text-text" data-hour-sentence>{current ? <HourSentence mode={current.strip_mode} hour={clock} cell={clockCell ?? { in_window: tone === "go", rating: tone === "ok" ? 1 : 0, reason: "ok" }} locale={locale === "en" ? "en" : "ko"} /> : null}</b>
+        <b className="text-text" data-hour-sentence>{clockCell ? <HourSentence mode={current.strip_mode} hour={clock} cell={clockCell} locale={locale === "en" ? "en" : "ko"} tier={current.tier} purpose={cond.purpose} /> : null}</b>
       </span>
       <span className="text-[14px] text-text-2">
         {pick ? t("map.dayPick", { date: dateLabel, time: pick }) : day === today ? t("home.noPickToday") : `${dateLabel} ${t("week.none")}`}
