@@ -10,7 +10,10 @@
     "todayLabel": "Today",
     "busyTopEmpty": "Nothing is busy right now",
     "favorites": "Saved places",
-    "popular": "Often visited"
+    "popular": "Often visited",
+    "tomorrowMorning": "Good tomorrow morning",
+    "tomorrowMorningEmpty": "Nothing to recommend tomorrow morning",
+    "tomorrowLabel": "Tomorrow"
   },
   "week": {
     "bestWhen": "Best time this week",
@@ -172,5 +175,10 @@
     "logo": "UrbanPulse",
     "language": "Language",
     "home": "Home"
+  },
+  "avoid": {
+    "busiest": "Busiest",
+    "line": "{label} {range} · {state}",
+    "b": "Busier than usual"
   }
 }

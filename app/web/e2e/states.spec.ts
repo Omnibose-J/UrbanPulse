@@ -94,7 +94,7 @@ test("a park's reason is a whole sentence", async ({ page, request }) => {
 // ---- mocked: states the live data does not have right now
 
 test("late data on home is said as late data, not as a calm city", async ({ page }) => {
-  await page.route("**/api/home**", (route) => route.fulfill(json({ as_of: "2026-10-02T05:30:00+00:00", stale: true, busy_top: [], open_quiet: [] })));
+  await page.route("**/api/home**", (route) => route.fulfill(json({ as_of: "2026-10-02T05:30:00+00:00", stale: true, busy_top: [], open_quiet: [], tomorrow_morning: [] })));
   await page.goto("/ko");
   await expect(page.locator("[data-state=stale]")).toHaveText("데이터가 늦어지고 있어요 (마지막 14:30)");
   await expect(page.getByText("지금은 붐비는 곳이 없어요")).toHaveCount(0);
@@ -102,7 +102,7 @@ test("late data on home is said as late data, not as a calm city", async ({ page
 });
 
 test("fresh data with nothing busy says so", async ({ page }) => {
-  await page.route("**/api/home**", (route) => route.fulfill(json({ as_of: new Date().toISOString(), stale: false, busy_top: [], open_quiet: [] })));
+  await page.route("**/api/home**", (route) => route.fulfill(json({ as_of: new Date().toISOString(), stale: false, busy_top: [], open_quiet: [], tomorrow_morning: [] })));
   await page.goto("/ko");
   await expect(page.locator("[data-busy-empty]")).toHaveText("지금은 붐비는 곳이 없어요");
   await expect(page.locator("[data-quiet-empty]")).toHaveText("지금은 열려 있고 한산한 곳이 없어요");

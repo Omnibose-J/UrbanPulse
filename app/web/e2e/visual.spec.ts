@@ -127,7 +127,10 @@ test("week cards show one range and even rows", async ({ page, request }) => {
       await expect(card).toBeVisible();
       const text = await card.innerText();
       expect(text).toContain(locale === "en" && place.name_en ? place.name_en : place.name);
-      expect(rangeCount(text)).toBe(1);
+      // One range in the big time; the "busiest" line (design spec 5.2, v2.8) carries its own range and is not it.
+      const avoidLine = (await card.locator("[data-avoid]").allInnerTexts()).join(" ");
+      expect(rangeCount(text.replace(avoidLine, ""))).toBe(1);
+      if (avoidLine) expect(rangeCount(avoidLine)).toBe(1);
       await expect(card.locator("p.body")).not.toHaveText("");
       const box = await card.boundingBox();
       expect(box!.y + box!.height).toBeLessThanOrEqual(844);
@@ -142,6 +145,14 @@ test("week cards show one range and even rows", async ({ page, request }) => {
         }),
       );
       expect(fits).toBe(true);
+      // The busiest-hours caption under the time never spills out of its column either.
+      const avoidFits = await page.locator("[data-week-avoid]").evaluateAll((nodes) =>
+        nodes.every((node) => {
+          const cell = node as HTMLElement;
+          return cell.getClientRects().length === 1 && cell.scrollWidth <= cell.clientWidth + 1;
+        }),
+      );
+      expect(avoidFits).toBe(true);
       if (locale === "en") {
         const width = await page.locator("[data-week-time]").first().evaluate((node) => Math.round((node as HTMLElement).clientWidth));
         expect(width).toBe(104);

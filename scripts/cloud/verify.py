@@ -40,7 +40,7 @@ def api_checks(today: str) -> list[tuple[str, set[str]]]:
     cond = "tolerance=moderate&purpose=sight"
     return [
         ("/api/health", {"db", "places"}),
-        (f"/api/home?{cond}", {"as_of", "busy_top", "open_quiet", "stale"}),
+        (f"/api/home?{cond}", {"as_of", "busy_top", "open_quiet", "stale", "tomorrow_morning"}),
         ("/api/places?q=%EA%B0%95%EB%82%A8", {"places"}),
         (f"/api/places/{PLACE}/week?{cond}", {"combos", "days", "now", "place"}),
         (f"/api/places/{PLACE}/day?date={today}", {"hours"}),

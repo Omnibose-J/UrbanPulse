@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { addDays, dayBounds, hourBounds, kstHour, kstNow, stillAhead } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
 import { driverMessage } from "@/lib/api-log";
+import { GatewayRejected, isGatewayRejection } from "@/lib/gateway";
+import { morningPicks } from "@/lib/morning";
 import { likePattern, namedAltPlaces, nowFromLive, quietSelection, requireForeignHeavy, selectAll } from "@/lib/shape";
 
 type Place = {
@@ -47,11 +49,19 @@ export async function searchPlaces(q: string) {
   if (q) {
     const pattern = likePattern(q);
     const hits = await Promise.all(
-      (["name", "name_en", "gu"] as const).map((column) =>
-        must<Row[]>(
-          sb.from("places").select(columns).in("serve_state", ["on", "preparing", "experimental"]).ilike(column, pattern).order("name").limit(50),
-        ),
-      ),
+      (["name", "name_en", "gu"] as const).map(async (column) => {
+        const { data, error } = await sb
+          .from("places")
+          .select(columns)
+          .in("serve_state", ["on", "preparing", "experimental"])
+          .ilike(column, pattern)
+          .order("name")
+          .limit(50);
+        // The edge gateway in front of the database may refuse the text itself and answer with an HTML page.
+        if (error && isGatewayRejection(error.message)) throw new GatewayRejected();
+        if (error || data === null) throw new Error(error ? driverMessage(error) : "unavailable");
+        return data as Row[];
+      }),
     );
     // PostgREST reads `*` as a wildcard and offers no escape for it, so the literal match is confirmed here.
     const needle = q.toLowerCase();
@@ -303,7 +313,58 @@ export async function homePayload(tolerance: string, purpose: string) {
     stale,
     busy_top: busy.map((row) => ({ ...row, ...windows.get(row.id) })),
     open_quiet: quiet.map((row) => ({ ...row, ...windows.get(row.id) })),
+    tomorrow_morning: await tomorrowMorning(addDays(date, 1), tolerance, purpose),
   };
+}
+
+/** Stored recommendations of tomorrow whose first window starts in the morning (home, at night). */
+async function tomorrowMorning(date: string, tolerance: string, purpose: string) {
+  type Brief = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
+  type Row = {
+    place_id: string;
+    purpose: string;
+    state: string;
+    windows: { hours: number[]; score: number }[] | null;
+    hours: unknown;
+    strip_mode: string | null;
+    places: Brief | Brief[];
+  };
+  const rows = (await selectAll((from, to) =>
+    supabaseServer()
+      .from("recommendations")
+      .select("place_id, purpose, state, windows, hours, strip_mode, places!inner(id, tier, name, name_en, gu, serve_state)")
+      .eq("date", date)
+      .eq("tolerance", tolerance)
+      .in("purpose", [purpose, "none"])
+      .order("place_id")
+      .range(from, to),
+  )) as unknown as Row[];
+  const candidates = rows
+    .map((row) => ({ ...row, place: Array.isArray(row.places) ? row.places[0] : row.places }))
+    .filter((row) => row.purpose === purposeFor(row.place.tier, purpose))
+    .map((row) => ({
+      id: row.place.id,
+      tier: row.place.tier,
+      serve_state: row.place.serve_state,
+      name: row.place.name,
+      name_en: row.place.name_en,
+      gu: row.place.gu,
+      state: row.state,
+      windows: row.windows,
+      hours: row.hours,
+      strip_mode: row.strip_mode,
+    }));
+  return morningPicks(candidates).map((row) => ({
+    id: row.id,
+    tier: row.tier,
+    name: row.name,
+    name_en: row.name_en,
+    gu: row.gu,
+    date,
+    window: row.windows![0],
+    hours: row.hours,
+    strip_mode: row.strip_mode,
+  }));
 }
 
 async function quietPlaces(

@@ -77,6 +77,28 @@ export function cellSentence(input: {
   return { kind: "verdict", hour, verdict, whys: [knownWhy(input.reason)] };
 }
 
+const BUSY_FROM = 2;
+
+/** The busiest hours of the day: among the open hours outside the recommended windows (`fit` or `too_busy`, never
+ * `closed` / `outside_hours`), the day's highest forecast crowd level when it is at least "a bit busy", and the longest
+ * run of hours at that level (the earliest on a tie). A recommended hour never counts, so the line never contradicts
+ * the pick. This states the forecast level, which the product promises; it is not the two-step verdict. */
+export function busiestRange(hours: HourCell[] | null | undefined): { start: number; end: number; crowd: number } | null {
+  if (!hours || hours.length === 0) return null;
+  const open = hours.filter((cell) => !cell.in_window && (cell.reason === "fit" || cell.reason === "too_busy") && typeof cell.crowd === "number");
+  const peak = Math.max(-1, ...open.map((cell) => cell.crowd as number));
+  if (peak < BUSY_FROM) return null;
+  const sorted = open.filter((cell) => cell.crowd === peak).sort((a, b) => a.h - b.h);
+  let best: { start: number; end: number } | null = null;
+  let run: { start: number; end: number } | null = null;
+  for (const cell of sorted) {
+    if (run && cell.h === run.end) run.end = cell.h + 1;
+    else run = { start: cell.h, end: cell.h + 1 };
+    if (!best || run.end - run.start > best.end - best.start) best = run;
+  }
+  return best ? { ...best, crowd: peak } : null;
+}
+
 export function cellTone(cell: { in_window?: boolean; rating?: number }, mode: string | null): "go" | "ok" | "bad" {
   if (cell.in_window) return "go";
   if (mode === "two_step" && cell.rating === 1) return "ok";

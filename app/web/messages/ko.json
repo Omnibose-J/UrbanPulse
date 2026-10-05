@@ -10,7 +10,10 @@
     "todayLabel": "오늘 추천",
     "busyTopEmpty": "지금은 붐비는 곳이 없어요",
     "favorites": "관심 장소",
-    "popular": "많이 찾는 곳"
+    "popular": "많이 찾는 곳",
+    "tomorrowMorning": "내일 아침 가기 좋은 곳",
+    "tomorrowMorningEmpty": "내일 아침에 추천할 곳이 없어요",
+    "tomorrowLabel": "내일 추천"
   },
   "week": {
     "bestWhen": "이번 주 가장 좋은 때",
@@ -172,5 +175,10 @@
     "logo": "UrbanPulse",
     "language": "언어",
     "home": "홈으로"
+  },
+  "avoid": {
+    "busiest": "가장 붐빌 때",
+    "line": "{label} {range} · {state}",
+    "b": "평소보다 붐빔"
   }
 }

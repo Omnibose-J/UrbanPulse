@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { cellSentence } from "./strip.ts";
+import { busiestRange, cellSentence } from "./strip.ts";
 
 test("windows_only does not state the two-step verdict", () => {
   const outside = cellSentence({
@@ -89,4 +89,36 @@ test("an unknown reason throws", () => {
       locale: "ko",
     }),
   );
+});
+
+test("busiestRange names the longest run at the day's peak crowd level, outside the windows and the closed hours", () => {
+  const cell = (h: number, crowd: number, reason = "fit", inWindow = false) => ({ h, rating: 1, in_window: inWindow, reason, crowd });
+  const hours = [
+    cell(9, 3, "closed"),
+    cell(10, 1),
+    cell(11, 2),
+    cell(12, 2, "fit", true),
+    cell(13, 2),
+    cell(14, 2),
+    cell(15, 2),
+    cell(16, 1),
+    cell(17, 2, "too_busy"),
+    cell(18, 3, "outside_hours"),
+  ];
+  assert.deepEqual(busiestRange(hours), { start: 13, end: 16, crowd: 2 });
+});
+
+test("busiestRange takes the earliest run on a tie, accepts unsorted input, and reports the peak level", () => {
+  const cell = (h: number, crowd: number) => ({ h, rating: 1, in_window: false, reason: "fit", crowd });
+  const hours = [cell(20, 3), cell(19, 3), cell(11, 3), cell(12, 3), cell(15, 2), cell(16, 2), cell(17, 2)];
+  assert.deepEqual(busiestRange(hours), { start: 11, end: 13, crowd: 3 });
+});
+
+test("busiestRange is null when the open hours never reach 'a bit busy', when only window hours are busy, and on empty input", () => {
+  const cell = (h: number, crowd: number, inWindow = false, reason = "fit") => ({ h, rating: 1, in_window: inWindow, reason, crowd });
+  assert.equal(busiestRange([cell(9, 0), cell(10, 1), cell(11, 1)]), null);
+  assert.equal(busiestRange([cell(12, 3, true), cell(13, 1)]), null);
+  assert.equal(busiestRange([cell(9, 3, false, "closed")]), null);
+  assert.equal(busiestRange([]), null);
+  assert.equal(busiestRange(null), null);
 });

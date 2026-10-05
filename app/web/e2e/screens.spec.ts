@@ -26,6 +26,9 @@ async function mockVisitor(page: Page, overrides?: { week?: unknown; home?: unkn
       { id: "POI006", name: "Quiet A", name_en: null, gu: "Yongsan", level: 1, tier: "A1", window: { hours: [13] }, hours: hours(), strip_mode: "windows_only" },
       { id: "POI007", name: "Quiet B", name_en: null, gu: "Nowon", level: 0, tier: "A2", window: { hours: [10] }, hours: hours(), strip_mode: "windows_only" },
     ],
+    tomorrow_morning: [
+      { id: "POI008", name: "Morning A", name_en: null, gu: "Jongno", date: kstDate(1), window: { hours: [10], score: 0.8 }, hours: hours(), strip_mode: "windows_only" },
+    ],
   };
   const recommend = overrides?.recommend ?? {
     recommendation: {
@@ -283,4 +286,91 @@ test("live smoke: home answers, and a listed place opens its week", async ({ pag
   }
   expect(statuses.length).toBeGreaterThan(0);
   expect(statuses.filter((item) => item.status !== 200)).toEqual([]);
+});
+
+// Night: 22:00 KST on the mocked day; day: 12:00 KST. `page.clock` moves the browser's clock, not the server's.
+function kstInstant(hour: number): number {
+  const date = kstDate(0);
+  return Date.parse(`${date}T${String(hour).padStart(2, "0")}:00:00+09:00`);
+}
+
+test("D13 the home shows tomorrow's morning picks at night and not by day", async ({ page }) => {
+  await mockVisitor(page);
+  await page.clock.setFixedTime(kstInstant(22));
+  await page.goto("/ko");
+  const section = page.locator("[data-tomorrow-section]");
+  await expect(section).toBeVisible();
+  await expect(section.locator("h2")).toHaveText("내일 아침 가기 좋은 곳");
+  const card = page.locator("[data-tomorrow]");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("Morning A");
+  await expect(card).toContainText("내일 추천10~11시");
+  await expect(card.locator("[data-place-status]")).toHaveCount(0);
+  await expect(card.locator("[data-mini-strip] > *")).toHaveCount(15);
+  await expect(card).toHaveAttribute("href", `/ko/p/POI008/${kstDate(1)}`);
+  await page.clock.setFixedTime(kstInstant(12));
+  await page.goto("/ko");
+  await expect(page.locator("[data-busy] [data-row]").first()).toBeVisible();
+  await expect(page.locator("[data-tomorrow-section]")).toHaveCount(0);
+});
+
+test("D14 an empty morning list says so, and a quiet card without a pick says 'no pick today'", async ({ page }) => {
+  await mockVisitor(page, {
+    home: {
+      as_of: "2026-10-01T10:00:00+09:00",
+      stale: false,
+      busy_top: [],
+      open_quiet: [{ id: "POI006", name: "Quiet A", name_en: null, gu: "Yongsan", level: 1, tier: "A1", window: null, hours: null, strip_mode: null }],
+      tomorrow_morning: [],
+    },
+  });
+  await page.clock.setFixedTime(kstInstant(23));
+  await page.goto("/ko");
+  await expect(page.locator("[data-tomorrow-empty]")).toHaveText("내일 아침에 추천할 곳이 없어요");
+  await expect(page.locator("[data-quiet]")).toContainText("오늘은 추천 없음");
+  await expect(page.locator("[data-quiet]")).not.toContainText("오늘 추천추천");
+});
+
+test("D15 the answer card and the week rows name the busiest hours and their level", async ({ page }) => {
+  // Peak crowd 3 at 14 to 16 and again at 20 to 21; the window hour 13 is also crowd 3 but never counts. The longest
+  // run at the peak wins: 14~17시.
+  const busyHours = hours().map((cell) => {
+    if (cell.h === 11) return { ...cell, in_window: false, reason: "fit", crowd: 2 };
+    if (cell.h === 13) return { ...cell, in_window: true, reason: "fit", crowd: 3 };
+    if (cell.h >= 14 && cell.h <= 16) return { ...cell, in_window: false, reason: "fit", crowd: 3 };
+    if (cell.h >= 20 && cell.h <= 21) return { ...cell, in_window: false, reason: "too_busy", crowd: 3 };
+    return cell;
+  });
+  const days = week.days.map((row) => ({ ...row, hours: busyHours }));
+  await mockVisitor(page, { week: { ...week, days }, recommend: undefined });
+  await page.route("**/api/places/*/recommend**", (route) =>
+    json(route, {
+      recommendation: { state: "on", off_reason: null, windows: [{ hours: [13] }], no_window: false, hours: busyHours, strip_mode: "windows_only" },
+      place,
+      holiday: null,
+      combos: week.combos,
+      alt_dates: [],
+      alt_places: [],
+    }),
+  );
+  await page.goto("/ko/p/POI001");
+  await expect(page.locator("[data-answer-card] [data-avoid]")).toHaveText("가장 붐빌 때 14~17시 · 붐빔");
+  await expect(page.locator("[data-week-avoid]").first()).toHaveText("14~17시");
+  await expect(page.locator("[data-week-avoid]").first()).toHaveAttribute("aria-label", "가장 붐빌 때 14~17시 · 붐빔");
+  await expect(page.locator("[data-week-avoid] [data-status-dot]").first()).toHaveCount(1);
+  await expect(page.locator("[data-week-avoid]")).toHaveCount(8);
+  await page.goto(`/ko/p/POI001/${day}`);
+  await expect(page.locator("[data-answer-card] [data-avoid]")).toHaveText("가장 붐빌 때 14~17시 · 붐빔");
+  await page.goto("/en/p/POI001");
+  await expect(page.locator("[data-answer-card] [data-avoid]")).toHaveText("Busiest 2 to 5 PM · Busy");
+  await expect(page.locator("[data-week-avoid]").first()).toHaveText("2 to 5 PM");
+  await expect(page.locator("[data-week-avoid]").first()).toHaveAttribute("aria-label", "Busiest 2 to 5 PM · Busy");
+});
+
+test("D16 no busiest line when no hour of the day is too busy", async ({ page }) => {
+  await mockVisitor(page);
+  await page.goto("/ko/p/POI001");
+  await expect(page.locator("[data-answer-card]")).toBeVisible();
+  await expect(page.locator("[data-avoid]")).toHaveCount(0);
+  await expect(page.locator("[data-week-avoid]")).toHaveCount(0);
 });

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import {
   AnswerCard,
+  avoidTexts,
   AppBar,
   ConditionField,
   ConditionSheet,
@@ -82,6 +83,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
   const range = best ? formatStoredWindows(best.windows, locale, suffix)[0] : undefined;
   const weekday = best ? formatShortWeekday(best.date, weekdays, t("time.today"), today) : undefined;
   const reason = place && best ? reasonMessageIds(place.tier, best.windows?.[0]).map((key) => t(key)).join(" ") : undefined;
+  const avoid = place && best ? avoidTexts(best.hours, place.tier, locale, t)?.line : undefined;
   const showList = Boolean(loaded.data) && !placePreparing && !dataPreparing;
   return (
     <Phone>
@@ -112,6 +114,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
           weekday={weekday}
           range={range}
           reason={reason}
+          avoid={avoid}
           href={`/${locale}/p/${id}/${best.date}`}
           nowText={nowText}
           nowLevel={place.tier === "B" || !now || now.stale ? null : now.level}
@@ -129,7 +132,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
       {showList ? (
         <>
           <div className={now?.stale ? "opacity-50" : undefined}>
-            <WeekList days={days} locale={locale} today={today} bestDate={best?.date} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
+            <WeekList days={days} locale={locale} today={today} bestDate={best?.date} tier={place?.tier} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
           </div>
           {comboOff ? null : <Legend mode={days.find((day) => day.strip_mode)?.strip_mode ?? "windows_only"} />}
         </>

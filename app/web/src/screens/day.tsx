@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, HourSentence, Legend, Phone, StateBox } from "@/components/ui";
+import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, HourSentence, Legend, Phone, StateBox, avoidTexts } from "@/components/ui";
 import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
@@ -72,6 +72,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   const holidayName = holiday ? (locale === "en" ? holiday.name_en || holiday.name : holiday.name) : null;
   const dateLine = holidayName ? `${formatLongDate(date, locale, marks)} · ${holidayName}` : formatLongDate(date, locale, marks);
   const reason = place && rec?.windows?.[0] ? reasonMessageIds(place.tier, rec.windows[0]).map((id) => t(id)).join(" ") : undefined;
+  const avoid = place && rec ? avoidTexts(rec.hours, place.tier, locale, t)?.line : undefined;
   const condLabel = place?.tier === "A1" ? `${t(`purpose.${cond.purpose}`)} · ${t(`tol.${cond.tolerance}`)}` : t(`tol.${cond.tolerance}`);
   return (
     <Phone>
@@ -105,6 +106,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
           dateLine={dateLine}
           range={ranges[0]}
           reason={reason}
+          avoid={avoid}
           badge={rec?.state === "reference" ? "reference" : holiday ? "holidayRef" : null}
           extra={ranges.length > 1 ? `${t("day.alsoRec")} ${ranges.slice(1).join(", ")}` : undefined}
         />

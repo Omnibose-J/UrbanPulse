@@ -6,9 +6,9 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
+import { formatHourRange, formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import type { HourCell } from "@/lib/strip";
-import { cellSentence, cellTone, toneColor } from "@/lib/strip";
+import { busiestRange, cellSentence, cellTone, toneColor } from "@/lib/strip";
 import type { Favorite, Purpose, Tolerance } from "@/lib/storage";
 
 export function PlaceName({ name, nameEn }: { name: string; nameEn?: string | null }) {
@@ -171,6 +171,7 @@ export function AnswerCard({
   weekday,
   range,
   reason,
+  avoid,
   href,
   badge,
   extra,
@@ -185,6 +186,8 @@ export function AnswerCard({
   weekday?: string;
   range?: string;
   reason?: string;
+  /** "가장 붐빌 때 13~15시 · 붐빔": the busiest run of the day and its forecast level. */
+  avoid?: string;
   href?: string;
   badge?: "reference" | "holidayRef" | "experimental" | null;
   extra?: string;
@@ -238,6 +241,7 @@ export function AnswerCard({
         </>
       ) : null}
       {reason ? <p className="body text-on-ink-2">{reason}</p> : null}
+      {avoid ? <p data-avoid className="label text-on-ink-3">{avoid}</p> : null}
       {extra ? <p className="label text-on-ink-3">{extra}</p> : null}
       {variant === "week" && href ? <p className="label font-semibold text-go-bright">{t("week.seeDay")} ›</p> : null}
     </div>
@@ -250,6 +254,23 @@ export function AnswerCard({
     );
   }
   return body;
+}
+
+/** The busiest hours of a day as copy: `line` for the answer card ("가장 붐빌 때 13~15시 · 붐빔"); the week list shows
+ * the level dot plus `range` and carries `line` as its accessible name. Null when no open hour reaches "a bit busy".
+ * Tier B has no level forecast, only "busier than usual". */
+export function avoidTexts(
+  hours: HourCell[] | null | undefined,
+  tier: string,
+  locale: "ko" | "en",
+  t: (key: string, values?: Record<string, string>) => string,
+): { line: string; range: string; crowd: number } | null {
+  const busiest = busiestRange(hours);
+  if (!busiest) return null;
+  const crowd = Math.min(Math.max(busiest.crowd, 0), 3);
+  const range = formatHourRange(busiest.start, busiest.end, locale, t("time.hour"));
+  const state = tier === "B" ? t("avoid.b") : t(`level.l${crowd}`);
+  return { line: t("avoid.line", { label: t("avoid.busiest"), range, state }), range, crowd };
 }
 
 export function MiniStrip({ hours, mode }: { hours: HourCell[]; mode: string | null }) {
@@ -283,12 +304,14 @@ export function WeekList({
   locale,
   today,
   bestDate,
+  tier,
   hrefFor,
 }: {
   days: { date: string; state: string; off_reason: string | null; windows: { hours: number[]; score: number }[] | null; hours: HourCell[] | null; strip_mode: string | null; holiday: { name: string; name_en?: string | null; kind: string } | null }[];
   locale: "ko" | "en";
   today: string;
   bestDate?: string | null;
+  tier?: string;
   hrefFor: (date: string) => string;
 }) {
   const t = useTranslations();
@@ -307,6 +330,7 @@ export function WeekList({
               : day.holiday.name
             : null;
           const recommended = Boolean(best) && day.date === bestDate;
+          const avoid = day.state === "off" ? null : avoidTexts(day.hours, tier ?? "", locale, t);
           const lower = holiday ?? (recommended ? t("week.recommended") : formatShortDate(day.date));
           const lowerColor = holiday ? "var(--hol)" : recommended ? "var(--go-text)" : "var(--text-3)";
           return (
@@ -331,8 +355,16 @@ export function WeekList({
                     <MiniStrip hours={day.hours} mode={day.strip_mode} />
                   ) : null}
                 </span>
-                <span data-week-time className={`relative min-w-0 text-right whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
-                  {time}
+                <span className="relative min-w-0 text-right">
+                  <span data-week-time className={`block whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
+                    {time}
+                  </span>
+                  {avoid ? (
+                    <span data-week-avoid aria-label={avoid.line} title={avoid.line} className="flex items-center justify-end gap-1 whitespace-nowrap text-[11px] font-medium leading-4 text-text-3">
+                      <LevelDot level={avoid.crowd} />
+                      <span aria-hidden>{avoid.range}</span>
+                    </span>
+                  ) : null}
                 </span>
               </Link>
             </li>

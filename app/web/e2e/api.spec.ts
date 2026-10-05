@@ -54,6 +54,12 @@ test("bad input gets 400, 404 or 410, never 500, and an error is never cacheable
 test("a search text is matched literally, whatever characters it has", async ({ request }) => {
   for (const text of [")", "(1호선)", "서울역(1호선)", "\\", "%", "_", "a,b", "name.eq.x,tier.eq.B", "*", "'; drop table places;--", "x".repeat(50)]) {
     const response = await request.get(`/api/places?q=${encodeURIComponent(text)}`);
+    // The hosted database's edge gateway may refuse a text that looks like an attack; that is said as a 400 with
+    // its reason, never as a 500. Any other answer is 200 with literal matches.
+    if (response.status() === 400) {
+      expect(await response.json(), text).toEqual({ error: "search text rejected by the gateway" });
+      continue;
+    }
     expect(response.status(), text).toBe(200);
     // Whatever comes back really contains the text: no character acts as a wildcard or a filter.
     for (const row of (await response.json()).places as { name: string; name_en: string | null; gu: string | null }[]) {
@@ -111,5 +117,16 @@ test("home lists obey their rules on live data", async ({ request }) => {
     expect(row.level).toBeLessThanOrEqual(1);
     if (row.tier === "A1") expect(row.activity).toBeGreaterThanOrEqual(0.5);
     else expect(row.activity).toBeNull();
+  }
+  // Tomorrow's morning picks: stored rows only, first window starting 9 to 11, best first, at most five.
+  expect(body.tomorrow_morning.length).toBeLessThanOrEqual(5);
+  const scores = body.tomorrow_morning.map((row: { window: { score: number } }) => row.window.score);
+  expect(scores).toEqual([...scores].sort((a: number, b: number) => b - a));
+  for (const row of body.tomorrow_morning) {
+    expect(["A1", "A2"]).toContain(row.tier);
+    expect(row.date).toBe(kstDate(1));
+    expect(row.window.hours[0]).toBeGreaterThanOrEqual(9);
+    expect(row.window.hours[0]).toBeLessThanOrEqual(11);
+    expect(Array.isArray(row.hours)).toBe(true);
   }
 });
