@@ -2,7 +2,7 @@
 
 Rules for any coding agent (or person) changing this repo. Read this file, then `docs/LLM_PROJECT_MAP.md` (where things live, every command). Setup for a fresh clone is in `README.md` (Korean).
 
-UrbanPulse tells a visitor when to go to a Seoul hotspot they already chose, from later today up to 7 days ahead, avoiding closed hours and the busiest hour. A Python engine runs as scheduled batch jobs and writes precomputed rows to Postgres; a Next.js app only reads them. Everything runs locally today; the cloud move is scripted and rehearsed but not done (`docs/RUNBOOK.md`).
+UrbanPulse tells a visitor when to go to a Seoul hotspot they already chose, from later today up to 7 days ahead, avoiding closed hours and the busiest hour. A Python engine runs as scheduled batch jobs and writes precomputed rows to Postgres; a Next.js app only reads them. Since 2026-10-05 it runs in the cloud: hosted Supabase (Seoul), Cloud Run Jobs + Cloud Scheduler in `asia-northeast3`, raw snapshots in GCS, the web on Vercel (`docs/RUNBOOK.md`). The laptop's three scheduled tasks are disabled and its local stack is the stopped rollback copy.
 
 ## Sources of truth
 
@@ -62,7 +62,7 @@ Playwright needs the local database with data and starts `next dev` itself. Stop
 
 ## Environment
 
-Windows, PowerShell 5.1 (no `&&`), Python 3.10 at `python`, Node 24, Docker Desktop, `supabase`, `vercel`, `pandoc`; `gcloud` is not installed. Paths may contain Korean: quote them, write files as UTF-8, set `PYTHONUTF8=1` when printing Korean. `.ps1` files stay ASCII. Local Supabase runs on ports 553xx (`app/supabase/config.toml`). Write any file that contains backslashes or quotes with an editor tool, not a shell heredoc.
+Windows, PowerShell 5.1 (no `&&`), Python 3.10 at `python`, Node 24, Docker Desktop, `supabase`, `vercel`, `pandoc`, `gcloud` (user-local install; the session's bash finds it only by its short path `%LOCALAPPDATA%\Google\CLOUDS~1\google-cloud-sdk\bin`). Paths may contain Korean: quote them, write files as UTF-8, set `PYTHONUTF8=1` when printing Korean. `.ps1` files stay ASCII. Local Supabase runs on ports 553xx (`app/supabase/config.toml`). Write any file that contains backslashes or quotes with an editor tool, not a shell heredoc.
 
 ## Reporting a change
 

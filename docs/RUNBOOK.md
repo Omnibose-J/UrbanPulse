@@ -4,9 +4,10 @@ How to move the system to the cloud and how to operate it there. Every command r
 PowerShell 5.1. Cloud scripts live in `scripts/cloud/`, read `.env.cloud` (gitignored) and never print a value.
 Add `-Plan` to any script to see its steps without running them.
 
-Status on 2026-10-02: steps 0–2 below are rehearsed end to end against local stand-ins
-(`scripts/cloud/rehearse.ps1`). The `gcloud` and `vercel` calls in 10, 20, 40, 50, 60, 70 and 80 have only been
-parsed and plan-run: no cloud account existed. Expect to fix a flag or two on the first real run, and record it here.
+Status on 2026-10-05: the move is done. GCP project `urbanpulse-sbj` (account sobeomjin@gmail.com, billing
+linked), Supabase project `urbanpulse` (Seoul, free plan, account imsw000111), Vercel project `urbanpulse` (team
+`imsw`) at https://urbanpulse-swart.vercel.app. Every script in section 2 ran for real; what differed from the
+2026-10-02 expectations is in "Observed on the first real run" below.
 
 ## 0 Before the first cloud run (the user)
 
@@ -51,15 +52,24 @@ Rules that are easy to break:
   `collect` writing the same observation is harmless (same key), but two `forecast` runs are wasted work.
 - Never `supabase db reset`, locally or remotely.
 
-Expected on the first real run (from a documentation review, 2026-10-02; none of it was executed):
-- Cloud Scheduler needs its own service agent role in the project; triggers fail without it. If a trigger
-  fails with a permission error, grant the role the error names, then rerun `60_schedule.ps1`.
-- `vercel link --yes` stops asking which team to use from CLI 55 on; with more than one team add
-  `--scope <team>` in `70_web_deploy.ps1`.
-- Artifact Registry applies a cleanup policy about a day after it is set, and may count one pushed image as
-  several versions; check that three images really remain after the fourth deploy.
-- `80_cutover` passes `--args "ingest_raw,--date,<day>"`; no documented example has a later element
-  starting with `--`. If it is rejected, use `--args=ingest_raw --args=--date --args=<day>`.
+Observed on the first real run (2026-10-05):
+- A new project: `gcloud services enable` returns before the permissions propagate. `10_gcp_setup` failed at the
+  repository create with `PERMISSION_DENIED` and passed unchanged a minute later. Rerun, do not fix.
+- `supabase projects create` takes the password only as a `--db-password` flag (no environment variable), which
+  the hard rules forbid. The project was created through the Management API (`POST /v1/projects`, password in
+  the body) with the CLI's token read from Windows Credential Manager (`Supabase CLI:supabase`). The pooler API
+  (`/config/database/pooler`) lists only a `transaction` entry; session mode is the same host on port 5432, which
+  is what `DATABASE_URL` holds.
+- Cloud Scheduler needed no extra service-agent role; the four triggers fired on the first run.
+- `vercel link --yes --project urbanpulse` created the project without asking (one team on the account).
+- Artifact Registry's cleanup policy: still to be checked after the fourth deploy (three images should remain).
+- `80_cutover` passes `--args "ingest_raw,--date,<day>"` and Cloud Run accepted it as written; `ingest_raw` of one
+  day (45 folders) took 5 minutes in the cloud against the laptop's 3 seconds per folder.
+- Before `rehearse.ps1`, run nothing else against the local database: a parallel `ingest_raw` changed the data the
+  comparison was built on and left ledger rows (two false FAILs), and a stale local `recommendations` table (the
+  laptop had not run `forecast` for three days) fails the last comparison; run `python -m engine forecast` first.
+- The laptop collects into `data/raw/` even while the local database is down (Docker off); `ingest_raw --date`
+  for each such day, locally, before `31_db_copy`, so the copy is complete.
 
 ## 3 Operate
 
@@ -68,7 +78,7 @@ Expected on the first real run (from a documentation review, 2026-10-02; none of
 | New engine code | commit, `rehearse.ps1`, then `50_engine_deploy.ps1` (jobs take the new tag) |
 | New web code | `70_web_deploy.ps1`, then `90_verify.ps1 -Url <url>` |
 | Run a job by hand | `gcloud run jobs execute urbanpulse-<job> --region asia-northeast3 --wait` |
-| Read a job's log | `gcloud run jobs executions list --job urbanpulse-<job> --region asia-northeast3`, then `gcloud beta run jobs executions logs read <execution> --region asia-northeast3` |
+| Read a job's log | `gcloud logging read 'resource.type="cloud_run_job" AND resource.labels.job_name="urbanpulse-<job>" AND logName:stdout' --limit 20 --format="value(jsonPayload)"` (the engine's JSON lines land in `jsonPayload`; `gcloud beta` cannot be installed under the bundled Python, so the GA `logging read` is the way). Executions: `gcloud run jobs executions list --job urbanpulse-<job> --region asia-northeast3` |
 | Is it healthy | `/admin` on the site (token form) → jobs table; or `python scripts/cloud/dbtool.py last-runs --target-env .env.cloud --job collect --count 2` |
 | Re-ingest a date | `gcloud run jobs execute urbanpulse-ingest-raw --region asia-northeast3 --args "ingest_raw,--date,YYYY-MM-DD" --wait` (idempotent) |
 | Laptop-only job against the hosted database (`tier_b`, `rejudge`, `load_places`, `backfill`, training) | `$env:ENGINE_ENV_FILE=".env.cloud"; python -m engine <job>; Remove-Item Env:ENGINE_ENV_FILE` |
