@@ -76,3 +76,29 @@ def test_a_day_with_no_folder_exits_1_and_writes_nothing(tmp_path, monkeypatch):
         assert ingest_raw.run("2026-10-01") == 1
         with psycopg.connect(dsn, connect_timeout=5) as conn:
             assert conn.execute("select count(*) from job_runs").fetchone()[0] == 0
+
+
+def test_a_store_failure_writes_a_fail_ledger_row_and_exits_1(tmp_path, monkeypatch, capsys):
+    """A bucket or disk that fails while listing the day is a job failure, not an escaping traceback."""
+
+    def broken(*_args, **_kwargs):
+        raise OSError("bucket unreachable")
+        yield  # pragma: no cover - makes this a generator like the real iter_day
+
+    with schema() as dsn:
+        monkeypatch.setenv("ENGINE_SKIP_DOTENV", "1")
+        monkeypatch.setenv("DATABASE_URL", dsn)
+        monkeypatch.setenv("RAW_DIR", str(tmp_path / "raw"))
+        monkeypatch.setattr(ingest_raw.raw_store, "iter_day", broken)
+
+        assert ingest_raw.run("2026-10-01") == 1
+        lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
+        assert any(line.get("event") == "fail" and line.get("stage") == "read" for line in lines)
+        with psycopg.connect(dsn, connect_timeout=5) as conn:
+            status, detail = conn.execute(
+                "select status, detail from job_runs where job = 'ingest_raw' order by id desc limit 1"
+            ).fetchone()
+            assert conn.execute("select count(*) from live_obs").fetchone()[0] == 0
+        assert status == "fail"
+        assert detail["stage"] == "read"
+        assert detail["error"].startswith("OSError")

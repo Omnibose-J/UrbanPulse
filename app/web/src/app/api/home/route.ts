@@ -9,7 +9,8 @@ export async function GET(request: Request) {
   const purpose = readPurpose(url.searchParams.get("purpose"));
   if (!tolerance || !purpose) return jsonFail(400, "invalid tolerance or purpose");
   try {
-    return jsonOk(await homePayload(tolerance, purpose));
+    // The home says what is busy and quiet "now": one minute at the edge, not five.
+    return jsonOk(await homePayload(tolerance, purpose), 60);
   } catch (error) {
     logApiError("home", error);
     return jsonFail(500, "unavailable");

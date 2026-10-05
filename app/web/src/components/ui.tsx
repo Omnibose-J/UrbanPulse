@@ -52,11 +52,11 @@ export function AppBar({
       <div className="flex items-center gap-1">
         {backHref ? (
           <>
-            <Link prefetch={false} href={backHref} className={`-ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold ${backLabel ? "h-11 pr-2" : "icon-hit"}`}>
+            <Link prefetch={false} href={backHref} aria-label={backLabel ? undefined : t("nav.back")} className={`-ml-2.5 flex shrink-0 items-center gap-1 whitespace-nowrap text-[15px] font-semibold ${backLabel ? "h-11 pr-2" : "icon-hit"}`}>
               <ChevronLeft aria-hidden />
               {backLabel ? <span className="whitespace-nowrap">{backLabel}</span> : null}
             </Link>
-            {title ? <span className="text-[17px] font-extrabold tracking-tight">{title}</span> : null}
+            {title ? <h1 className="text-[17px] font-extrabold tracking-tight">{title}</h1> : null}
           </>
         ) : (
           <span className="flex items-center gap-2 font-extrabold tracking-tight">
@@ -86,7 +86,7 @@ export function AppBar({
             <Star fill={star ? "var(--star)" : "none"} color="var(--star)" />
           </button>
         ) : null}
-        <a href={switched} data-lang className="label shrink-0 px-2 font-bold" aria-label={t("nav.language")}>
+        <a href={switched} data-lang className="label flex h-11 shrink-0 items-center px-2 font-bold" aria-label={t("nav.language")}>
           KO · EN
         </a>
       </div>
@@ -203,9 +203,9 @@ export function AnswerCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           {dateLine ? <p className="label truncate font-semibold text-on-ink-3">{dateLine}</p> : null}
-          <p className={`${nameClass} truncate`}>
+          <h1 className={`${nameClass} truncate`}>
             <PlaceName name={name} nameEn={nameEn} />
-          </p>
+          </h1>
           {variant === "week" && (staleText || nowText) ? (
             <p className="label mt-1 flex items-center gap-1.5 text-on-ink-2">
               {staleText || nowLevel === null || nowLevel === undefined ? null : <LevelDot level={nowLevel} onDark />}
@@ -356,7 +356,7 @@ export function WeekList({
                   ) : null}
                 </span>
                 <span className="relative min-w-0 text-right">
-                  <span data-week-time className={`block whitespace-nowrap ${best ? "text-[15px] font-bold" : "caption text-text-3"}`}>
+                  <span data-week-time className={`block whitespace-nowrap ${best ? `${locale === "en" ? "text-[14px]" : "text-[15px]"} font-bold` : "caption text-text-3"}`}>
                     {time}
                   </span>
                   {avoid ? (
@@ -525,13 +525,19 @@ export function ConditionSheet({
   const [note, setNote] = useState<string | null>(null);
 
   // Focus moves into the sheet when it opens and back to what opened it when it closes; Tab stays inside.
+  // The opener is captured once per opening: `onClose` is a fresh function on every render of the parent, so the
+  // effect must not re-run (and re-capture the sheet's own title as the opener) each time it changes.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
   useEffect(() => {
     if (!open) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     title.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        closeRef.current();
         return;
       }
       if (event.key !== "Tab" || !dialog.current) return;
@@ -552,7 +558,7 @@ export function ConditionSheet({
       window.removeEventListener("keydown", onKey);
       opener?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   // Invariant 7: a combination the API did not list is off.

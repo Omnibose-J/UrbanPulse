@@ -29,7 +29,7 @@ and writes precomputed rows to Postgres; a Next.js app only reads them. Nothing 
 | `app/supabase/` | Supabase project | implementer | `config.toml` (project `urbanpulse`, ports 553xx), `migrations/`, `tests/` (pgTAP) |
 | `app/web/` | Next.js 16 app | implementer | App Router, TypeScript, Tailwind v4; Supabase only from server code |
 | `models/` | trained model artifacts | created by W5 | Tracked; copied into the engine image |
-| `scripts/cloud/` | cloud move | designer | PowerShell steps `00`–`90` (each takes `-Plan` and `-EnvFile`), `dbtool.py` (schema check, one-off copy, comparisons), `verify.py`, `rehearse.ps1`. Order and operation: `docs/RUNBOOK.md` |
+| `scripts/cloud/` | cloud move | designer | PowerShell steps `00`–`90` (each takes `-Plan` and `-EnvFile`; `65_alerts.ps1` + `alerts.py` set up the failure e-mail), `dbtool.py` (schema check, one-off copy, comparisons), `verify.py`, `rehearse.ps1`. Order and operation: `docs/RUNBOOK.md` |
 | `docs/RUNBOOK.md` | operations | designer | How to move to the cloud and operate it; update it when a real run differs from the script |
 | `data/` | local runtime data | runtime | Gitignored. `data/raw/` holds raw API snapshots until SOW-MC moves them to GCS |
 | `.env` | secrets | user | Gitignored. Names in `.env.example`. Never printed, never committed |
@@ -108,7 +108,7 @@ Done and running locally: collection every 30 minutes, daily forecast, recommend
 (experimental), every screen, the admin page, hardening, and a rehearsed cloud move.
 
 Next, in this order:
-1. Cloud move: `docs/RUNBOOK.md`. Blocked on the user's accounts (`scripts/cloud/00_check.ps1` must exit 0).
+1. Cloud move: done 2026-10-05 (`docs/RUNBOOK.md` for operation; `scripts/cloud/00_check.ps1` exits 0 on the laptop).
 2. Weekly re-judgement of the on/off table once October data has accumulated (`python -m engine rejudge`).
 3. The open rows of `docs/tracking/findings.md` (English place names, collection-gap marker, archive retention,
    failure alerts).

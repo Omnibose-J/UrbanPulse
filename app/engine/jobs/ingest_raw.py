@@ -21,6 +21,18 @@ def _day(date: str | None):
     return datetime.strptime(date, "%Y-%m-%d").date()
 
 
+def _fail_before_store(database_url: str, exc: BaseException) -> int:
+    log(JOB, "fail", reason=type(exc).__name__, stage="read")
+    try:
+        with _ledger(database_url, JOB) as ctx:
+            ctx["detail"] = {"stage": "read"}  # the ledger adds `error` from the exception
+            raise exc
+    except Exception:
+        # The context manager wrote the fail row; a database that is down as well leaves only the log line.
+        return 1
+    return 1
+
+
 def run(date: str | None = None) -> int:
     settings.load_env()
     env = settings.require(("DATABASE_URL",))
@@ -34,26 +46,30 @@ def run(date: str | None = None) -> int:
     folders: set[str] = set()
     files = 0
     saw_any = False
-    for folder, place_id, body, error in raw_store.iter_day(location, day):
-        saw_any = True
-        files += 1
-        folders.add(folder)
-        if error or body is None:
-            failed.append({"file": place_id, "error": error or "empty"})
-            continue
-        try:
-            snapshot = parse_citydata(place_id, body)
-        except (ValueError, KeyError, TypeError) as exc:
-            failed.append({"file": place_id, "error": type(exc).__name__})
-            continue
-        if snapshot.live is None:
-            continue
-        live.append(snapshot.live)
-        if snapshot.commerce is not None:
-            commerce.append(snapshot.commerce)
-        forecasts.extend(snapshot.forecasts)
-        if snapshot.unknown_categories:
-            unknowns.append(snapshot.unknown_categories)
+    try:
+        for folder, place_id, body, error in raw_store.iter_day(location, day):
+            saw_any = True
+            files += 1
+            folders.add(folder)
+            if error or body is None:
+                failed.append({"file": place_id, "error": error or "empty"})
+                continue
+            try:
+                snapshot = parse_citydata(place_id, body)
+            except (ValueError, KeyError, TypeError) as exc:
+                failed.append({"file": place_id, "error": type(exc).__name__})
+                continue
+            if snapshot.live is None:
+                continue
+            live.append(snapshot.live)
+            if snapshot.commerce is not None:
+                commerce.append(snapshot.commerce)
+            forecasts.extend(snapshot.forecasts)
+            if snapshot.unknown_categories:
+                unknowns.append(snapshot.unknown_categories)
+    except Exception as exc:
+        # The store itself failed (bucket listing, disk): a `fail` ledger row names the stage, then exit 1.
+        return _fail_before_store(env["DATABASE_URL"], exc)
     if not saw_any:
         log(JOB, "fail", reason="no raw folder", raw_dir=day.isoformat())
         return 1

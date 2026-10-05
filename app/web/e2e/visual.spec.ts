@@ -79,9 +79,17 @@ test("home matches the mockup measurements", async ({ page }) => {
     for (let index = 0; index < count; index += 1) {
       const card = cards.nth(index);
       await expect(card.locator("[data-status-dot]")).toHaveCount(1);
-      await expect(card.locator("[data-mini-strip] > *")).toHaveCount(15);
+      // The strip is the full 15 hours when the place has hourly rows today, and absent when it is still preparing.
+      expect([0, 15]).toContain(await card.locator("[data-mini-strip] > *").count());
     }
-    const ranges = (await page.locator(".phone-shell").innerText()).match(/\d+~\d+시|\d+\s*(?:AM|PM)?\s+to\s+\d+\s*(?:AM|PM)/gi) ?? [];
+    // Every range of today starts at or after the current hour; tomorrow's morning picks (shown at night) are
+    // tomorrow's hours and are left out of the comparison.
+    const todayText = await page.locator(".phone-shell").evaluate((node) => {
+      const copy = node.cloneNode(true) as HTMLElement;
+      copy.querySelector("[data-tomorrow-section]")?.remove();
+      return copy.innerText ?? copy.textContent ?? "";
+    });
+    const ranges = todayText.match(/\d+~\d+시|\d+\s*(?:AM|PM)?\s+to\s+\d+\s*(?:AM|PM)/gi) ?? [];
     for (const range of ranges) {
       const start = startHour(range);
       if (start !== null) expect(start).toBeGreaterThanOrEqual(hour);

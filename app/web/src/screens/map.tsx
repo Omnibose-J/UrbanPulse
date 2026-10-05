@@ -48,7 +48,11 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
   const today = kstNow().date;
   const days = useMemo(() => Array.from({ length: 8 }, (_, index) => addDays(today, index)), [today]);
   const [day, setDay] = useState(date && days.includes(date) ? date : today);
-  const [clock, setClock] = useState(() => initialHour(hour, kstNow().hour));
+  const [pickedHour, setClock] = useState(() => initialHour(hour, kstNow().hour));
+  // Today's past hours are not on offer (design spec 5.11): the slider starts at the current hour, and an hour
+  // picked for another day is lifted to it when the day switches back to today.
+  const minHour = day === today ? Math.min(23, Math.max(9, kstNow().hour)) : 9;
+  const clock = Math.max(pickedHour, minHour);
   const [stations, setStations] = useState(false);
   const [cond, setCond] = useState({ purpose: "sight" as Purpose, tolerance: "moderate" as Tolerance });
   const [selected, setSelected] = useState<string | null>(null);
@@ -267,7 +271,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
           </div>
           <label className="flex h-12 items-center gap-3">
             <span className="w-[52px] text-[20px] font-extrabold">{t("map.hourNow", { hour: String(clock) })}</span>
-            <input data-hour className="min-w-0 flex-1" type="range" min={9} max={23} value={clock} onChange={(event) => setClock(Number(event.target.value))} />
+            <input data-hour className="min-w-0 flex-1" type="range" min={minHour} max={23} value={clock} aria-description={minHour > 9 ? t("map.pastHours") : undefined} onChange={(event) => setClock(Number(event.target.value))} />
           </label>
         </div>
         {failed ? (
@@ -281,7 +285,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
                 {t(`rate.${key}`)}
               </span>
             ))}
-            <label className="inline-flex items-center gap-1 border-l border-line pl-2">
+            <label className="-my-3 inline-flex items-center gap-1 border-l border-line py-3 pl-2">
               <input
                 type="checkbox"
                 checked={stations}

@@ -10,7 +10,7 @@
     "todayLabel": "오늘 추천",
     "busyTopEmpty": "지금은 붐비는 곳이 없어요",
     "favorites": "관심 장소",
-    "popular": "많이 찾는 곳",
+    "popular": "장소 목록",
     "tomorrowMorning": "내일 아침 가기 좋은 곳",
     "tomorrowMorningEmpty": "내일 아침에 추천할 곳이 없어요",
     "tomorrowLabel": "내일 추천"
@@ -47,7 +47,8 @@
     "includeStations": "역세권 포함",
     "hourNow": "{hour}시",
     "hourLine": "{hour}시는 {verdict}.",
-    "station": "{name} · 추정"
+    "station": "{name} · 추정",
+    "pastHours": "지난 시간은 고를 수 없어요"
   },
   "cond": {
     "change": "바꾸기"
@@ -137,7 +138,8 @@
     "outOfRange": "오늘부터 7일 뒤까지만 볼 수 있어요."
   },
   "search": {
-    "empty": "찾는 장소가 없어요. 가까운 지하철역 이름으로 찾아보세요."
+    "empty": "찾는 장소가 없어요. 가까운 지하철역 이름으로 찾아보세요.",
+    "title": "검색"
   },
   "time": {
     "today": "오늘",
@@ -158,7 +160,7 @@
     "title": "안내",
     "does": "고른 장소에 언제 가면 좋은지, 오늘부터 7일까지 알려 드려요.",
     "how": "평소 같은 요일의 흐름에, 달력으로 배운 비율을 곱해 혼잡을 예상해요. 추천 시간은 그 예상과 영업 활동으로 골라요.",
-    "flags": "켜진 기능과 준비 중인 기능",
+    "flags": "켜진 기능과 준비 중인 기능 (오늘 기준)",
     "limits": "121곳의 실시간 인구만 봐요. 명절에는 추천하지 않아요. 역세권 추정은 실험이에요.",
     "sources": "데이터 출처: 서울시 실시간 도시데이터, 한국천문연구원 특일 정보. 공공누리.",
     "on": "켜짐",
@@ -169,12 +171,14 @@
     "tierA2": "공원·고궁",
     "tierB": "역세권",
     "foreign": "외국인 많은 곳",
-    "places": "{count}곳"
+    "places": "{count}곳",
+    "flagsNote": "같은 조합이 두 줄로 나오면 장소마다 상태가 다른 거예요. 공휴일에는 역세권이 모두 꺼져요."
   },
   "nav": {
     "logo": "UrbanPulse",
     "language": "언어",
-    "home": "홈으로"
+    "home": "홈으로",
+    "back": "뒤로"
   },
   "avoid": {
     "busiest": "가장 붐빌 때",

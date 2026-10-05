@@ -16,6 +16,7 @@ export function AboutScreen() {
       <p className="body mt-4">{t("about.does")}</p>
       <p className="body mt-4">{t("about.how")}</p>
       <h2 className="section mb-2 mt-6">{t("about.flags")}</h2>
+      <p className="caption mb-2 text-text-3">{t("about.flagsNote")}</p>
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
       <table className="w-full text-left">
         <tbody>

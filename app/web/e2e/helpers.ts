@@ -42,6 +42,8 @@ export function strayHangul(page: Page): Promise<string[]> {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
+      // Rendered text only: the inlined RSC payload (<script>) carries the page title and the messages.
+      if (node.parentElement?.closest("script, style")) continue;
       if (/[가-힣]/.test(node.textContent ?? "") && !node.parentElement?.closest("[lang=ko]")) found.push((node.textContent ?? "").trim());
     }
     return found;

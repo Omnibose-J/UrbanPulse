@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
-const OK = { "Cache-Control": "public, s-maxage=300" };
 const NO = { "Cache-Control": "no-store" };
 
-export function jsonOk(body: unknown) {
-  return NextResponse.json(body, { headers: OK });
+/** Stored rows change at most every 30 minutes (collect) and once a day (forecast), so the edge may hold a success
+ * for `ttl` seconds; a route that carries "now" passes a shorter one. The edge strips `s-maxage` from what the
+ * browser sees and keeps `public`, so the browser itself never caches. Errors are never cacheable. */
+export function jsonOk(body: unknown, ttl = 300) {
+  return NextResponse.json(body, { headers: { "Cache-Control": `public, s-maxage=${ttl}` } });
 }
 
 export function jsonFail(status: number, error: string) {

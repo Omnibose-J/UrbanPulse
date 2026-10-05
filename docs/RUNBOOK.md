@@ -41,6 +41,7 @@ change to the engine, the migrations or the scripts, before touching the cloud.
 | Raw | `scripts/cloud/40_raw_upload.ps1` | bucket object count and bytes at least the local ones |
 | Engine | `scripts/cloud/50_engine_deploy.ps1 -Execute` | six jobs deployed; `healthcheck`, `collect`, `forecast`, `evaluate` executed once |
 | Schedules | `scripts/cloud/60_schedule.ps1` | four triggers, Asia/Seoul, ENABLED |
+| Alerts | `scripts/cloud/65_alerts.ps1` | an e-mail channel (the gcloud account) and a policy that mails when any job execution fails |
 | Cutover | `scripts/cloud/80_cutover.ps1 -Since <date of the data copy>` | local tasks disabled, gap closed, recommendations equal |
 | Web | `scripts/cloud/70_web_deploy.ps1` | the deployment URL |
 | Verify | `scripts/cloud/90_verify.ps1 -Url <url>` | every line `OK`, `0 failed` |
@@ -84,6 +85,7 @@ Observed on the first real run (2026-10-05):
 | Laptop-only job against the hosted database (`tier_b`, `rejudge`, `load_places`, `backfill`, training) | `$env:ENGINE_ENV_FILE=".env.cloud"; python -m engine <job>; Remove-Item Env:ENGINE_ENV_FILE` |
 | Rotate a secret | change the value in `.env.cloud`, `20_secrets.ps1` (prints `updated`), then `50_engine_deploy.ps1`; for `ADMIN_TOKEN` or the service-role key, `70_web_deploy.ps1` |
 | Pause everything | `60_schedule.ps1 -Pause`; resume with `-Resume` |
+| A job failed (e-mail from Cloud Monitoring) | read its log (row above); the next scheduled slot is the retry; `/admin` shows the ledger row. The policy auto-closes after 30 minutes |
 | Roll back to the laptop | `60_schedule.ps1 -Pause`; `cd app; supabase start`; `Enable-ScheduledTask` for `UrbanPulse collect`, `UrbanPulse forecast`, `UrbanPulse evaluate`; `python -m engine ingest_raw --date <each missed day>` after downloading the bucket's folders for those days into `data/raw` |
 | Launch publicly | remove the `X-Robots-Tag` header in `app/web/next.config.ts` and redeploy |
 
@@ -111,6 +113,5 @@ first week.
 
 ## 6 Known gaps
 
-- No alert when a cloud job fails; the jobs table on `/admin` is the only place it shows.
 - Place names have no English version (`name_en` is null).
 - Hours that were never collected are not marked on any screen.

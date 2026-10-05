@@ -10,7 +10,7 @@
     "todayLabel": "Today",
     "busyTopEmpty": "Nothing is busy right now",
     "favorites": "Saved places",
-    "popular": "Often visited",
+    "popular": "All places",
     "tomorrowMorning": "Good tomorrow morning",
     "tomorrowMorningEmpty": "Nothing to recommend tomorrow morning",
     "tomorrowLabel": "Tomorrow"
@@ -47,7 +47,8 @@
     "includeStations": "Include station areas",
     "hourNow": "{hour}",
     "hourLine": "{hour}: {verdict}.",
-    "station": "{name} · estimate"
+    "station": "{name} · estimate",
+    "pastHours": "Past hours cannot be picked"
   },
   "cond": {
     "change": "Change"
@@ -137,7 +138,8 @@
     "outOfRange": "You can look up to 7 days ahead."
   },
   "search": {
-    "empty": "No place with that name. Try a nearby station."
+    "empty": "No place with that name. Try a nearby station.",
+    "title": "Search"
   },
   "time": {
     "today": "Today",
@@ -158,7 +160,7 @@
     "title": "About",
     "does": "Tell you when to visit a place you already chose, from today through seven days ahead.",
     "how": "We start from the usual flow for that weekday and scale it with a calendar ratio. Recommended hours come from that forecast and from how active the place usually is.",
-    "flags": "What is on, and what is still in preparation",
+    "flags": "What is on, and what is still in preparation (as of today)",
     "limits": "Live counts cover 121 places. We do not recommend holiday periods around Seollal and Chuseok. Station-area estimates are experimental.",
     "sources": "Sources: Seoul real-time city data, and holiday dates from the Korea Astronomy and Space Science Institute. Public Nuri.",
     "on": "On",
@@ -169,12 +171,14 @@
     "tierA2": "Parks and palaces",
     "tierB": "Station areas",
     "foreign": "many foreign visitors",
-    "places": "{count} places"
+    "places": "{count} places",
+    "flagsNote": "The same setting on two rows means its state differs by place. On public holidays every station area is off."
   },
   "nav": {
     "logo": "UrbanPulse",
     "language": "Language",
-    "home": "Home"
+    "home": "Home",
+    "back": "Back"
   },
   "avoid": {
     "busiest": "Busiest",

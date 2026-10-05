@@ -58,5 +58,6 @@
   --color-star: var(--star);
   --color-error-fg: var(--error-fg);
   --color-stale-fg: var(--stale-fg);
+  --font-pretendard: "Pretendard Variable";
   --font-sans: var(--font-pretendard), sans-serif;
 }

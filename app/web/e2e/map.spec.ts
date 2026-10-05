@@ -50,13 +50,19 @@ test("a nonsense address is corrected instead of drawn", async ({ page }) => {
   await expect(page.locator("[data-pin]").first()).toBeVisible({ timeout: 20000 });
   await expect(page).toHaveURL(new RegExp(`date=${kstDate()}&hour=(9|1\\d|2[0-3])$`));
   await expect(page.getByText("NaN")).toHaveCount(0);
+  // Today's slider starts at the current hour (design spec 5.11), so a too-early hour lands there, never below 9.
+  const floor = Math.max(9, Number(new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 13)));
   await page.goto("/ko/map?hour=2");
-  await expect(page).toHaveURL(/hour=9$/);
+  await expect(page).toHaveURL(new RegExp(`hour=${floor}$`));
   expect(seen.failed).toEqual([]);
 });
 
-test("stations are off by default, add pins when on, and the choice is remembered", async ({ page }) => {
-  await page.goto("/ko/map");
+test("stations are off by default, add pins when on, and the choice is remembered", async ({ page, request }) => {
+  // Station areas are off on every public holiday by rule, so the check runs on the first ordinary day of the week.
+  const holidays = (await (await request.get(`/api/map?date=${kstDate()}&tolerance=moderate&purpose=sight`)).json()).holidays as { date: string }[];
+  const ordinary = Array.from({ length: 8 }, (_, index) => kstDate(index)).find((date) => !holidays.some((item) => item.date === date));
+  expect(ordinary).toBeTruthy();
+  await page.goto(`/ko/map?date=${ordinary}`);
   await expect(page.locator("[data-pin]").first()).toBeVisible({ timeout: 20000 });
   const without = await page.locator("[data-pin]").count();
   await expect(page.locator("[data-pin^=STN]")).toHaveCount(0);
@@ -79,7 +85,8 @@ test("a switched-off combination draws no pin for its places", async ({ page, re
 });
 
 test("zooming in is kept when the hour changes", async ({ page }) => {
-  await page.goto("/ko/map");
+  // Tomorrow: every hour from 9 is pickable, whatever the clock says now.
+  await page.goto(`/ko/map?date=${kstDate(1)}`);
   await expect(page.locator("[data-pin]").first()).toBeVisible({ timeout: 20000 });
   const small = await page.locator("[data-pin][data-selected='0']").first().getAttribute("data-pin-size");
   expect(small).toBe("18");
