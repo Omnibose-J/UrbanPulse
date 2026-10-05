@@ -108,7 +108,9 @@ Cloud Run Jobs bill CPU and memory for the seconds a job runs: 48 collects, one 
 is a few minutes of one or two CPUs. Cloud Scheduler bills per trigger (four). Artifact Registry bills the stored
 image (three tags kept, about 0.9 GB each). GCS bills the raw objects (about 70 MB on 2026-10-02, growing with
 every collect) and their versions. Supabase and Vercel are on their free plans until a limit is hit: the database
-size against 500 MB is the one to watch. No figure here was read from a bill; check the billing page after the
+size against 500 MB is the one to watch: observations are kept in full (no archive job, decided 2026-10-06), the
+observation tables grow about 0.9 MB a day (184 MB on 2026-10-05), so the free plan lasts roughly a year from the move;
+raise the plan before the limit, never delete rows. No figure here was read from a bill; check the billing page after the
 first week.
 
 ## 6 Known gaps

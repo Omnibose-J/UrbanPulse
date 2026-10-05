@@ -10,7 +10,6 @@ import argparse
 import sys
 
 from engine.jobs import (
-    archive,
     backfill,
     collect,
     evaluate,
@@ -27,7 +26,6 @@ from engine.jobs import (
 NOT_YET: dict[str, str] = {}
 
 JOBS = {
-    "archive": archive.run,
     "evaluate": evaluate.run,
     "integrity": integrity.run,
     "forecast": forecast.run,
@@ -51,9 +49,6 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--date", default=None)
         if name == "rejudge":
             command.add_argument("--apply", action="store_true")
-        if name == "archive":
-            command.add_argument("--dry-run", action="store_true")
-            command.add_argument("--execute", action="store_true")
         if name == "tier_b":
             command.add_argument("--check", action="store_true")
         if name == "integrity":
@@ -71,8 +66,6 @@ def main(argv: list[str] | None = None) -> int:
         return evaluate.run(day)
     if args.job == "rejudge":
         return rejudge.run(apply=args.apply)
-    if args.job == "archive":
-        return archive.run(dry_run=args.dry_run, execute=args.execute)
     if args.job == "tier_b":
         return tier_b.run(check_only=args.check)
     if args.job == "integrity":

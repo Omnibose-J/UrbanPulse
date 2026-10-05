@@ -7,7 +7,7 @@ Assert-Names $v @("GCP_PROJECT")
 $P = $v["GCP_PROJECT"]
 $scheduler = Scheduler-Account $v
 
-# No trigger for ingest-raw, healthcheck, archive, tier_b, rejudge: those are run by hand.
+# No trigger for ingest-raw, healthcheck, tier_b, rejudge: those are run by hand.
 $schedules = @(
     @{ Job = "urbanpulse-collect";       Cron = "*/30 * * * *" },
     @{ Job = "urbanpulse-forecast";      Cron = "10 5 * * *" },

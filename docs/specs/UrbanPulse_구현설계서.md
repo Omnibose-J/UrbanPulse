@@ -1,9 +1,10 @@
-# UrbanPulse 구현 설계서 v7.6 (2026-10-02)
+# UrbanPulse 구현 설계서 v7.7 (2026-10-06)
 
 > 서비스정의서 v3을 어떻게 만드는지 정리한 문서입니다. 무엇을 왜 만드는지는 `docs/specs/UrbanPulse_서비스정의서.md`에 있습니다.
 > 구현은 팀원이 Cursor로 하고, 이 문서를 작업 지시서(작업 단위별 문서)로 쪼개서 넘깁니다.
 > 수치의 근거는 서비스정의서 부록과 `analysis/scripts/`에 있습니다.
 > 이 문서에 나오는 SOW-M0 ~ SOW-L1(작업 지시서)과 criteria-*(검수 기록)는 작업이 끝나 2026-10-02에 저장소에서 지웠습니다. 깃 기록에 남아 있습니다. 남은 것은 `docs/sow/SOW-MC.md`(클라우드)와 `docs/tracking/findings.md`입니다.
+> v7.7: 관측 보존 정책 확정(사용자 결정, 2026-10-06): `live_obs`·`commerce_obs`·`forecast_log`는 전체 보존, `archive` 작업 삭제(4.7). 클라우드 이전 완료(SOW-MC, 2026-10-05).
 > v7.6: 로컬 완성(SOW-L1) 반영. 클라우드 이전 스크립트와 예행연습(1.2 아래), 관리 화면은 토큰을 주소가 아니라 입력 창으로 받음(6.1), 대체 날짜는 점수가 같으면 가까운 날 먼저, 지도 워커는 정적 파일. 클라우드 계정 작업은 뒤로 미룸.
 > v7.5: 전체 리뷰와 e2e에 따른 하드닝(SOW-H1) 반영. 정합성 점검 작업 `integrity`(4.9), 작업 실패 기록과 한 번에 커밋(4.8 아래), API 입력 검증과 1,000행 제한 대응(6.4), 테스트 원칙(7.3).
 > v7.4: 실험 17 반영. 단계 경계를 "오분류가 가장 적은 인구값"으로 교체(4.2), 외국인 많은 장소의 쇼핑·붐벼도 끔(4.4 표), `closed` 문구 완화. 작업 지시서 SOW-M6.
@@ -52,7 +53,6 @@
                                           │ forecast   : 7일치 시간대 예측 + 추천 계산       │
                                           │ tier_b     : B등급 역세권 평소 흐름 재계산        │
                                           │ evaluate   : 어제 예측 vs 실제, 오차 기록         │
-                                          │ archive    : 90일 지난 관측을 GCS parquet로      │
                                           └──────────────┬──────────────────────────────────┘
                                                          ▼
                                    [Supabase Postgres]  예측·추천·최근 관측·평가 테이블
@@ -64,10 +64,10 @@
 
 | 조각 | 역할 | 언어·런타임 | 코드 위치 |
 |---|---|---|---|
-| **엔진** | 적재, 수집, 예측, 추천, B등급 흐름, 평가, 보관 | Python 3.10, Docker, Cloud Run Jobs | `app/engine/` |
+| **엔진** | 적재, 수집, 예측, 추천, B등급 흐름, 평가 | Python 3.10, Docker, Cloud Run Jobs | `app/engine/` |
 | **학습** | 달력 변화율 모델 학습·검증 (노트북에서 가끔 실행) | Python | `app/engine/train/` |
-| **원장** | 장소, 최근 90일 관측, 예측, 추천, 평가 | Supabase Postgres | `app/supabase/migrations/` |
-| **원본 보관** | 30분 원본 스냅샷(gzip JSON), 90일 지난 관측(parquet) | GCS 버킷 `urbanpulse-raw`, `urbanpulse-archive` | — |
+| **원장** | 장소, 관측 전체, 예측, 추천, 평가 | Supabase Postgres | `app/supabase/migrations/` |
+| **원본 보관** | 30분 원본 스냅샷(gzip JSON, 덮어쓰기 불가) | GCS 버킷 `<project>-urbanpulse-raw` | — |
 | **화면** | 모바일 웹, PC 대시보드 | Next.js(App Router) + TypeScript, Vercel | `app/web/` |
 | **연구** | 지금까지의 실험 스크립트와 데이터 (서비스에서 import하지 않음) | Python | `analysis/` |
 
@@ -94,8 +94,8 @@
 
 | 테이블 | 계산 | 행/일 | 보관 |
 |---|---|---|---|
-| `live_obs` | 111곳 × 48회 | 약 5.3천 | DB 90일, 이후 GCS parquet |
-| `commerce_obs` | 81곳 × 48회 | 약 3.9천 | DB 90일, 이후 GCS parquet |
+| `live_obs` | 111곳 × 48회 | 약 5.3천 | 전체 보존(약 0.3 MB/일) |
+| `commerce_obs` | 81곳 × 48회 | 약 3.9천 | 전체 보존(약 0.6 MB/일) |
 | `city_fcst` | 최신 스냅샷만 덮어씀: 111곳 × 12시간 | 고정 약 1.3천 행 | 최신만 |
 | `forecast_log` | 111곳 × 15시간(09~23) × 예측 거리 3개(1·3·7일) | 약 5천 | DB 180일, 이후 GCS parquet |
 | `forecast_hourly`, `recommendations` | 덮어씀 | 고정 수만 행 | 최신만 |
@@ -138,8 +138,8 @@
 | 테이블 | 주요 컬럼 | 설명 |
 |---|---|---|
 | `places` | `id`, `tier`(A1/A2/B), `name`, `name_en`, `category`, `gu`, `lat`, `lon`, `geom`(GeoJSON), `poi_code`, `station_codes[]`, `open_hours`(jsonb, 고궁 등), `foreign_heavy`, `serve_state`(on/preparing/off/experimental) | B등급 영어 이름은 역사마스터의 영문 역명(없으면 로마자 표기). `serve_state`: 검증 안 된 9곳은 preparing, 실시간이 없는 10곳은 off. `foreign_heavy`: 켜기·끄기 표의 외국인 많은 장소 11곳 |
-| `live_obs` | `place_id`, `ts`, `pop_min`, `pop_max`, `level`, `age_rates`(jsonb), `male_rate` | A1·A2 30분 관측. DB는 90일, 전체는 GCS |
-| `commerce_obs` | `place_id`, `ts`, `level`, `pay_cnt`, `cat_counts`(jsonb: 업종 대분류별 결제 건수) | A1 영업 활동. DB는 90일, 전체는 GCS |
+| `live_obs` | `place_id`, `ts`, `pop_min`, `pop_max`, `level`, `age_rates`(jsonb), `male_rate` | A1·A2 30분 관측. 전체 보존(원본 스냅샷은 GCS에도) |
+| `commerce_obs` | `place_id`, `ts`, `level`, `pay_cnt`, `cat_counts`(jsonb: 업종 대분류별 결제 건수) | A1 영업 활동. 전체 보존 |
 | `city_fcst` | `place_id`, `target_ts`, `issued_ts`, `pop_min`, `pop_max`, `level` | 서울시 12시간 예측, **최신 것만**. PK (`place_id`, `target_ts`) |
 | `holidays` | `date`, `name`, `name_en`, `kind`(holiday/substitute/seol/chuseok) | 특일 정보 API + 명절 구간 |
 | `level_thresholds` | `place_id`, `t1`, `t2`, `t3`, `based_on_days` | A1·A2: 인구값 → 단계 경계 |
@@ -311,10 +311,9 @@ A1·A2 장소마다 오늘부터 7일 뒤까지 시간대 예측을 만듭니다
 - **입력:** 추천 품질과 시간별 판정은 `recommendation_log`(3일 전에 낸 추천)를 채점. 실제 활발 기준은 모든 목적 0.5(쇼핑의 0.6은 예측 쪽 기준). 첫 채점 가능일은 기록 시작 3일 뒤
 - **매주 재판정 `rejudge`:** 표만 출력하고 `data/rejudge/`에 제안 파일 저장. 설정 파일은 `--apply`를 줄 때만 변경. 조합당 28일 또는 10곳 미만이면 판정 보류. 시간별 2단계(`strip`)는 이 작업이 바꾸지 않음(E6에서 한 번 판정)
 
-### 4.7 `archive` (매일 03:00)
-- 90일 지난 `live_obs`·`commerce_obs`, 180일 지난 `forecast_log`를 GCS parquet로 옮긴 뒤 DB에서 지웁니다.
-- 옮긴 파일의 행 수가 DB에서 지울 행 수와 같을 때만 지웁니다.
-- **현재 상태:** 로컬에서는 `--dry-run`으로 후보 수만 확인하고 삭제·예약 실행 없음. 90일 지난 결제 관측을 지우면 `lively_profile`의 공휴일·명절 유형이 비게 됨(전체 이력 평균). 보관 기간 재설계 뒤 켬(10장)
+### 4.7 보존 (작업 없음)
+- `live_obs`·`commerce_obs`·`forecast_log`는 지우지 않습니다(전체 보존, 2026-10-06 결정). `lively_profile`이 공휴일·명절 유형을 전체 이력 평균으로 만들고, 기준선이 1·2·3주 전 같은 요일을 쓰므로 오래된 관측도 계산에 쓰입니다.
+- 지우는 작업(`archive`)은 없습니다. DB 크기만 감시합니다: 관측 테이블은 하루 약 0.9 MB씩 자라고(2026-10-05 기준 184 MB), Supabase 무료 요금제 한도 500 MB에 가까워지면 요금제를 올립니다(`docs/RUNBOOK.md` 5장).
 
 ### 4.8 불변 조건 (테스트로 고정)
 1. 예측은 예측 시점 이후의 데이터를 쓰지 않습니다. 기준값은 `target − 7k일`만 쓰고, 7일 뒤 예측은 k ≥ 2입니다.
@@ -340,7 +339,6 @@ A1·A2 장소마다 오늘부터 7일 뒤까지 시간대 예측을 만듭니다
 - `forecast`가 화면이 읽는 표(장소 상태, 단계 경계, 활동 기준, 예측, 추천, 비슷한 장소)를 한 번에 커밋. 평가용 기록 두 표는 그 뒤
 - 활성 모델이 등록돼 있는데 모델 파일이 없으면 종료 코드 1(이미지에 `models/` 포함, `MODELS_DIR`)
 - 수집: 원본 쓰기 실패는 그 장소만 실패 처리, 꺼지지 않은 장소의 실패 + 무자료가 20곳 초과면 `fail`, 전체 호출 6분 제한, 원본은 임시 파일로 쓴 뒤 이름을 붙여 반쯤 쓰인 파일이 남지 않게 함
-- `archive`: 인자 없이 실행하면 종료 코드 2. `--dry-run`만 동작
 - DB 연결 실패 문구에 연결 문자열을 넣지 않음
 
 ---
@@ -522,7 +520,7 @@ A1·A2 장소마다 오늘부터 7일 뒤까지 시간대 예측을 만듭니다
 | W9 | `tier_b` 작업 | 부록 실험 8의 결과(흐름 상관 중앙값 0.83, 크게 틀린 역 7%)를 엔진 코드로 재현, B등급 흐름 생성 |
 | W10 | 모바일 화면 `/`, `/p/[id]`, `/about` | 휴대폰 실기기에서 입력 → 추천까지 동작, 준비 중·stale·검증 전 표시 확인 |
 | W11 | 대시보드 `/map` | PC에서 날짜·시간을 바꾸면 지도 색이 바뀜 |
-| W12 | `evaluate`·`archive` 작업 + `/admin/eval` | 3일치 누적 후 표에 값이 보임, 보관 전후 행 수 일치 |
+| W12 | `evaluate` 작업 + `/admin/eval` | 3일치 누적 후 표에 값이 보임 (보관 작업은 v7.7에서 삭제) |
 | W13 | 다국어(한·영): 언어 경로, 번역 파일, 문구 코드 → 문장, 지도 언어 | 영어 브라우저로 접속하면 모든 화면이 영어로 나오고, 번역 키가 빠진 곳이 없음(빌드 검사) |
 
 ---
