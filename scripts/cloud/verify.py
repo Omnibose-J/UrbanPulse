@@ -87,7 +87,8 @@ def site(report: Report, client: httpx.Client, env: dict[str, str], today: str) 
         report.line(served, "/sw.js", f"HTTP {response.status_code}")
     response = get("/api/push/weekend")
     if response is not None:
-        report.line(response.status_code == 401, "/api/push/weekend without secret", f"HTTP {response.status_code}")
+        refused = response.status_code == 401
+        report.line(refused, "/api/push/weekend without secret", f"HTTP {response.status_code}")
     try:
         bad = client.post("/api/push/subscribe", json={"subscription": {"endpoint": "http://x"}})
         bodies.append(bad.text)
