@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+import path from "node:path";
+
+import { config } from "dotenv";
+
 import { db, kstDate } from "./helpers";
+
+// The cron secret of the environment under test: the same file the database helper reads.
+config({ path: path.resolve(__dirname, process.env.PLAYWRIGHT_BASE_URL ? "../../../.env.cloud" : "../../../.env"), quiet: true });
 
 // Live local stack, no mocks.
 const today = kstDate();
@@ -129,4 +136,36 @@ test("home lists obey their rules on live data", async ({ request }) => {
     expect(row.window.hours[0]).toBeLessThanOrEqual(11);
     expect(Array.isArray(row.hours)).toBe(true);
   }
+});
+
+test("push subscribe refuses a malformed body, accepts a real one once, and deletes it again", async ({ request }) => {
+  const bad = await request.post("/api/push/subscribe", { data: { subscription: { endpoint: "http://x" } } });
+  expect(bad.status()).toBe(400);
+  expect((await bad.json()).error).toMatch(/endpoint|subscription/);
+  const endpoint = `https://push.invalid/urbanpulse-test-${Date.now()}`;
+  const body = { subscription: { endpoint, keys: { p256dh: "test-p256dh", auth: "test-auth" } }, locale: "ko", place_ids: ["POI001"], tolerance: "moderate", purpose: "sight" };
+  const first = await request.post("/api/push/subscribe", { data: body });
+  expect(first.status()).toBe(200);
+  const again = await request.post("/api/push/subscribe", { data: { ...body, place_ids: ["POI001", "POI002"] } });
+  expect(again.status()).toBe(200);
+  const { data: stored } = await db.from("push_subscriptions").select("place_ids, locale").eq("endpoint", endpoint);
+  expect(stored).toEqual([{ place_ids: ["POI001", "POI002"], locale: "ko" }]);
+  const gone = await request.delete("/api/push/subscribe", { data: { endpoint } });
+  expect(gone.status()).toBe(200);
+  const { data: after } = await db.from("push_subscriptions").select("endpoint").eq("endpoint", endpoint);
+  expect(after).toEqual([]);
+  expect((await request.delete("/api/push/subscribe", { data: { endpoint: "nope" } })).status()).toBe(400);
+});
+
+test("the weekend cron route answers only to its secret", async ({ request }) => {
+  expect((await request.get("/api/push/weekend")).status()).toBe(401);
+  expect((await request.get("/api/push/weekend", { headers: { authorization: "Bearer wrong" } })).status()).toBe(401);
+  const secret = process.env.CRON_SECRET;
+  expect(secret, "CRON_SECRET missing in the env file").toBeTruthy();
+  const run = await request.get("/api/push/weekend", { headers: { authorization: `Bearer ${secret}` } });
+  expect(run.status()).toBe(200);
+  const body = await run.json();
+  for (const key of ["saturday", "sunday", "subscribers", "sent", "skipped", "removed", "failed"]) expect(body).toHaveProperty(key);
+  expect(body.saturday < body.sunday).toBe(true);
+  expect(body.subscribers).toBe(body.sent + body.skipped + body.removed + body.failed);
 });

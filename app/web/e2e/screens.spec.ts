@@ -560,3 +560,55 @@ test("D23 compare shows two weeks side by side, entered from the week screen thr
   await page.goto("/ko/compare?a=nope&b=POI002");
   await expect(page).toHaveURL(/\/ko$/);
 });
+
+test("D24 the weekend reminder switch subscribes the saved places and reports a refused permission", async ({ page }) => {
+  await mockVisitor(page);
+  const posted: unknown[] = [];
+  await page.route("**/api/push/subscribe", async (route) => {
+    posted.push(route.request().postDataJSON());
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{\"ok\":true}" });
+  });
+  // A push stack that always succeeds: the browser pieces are stubbed, the request to our own API is real.
+  await page.addInitScript(() => {
+    const subscription = { endpoint: "https://push.invalid/stub", toJSON: () => ({ endpoint: "https://push.invalid/stub", keys: { p256dh: "p", auth: "a" } }), unsubscribe: () => Promise.resolve(true) };
+    const registration = { pushManager: { getSubscription: () => Promise.resolve(null), subscribe: () => Promise.resolve(subscription) } };
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { register: () => Promise.resolve(registration), getRegistration: () => Promise.resolve(registration) } });
+    (window as unknown as { PushManager: unknown }).PushManager = function PushManager() {};
+    (window as unknown as { Notification: unknown }).Notification = { permission: "default", requestPermission: () => Promise.resolve((window as unknown as { __perm: string }).__perm ?? "granted") };
+    localStorage.setItem("urbanpulse.favorites", JSON.stringify([{ id: "POI001", name: "Sample", nameEn: null, gu: "Gangnam" }, { id: "POI009", name: "Other", nameEn: null, gu: "Jongno" }]));
+  });
+  await page.goto("/ko/p/POI001");
+  const toggle = page.locator("[data-push-toggle]");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(page.locator("[data-push-note]")).toHaveText("금요일 저녁에 관심 장소의 주말 추천 시간을 알려 드려요");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  expect(posted).toHaveLength(1);
+  expect(posted[0]).toMatchObject({ locale: "ko", place_ids: ["POI001", "POI009"], tolerance: "moderate", purpose: "sight" });
+  await page.reload();
+  await expect(page.locator("[data-push-toggle]")).toHaveAttribute("aria-checked", "true");
+  await page.locator("[data-push-toggle]").click();
+  await expect(page.locator("[data-push-toggle]")).toHaveAttribute("aria-checked", "false");
+
+  await page.addInitScript(() => {
+    (window as unknown as { __perm: string }).__perm = "denied";
+  });
+  await page.goto("/ko/p/POI001");
+  await page.locator("[data-push-toggle]").click();
+  await expect(page.locator("[data-push-note]")).toHaveText("알림 권한이 없어 켤 수 없어요");
+  await expect(page.locator("[data-push-toggle]")).toHaveAttribute("aria-checked", "false");
+});
+
+test("D25 without a saved place the reminder switch is off and says why; without push support it is absent", async ({ page }) => {
+  await mockVisitor(page);
+  // Chromium has the push stack; with nothing saved the switch is there but cannot be turned on.
+  await page.goto("/ko/p/POI001");
+  await expect(page.locator("[data-push-toggle]")).toBeDisabled();
+  await expect(page.locator("[data-push-note]")).toHaveText("별표한 장소가 있을 때 켤 수 있어요");
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: undefined });
+  });
+  await page.goto("/ko/p/POI001");
+  await expect(page.locator("[data-answer-card]")).toBeVisible();
+  await expect(page.locator("[data-push-toggle]")).toHaveCount(0);
+});

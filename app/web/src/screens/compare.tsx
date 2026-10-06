@@ -107,7 +107,7 @@ export function CompareScreen({ a, b }: { a: string; b: string }) {
                     const offLabel = day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("state.dayPreparing");
                     return (
                       <span key={index} className="min-w-0">
-                        <span data-compare-time className={`block truncate text-[13px] ${pick ? "font-bold" : "caption text-text-3"}`}>
+                        <span data-compare-time className={`block text-[13px] ${pick ? "truncate font-bold" : "caption text-text-3"}`}>
                           {day.state === "off" ? offLabel : pick ? formatStoredWindows(day.windows, locale, suffix)[0] : t("week.none")}
                         </span>
                         {day.state !== "off" && day.hours ? (

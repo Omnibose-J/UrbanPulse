@@ -83,6 +83,7 @@ host injects the same names.
 Seoul citydata API (30 min) → `collect` → `live_obs`, `commerce_obs`, `city_fcst` (+ raw snapshot to `RAW_DIR`)
 → `forecast` (05:00) → `forecast_hourly`, `recommendations` (incl. per-hour `hours`, `strip_mode`), `forecast_log`
 → web route handlers (`/api/places/[id]/week`, `/recommend`, `/api/home`, `/api/map`) → screens.
+→ weekend reminder: browser → `POST /api/push/subscribe` → `push_subscriptions`; Vercel Cron (Fri 18:00 KST) → `GET /api/push/weekend` → web-push (`src/lib/push.ts`, `public/sw.js`).
 `evaluate` (06:00) compares yesterday's `forecast_log` and `recommendations.hours` with `live_obs`/`commerce_obs`
 → `eval_daily`, `reco_eval_daily`, `strip_eval_daily`; the weekly re-judgement reads those and edits
 `app/engine/config/feature_flags.yaml` (on / reference / off per purpose × tolerance × place group; `strip`

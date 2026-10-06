@@ -1,9 +1,10 @@
-# UrbanPulse 구현 설계서 v7.8 (2026-10-06)
+# UrbanPulse 구현 설계서 v7.9 (2026-10-06)
 
 > 서비스정의서 v3을 어떻게 만드는지 정리한 문서입니다. 무엇을 왜 만드는지는 `docs/specs/UrbanPulse_서비스정의서.md`에 있습니다.
 > 구현은 팀원이 Cursor로 하고, 이 문서를 작업 지시서(작업 단위별 문서)로 쪼개서 넘깁니다.
 > 수치의 근거는 서비스정의서 부록과 `analysis/scripts/`에 있습니다.
 > 이 문서에 나오는 SOW-M0 ~ SOW-L1(작업 지시서)과 criteria-*(검수 기록)는 작업이 끝나 2026-10-02에 저장소에서 지웠습니다. 깃 기록에 남아 있습니다. 남은 것은 `docs/sow/SOW-MC.md`(클라우드)와 `docs/tracking/findings.md`입니다.
+> v7.9: 주말 알림(브라우저 푸시). 표 `push_subscriptions`(3장), `POST/DELETE /api/push/subscribe`, 금요일 18:00 KST Vercel Cron → `GET /api/push/weekend`(6장), 환경 변수 `VAPID_*`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `CRON_SECRET`. 지도 API 행에 `category`. 엔진 변경 없음.
 > v7.8: 홈·검색 API의 장소 행에 서울시 분류 `category`를 실어 화면이 종류 칩과 홈 순서에 씁니다(6장). 계산은 없습니다(저장된 열 그대로).
 > v7.7: 관측 보존 정책 확정(사용자 결정, 2026-10-06): `live_obs`·`commerce_obs`·`forecast_log`는 전체 보존, `archive` 작업 삭제(4.7). 클라우드 이전 완료(SOW-MC, 2026-10-05).
 > v7.6: 로컬 완성(SOW-L1) 반영. 클라우드 이전 스크립트와 예행연습(1.2 아래), 관리 화면은 토큰을 주소가 아니라 입력 창으로 받음(6.1), 대체 날짜는 점수가 같으면 가까운 날 먼저, 지도 워커는 정적 파일. 클라우드 계정 작업은 뒤로 미룸.
@@ -157,6 +158,7 @@
 | `job_runs` | `job`, `started_at`, `finished_at`, `status`, `detail` | 작업 성공·실패 기록 |
 | `recommendation_log` | `place_id`, `issued_date`, `date`, `tolerance`, `purpose`, `state`, `windows`, `hours`, `p90`, `lively_min` | 3일 뒤 날짜의 추천을 낸 그대로 남기는 기록. 덮어쓰지 않음. `recommendations`는 30분마다 다시 쓰여서 평가할 원본이 따로 필요 |
 | `lively_norm` | `place_id`, `p90_all`, `p90_food`, `p90_shop` | A1 활동값 정규화 기준(최근 8주 주말·공휴일 09~23시 상위 10% 값). `collect`가 실측 결제를 활동값으로 바꿀 때 사용 |
+| `push_subscriptions` | `endpoint`(PK), `subscription`, `locale`, `place_ids`(1~20), `tolerance`, `purpose`, `created_at`, `updated_at`, `last_sent_at` | 주말 알림 구독. 웹의 서비스 역할만 쓰고 읽음(RLS 켜짐, anon 권한 없음). 엔진은 건드리지 않음 |
 | `forecast_hourly.a_actual` (컬럼) | boolean | 그 시간의 `a_*`가 기대값이 아니라 실측이면 true. 오늘의 A1 시간에만 생김 |
 
 ---
@@ -414,6 +416,8 @@ A1·A2 장소마다 오늘부터 7일 뒤까지 시간대 예측을 만듭니다
 |---|---|
 | `GET /api/places?q=&tier=` | 장소 목록 (id, 이름, 등급, 서울시 분류 `category`, 구, 지금 단계) |
 | `GET /api/home?tolerance=&purpose=` | 홈 두 목록: `busy_top`(A1·A2 5곳, 지금 단계·인구 범위·오늘 1순위 창) + `open_quiet`(최대 5곳, 같은 필드 + 오늘 `hours` 띠) + 밤에 쓰는 `tomorrow_morning`. 세 목록의 장소 행에 서울시 분류 `category`(디자인명세서 5.7의 종류 칩·순서). "지금"은 장소별 가장 최근 실측 시간(`source = live`)의 `forecast_hourly` 행. `open_quiet`의 A1은 실측 활동값(`a_actual`)이 0.5 이상인 곳만. 기대값으로 고르지 않음(실험 16). 캐시 `s-maxage=300` |
+| `POST /api/push/subscribe` | 본문 `{subscription, locale, place_ids, tolerance, purpose}`를 검증해 `push_subscriptions`에 endpoint 기준 upsert. 잘못된 본문은 400에 필드 이름. `DELETE` 본문 `{endpoint}`로 삭제 |
+| `GET /api/push/weekend` | Vercel Cron(금 09:00 UTC = 18:00 KST, `vercel.json`)이 `Authorization: Bearer <CRON_SECRET>`로 호출. 구독마다 별표 장소의 토·일 추천(`recommendations`, 그 구독의 조건, `on`/`reference`) 중 장소별 최고 창을 한 줄씩 묶어 web-push로 전송. 404/410 응답의 구독은 삭제. 응답 `{saturday, sunday, subscribers, sent, skipped, removed, failed}`. 비밀이 없거나 틀리면 401, 환경 변수가 없으면 500 |
 | `GET /api/flags` | 오늘 추천의 상태별 개수(등급·외국인 많은 장소·목적·허용도별). `/about`의 켜진 기능 표 |
 | `GET /api/places/[id]/day?date=` | 09~23시 `forecast_hourly` + 지금 관측 + 데이터 기준 시각 + stale·ready 여부 |
 | `GET /api/places/[id]/recommend?date=&tolerance=&purpose=` | `recommendations` 한 행 (창, no_window, `hours`, `strip_mode`, 대안 날짜, 대안 장소). ⑤ 하루 상세 |

@@ -113,6 +113,19 @@ observation tables grow about 0.9 MB a day (184 MB on 2026-10-05), so the free p
 raise the plan before the limit, never delete rows. No figure here was read from a bill; check the billing page after the
 first week.
 
+## 5.1 Weekend reminder (web push, added 2026-10-06)
+
+- Env names on Vercel production and in `.env.cloud` (values never printed): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT` (a `mailto:`), `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (same value as the public key, read by the browser),
+  `CRON_SECRET`. Rotating the VAPID pair invalidates every stored subscription: visitors turn the switch on again.
+- Schedule: `app/web/vercel.json` `crons` → `GET /api/push/weekend` at `0 9 * * 5` UTC (Friday 18:00 KST). Vercel sends
+  `Authorization: Bearer <CRON_SECRET>`. Run it by hand with the same header to see the counts; the route never
+  prints a subscription.
+- Table `push_subscriptions` (migration `20261006000000`, applied to the hosted database with `30_db_push.ps1` on
+  2026-10-06: `tables 20 (source 20)`, `schema OK`).
+- Browser side: `public/sw.js` only shows pushes and opens their link. iOS Safari needs the site added to the home
+  screen first; the switch is hidden until the browser reports push support.
+
 ## 6 Known gaps
 
 - Place names have no English version (`name_en` is null).

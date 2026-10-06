@@ -6,6 +6,7 @@ import { pickBusy, pickQuiet } from "@/lib/home-rules";
 import { driverMessage } from "@/lib/api-log";
 import { GatewayRejected, isGatewayRejection } from "@/lib/gateway";
 import { morningPicks } from "@/lib/morning";
+import type { SubscribeBody, Subscription } from "@/lib/push";
 import { likePattern, namedAltPlaces, nowFromLive, quietSelection, requireForeignHeavy, selectAll } from "@/lib/shape";
 
 type Place = {
@@ -198,7 +199,7 @@ export async function mapPayload(date: string, tolerance: string, purpose: strin
   const rows = await selectAll((from, to) =>
     supabaseServer()
       .from("recommendations")
-      .select("place_id, purpose, state, windows, hours, strip_mode, places!inner(id, tier, name, name_en, lat, lon)")
+      .select("place_id, purpose, state, windows, hours, strip_mode, places!inner(id, tier, name, name_en, category, lat, lon)")
       .eq("date", date)
       .eq("tolerance", tolerance)
       .in("purpose", [purpose, "none"])
@@ -228,6 +229,7 @@ export async function mapPayload(date: string, tolerance: string, purpose: strin
       tier: row.place.tier,
       name: row.place.name,
       name_en: row.place.name_en,
+      category: row.place.category,
       lat: row.place.lat,
       lon: row.place.lon,
       state: row.state,
@@ -477,4 +479,69 @@ async function todayWindows(date: string, clockHour: number, tolerance: string, 
     });
   }
   return out;
+}
+
+// ---- weekend reminder (push_subscriptions)
+
+export async function upsertSubscription(body: SubscribeBody) {
+  const { error } = await supabaseServer()
+    .from("push_subscriptions")
+    .upsert(
+      {
+        endpoint: body.subscription.endpoint,
+        subscription: body.subscription,
+        locale: body.locale,
+        place_ids: body.place_ids,
+        tolerance: body.tolerance,
+        purpose: body.purpose,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "endpoint" },
+    );
+  if (error) throw new Error(driverMessage(error));
+}
+
+export async function deleteSubscription(endpoint: string) {
+  const { error } = await supabaseServer().from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (error) throw new Error(driverMessage(error));
+}
+
+export async function markSent(endpoint: string) {
+  const { error } = await supabaseServer().from("push_subscriptions").update({ last_sent_at: new Date().toISOString() }).eq("endpoint", endpoint);
+  if (error) throw new Error(driverMessage(error));
+}
+
+export type SubscriptionRow = { endpoint: string; subscription: Subscription; locale: "ko" | "en"; place_ids: string[]; tolerance: string; purpose: string };
+
+export async function listSubscriptions(): Promise<SubscriptionRow[]> {
+  return selectAll<SubscriptionRow>((from, to) =>
+    supabaseServer().from("push_subscriptions").select("endpoint, subscription, locale, place_ids, tolerance, purpose").order("endpoint").range(from, to),
+  );
+}
+
+/** For each place, its best served window on the given dates (highest score, earlier date on a tie); places with no
+ * window on either date are left out. A1 places use the purpose, others `none`. */
+export async function weekendPicks(placeIds: string[], dates: string[], tolerance: string, purpose: string) {
+  type Row = { place_id: string; date: string; purpose: string; state: string; windows: { hours: number[]; score: number }[] | null; places: Place | Place[] };
+  const rows = (await must(
+    supabaseServer()
+      .from("recommendations")
+      .select("place_id, date, purpose, state, windows, places!inner(id, tier, name, name_en)")
+      .in("place_id", placeIds)
+      .in("date", dates)
+      .eq("tolerance", tolerance)
+      .in("purpose", [purpose, "none"])
+      .in("state", ["on", "reference"])
+      .limit(1000),
+  )) as Row[];
+  const best = new Map<string, { place_id: string; name: string; name_en: string | null; date: string; windows: { hours: number[]; score: number }[] }>();
+  for (const row of rows) {
+    const place = Array.isArray(row.places) ? row.places[0] : row.places;
+    if (row.purpose !== purposeFor(place.tier, purpose)) continue;
+    if (!row.windows || row.windows.length === 0) continue;
+    const current = best.get(row.place_id);
+    const better = !current || row.windows[0].score > current.windows[0].score || (row.windows[0].score === current.windows[0].score && row.date < current.date);
+    if (better) best.set(row.place_id, { place_id: row.place_id, name: place.name, name_en: place.name_en, date: row.date, windows: row.windows });
+  }
+  return placeIds.flatMap((id) => (best.has(id) ? [best.get(id)!] : []));
 }

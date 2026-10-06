@@ -230,5 +230,16 @@
     "action": "Compare with another place",
     "pick": "Pick a place to compare with",
     "best": "Best this week"
+  },
+  "push": {
+    "toggle": "Weekend reminder",
+    "hint": "On Friday evening we tell you the best weekend time for your saved places",
+    "on": "On",
+    "off": "Off",
+    "denied": "Notification permission was not given",
+    "failed": "Could not turn the reminder on",
+    "needStar": "Save a place first to turn this on",
+    "title": "Best times this weekend",
+    "line": "{place}: {day} {time}"
   }
 }

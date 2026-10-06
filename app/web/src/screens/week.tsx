@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 
 import { bestDay, withTodayTrimmed } from "@/lib/best";
+import { disablePush, enablePush, pushSupported, readPushOn, type PushOutcome } from "@/lib/push-client";
 import { formatClock, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import { kstNow } from "@/lib/kst";
 import { reasonMessageIds } from "@/lib/reason";
@@ -50,14 +51,29 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
   const [open, setOpen] = useState(false);
   const [star, setStar] = useState(false);
   const [ready, setReady] = useState(false);
+  // The weekend reminder: hidden where the browser cannot push; its switch state is the browser's own record.
+  const [push, setPush] = useState<{ supported: boolean; on: boolean; note: PushOutcome | "busy" | null }>({ supported: false, on: false, note: null });
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setCond(readConditions());
       setStar(readFavorites().some((item) => item.id === id));
+      setPush({ supported: pushSupported(), on: readPushOn(), note: null });
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [id]);
+  const togglePush = async () => {
+    setPush((state) => ({ ...state, note: "busy" }));
+    if (push.on) {
+      const outcome = await disablePush();
+      setPush((state) => ({ ...state, on: outcome === "off" ? false : state.on, note: outcome === "off" ? null : outcome }));
+      return;
+    }
+    const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!key) throw new Error("missing env var: NEXT_PUBLIC_VAPID_PUBLIC_KEY");
+    const outcome = await enablePush({ locale, placeIds: readFavorites().map((item) => item.id), tolerance: cond.tolerance, purpose: cond.purpose, vapidPublicKey: key });
+    setPush((state) => ({ ...state, on: outcome === "on", note: outcome === "on" ? null : outcome }));
+  };
   const purpose = cond.purpose;
   const loaded = useLoad<Body>(ready ? `/api/places/${id}/week?tolerance=${cond.tolerance}&purpose=${purpose}` : null);
   const place = loaded.data?.place;
@@ -144,6 +160,28 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
           <span data-field-label className="truncate">{t("compare.action")}</span>
           <span aria-hidden>›</span>
         </Link>
+      ) : null}
+      {place && showList && push.supported ? (
+        <div className="mt-2 rounded-[12px] bg-bg-soft px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="body font-semibold">{t("push.toggle")}</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={push.on}
+              data-push-toggle
+              disabled={push.note === "busy" || (!push.on && !star)}
+              className="label flex h-8 min-w-14 items-center justify-center rounded-[var(--r-pill)] px-3 font-bold disabled:opacity-50"
+              style={{ background: push.on ? "var(--go)" : "var(--line)", color: push.on ? "var(--on-ink)" : "var(--text)" }}
+              onClick={togglePush}
+            >
+              {push.on ? t("push.on") : t("push.off")}
+            </button>
+          </div>
+          <p data-push-note className="caption mt-1 text-text-3">
+            {push.note === "denied" ? t("push.denied") : push.note === "failed" || push.note === "unsupported" ? t("push.failed") : !push.on && !star ? t("push.needStar") : t("push.hint")}
+          </p>
+        </div>
       ) : null}
       {toast}
       {showList ? (

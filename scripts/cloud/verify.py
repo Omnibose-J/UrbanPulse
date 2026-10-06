@@ -22,7 +22,10 @@ from engine import db, raw_gcs, raw_store
 from engine.parsers import KST
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SECRET_NAMES = ("SUPABASE_SERVICE_ROLE_KEY", "DATABASE_URL", "ADMIN_TOKEN", "SEOUL_API_KEY", "KASI_API_KEY")
+SECRET_NAMES = (
+    "SUPABASE_SERVICE_ROLE_KEY", "DATABASE_URL", "ADMIN_TOKEN", "SEOUL_API_KEY", "KASI_API_KEY",
+    "VAPID_PRIVATE_KEY", "CRON_SECRET",
+)
 SCHEDULED = {"collect": 45, "forecast": 26 * 60, "evaluate": 26 * 60}  # minutes a newest run may be old
 PLACE = "POI001"
 
@@ -76,7 +79,23 @@ def site(report: Report, client: httpx.Client, env: dict[str, str], today: str) 
             continue
         report.line(set(response.json().keys()) == keys, name, f"keys {sorted(response.json().keys())}")
 
-    for path in ("/ko", "/en", "/ko/map", f"/ko/p/{PLACE}"):
+    # Weekend reminder: the worker file is served, the cron route refuses a call without the secret, and a
+    # malformed subscription is refused with its field named.
+    response = get("/sw.js")
+    if response is not None:
+        served = response.status_code == 200 and "push" in response.text
+        report.line(served, "/sw.js", f"HTTP {response.status_code}")
+    response = get("/api/push/weekend")
+    if response is not None:
+        report.line(response.status_code == 401, "/api/push/weekend without secret", f"HTTP {response.status_code}")
+    try:
+        bad = client.post("/api/push/subscribe", json={"subscription": {"endpoint": "http://x"}})
+        bodies.append(bad.text)
+        report.line(bad.status_code == 400, "/api/push/subscribe malformed", f"HTTP {bad.status_code}")
+    except httpx.HTTPError as exc:
+        report.line(False, "/api/push/subscribe malformed", type(exc).__name__)
+
+    for path in ("/ko", "/en", "/ko/map", f"/ko/p/{PLACE}", "/ko/compare?a=POI001&b=POI002"):
         response = get(path)
         if response is not None:
             noindex = "noindex" in response.headers.get("x-robots-tag", "")
