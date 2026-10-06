@@ -139,7 +139,8 @@
     "tierb": "No live data, so this is the usual flow. This feature is experimental.",
     "notFoundPlace": "We cannot find this place.",
     "notFoundPage": "We cannot find this page.",
-    "outOfRange": "You can look up to 7 days ahead."
+    "outOfRange": "You can look up to 7 days ahead.",
+    "dayPreparing": "Not enough past records to forecast yet"
   },
   "search": {
     "empty": "No place with that name. Try a nearby station.",
@@ -196,5 +197,13 @@
     "busiest": "Busiest",
     "outside": "Closed hours",
     "now": "Now"
+  },
+  "kind": {
+    "tourist": "Tourist zone",
+    "district": "Shopping street",
+    "heritage": "Palace and heritage",
+    "park": "Park",
+    "dense": "Dense area",
+    "station": "Station area"
   }
 }

@@ -14,6 +14,7 @@ type Place = {
   name: string;
   name_en: string | null;
   gu: string | null;
+  category: string | null;
   serve_state: string;
   foreign_heavy: boolean;
   lat?: number | null;
@@ -29,7 +30,7 @@ async function must<T>(query: PromiseLike<{ data: T | null; error: { message: st
 export async function findPlace(id: string): Promise<Place | null> {
   const { data, error } = await supabaseServer()
     .from("places")
-    .select("id, tier, name, name_en, gu, serve_state, foreign_heavy, lat, lon")
+    .select("id, tier, name, name_en, gu, category, serve_state, foreign_heavy, lat, lon")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(driverMessage(error));
@@ -43,8 +44,8 @@ export function purposeFor(tier: string, purpose: string): string {
 
 export async function searchPlaces(q: string) {
   const sb = supabaseServer();
-  const columns = "id, tier, name, name_en, gu, serve_state";
-  type Row = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
+  const columns = "id, tier, name, name_en, gu, category, serve_state";
+  type Row = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; category: string | null; serve_state: string };
   let places: Row[];
   if (q) {
     const pattern = likePattern(q);
@@ -299,6 +300,7 @@ export async function homePayload(tolerance: string, purpose: string) {
       name: row.place.name,
       name_en: row.place.name_en,
       gu: row.place.gu,
+      category: row.place.category,
       level: row.level,
       popMax: pops.get(row.place.id)?.pop_max ?? 0,
       pop_min: pops.get(row.place.id)?.pop_min ?? null,
@@ -319,7 +321,7 @@ export async function homePayload(tolerance: string, purpose: string) {
 
 /** Stored recommendations of tomorrow whose first window starts in the morning (home, at night). */
 async function tomorrowMorning(date: string, tolerance: string, purpose: string) {
-  type Brief = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string };
+  type Brief = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; category: string | null; serve_state: string };
   type Row = {
     place_id: string;
     purpose: string;
@@ -332,7 +334,7 @@ async function tomorrowMorning(date: string, tolerance: string, purpose: string)
   const rows = (await selectAll((from, to) =>
     supabaseServer()
       .from("recommendations")
-      .select("place_id, purpose, state, windows, hours, strip_mode, places!inner(id, tier, name, name_en, gu, serve_state)")
+      .select("place_id, purpose, state, windows, hours, strip_mode, places!inner(id, tier, name, name_en, gu, category, serve_state)")
       .eq("date", date)
       .eq("tolerance", tolerance)
       .in("purpose", [purpose, "none"])
@@ -349,6 +351,7 @@ async function tomorrowMorning(date: string, tolerance: string, purpose: string)
       name: row.place.name,
       name_en: row.place.name_en,
       gu: row.place.gu,
+      category: row.place.category,
       state: row.state,
       windows: row.windows,
       hours: row.hours,
@@ -360,6 +363,7 @@ async function tomorrowMorning(date: string, tolerance: string, purpose: string)
     name: row.name,
     name_en: row.name_en,
     gu: row.gu,
+    category: row.category,
     date,
     window: row.windows![0],
     hours: row.hours,
@@ -412,12 +416,12 @@ async function quietPlaces(
     }
   }
   const chosen = quietSelection(
-    onNow.map((row) => ({ id: row.place.id, tier: row.place.tier, level: row.level, hour: row.hour, name: row.place.name, name_en: row.place.name_en, gu: row.place.gu })),
+    onNow.map((row) => ({ id: row.place.id, tier: row.place.tier, level: row.level, hour: row.hour, name: row.place.name, name_en: row.place.name_en, gu: row.place.gu, category: row.place.category })),
     clockHour,
     activity,
     openA2,
   );
-  return pickQuiet(chosen.map((row) => ({ id: row.id, tier: row.tier, name: row.name, name_en: row.name_en, gu: row.gu, level: row.level, activity: row.activity })));
+  return pickQuiet(chosen.map((row) => ({ id: row.id, tier: row.tier, name: row.name, name_en: row.name_en, gu: row.gu, category: row.category, level: row.level, activity: row.activity })));
 }
 
 async function latestMeasured(date: string, clockHour: number, placeId?: string) {
@@ -426,7 +430,7 @@ async function latestMeasured(date: string, clockHour: number, placeId?: string)
   const [, dayEnd] = dayBounds(date);
   let query = supabaseServer()
     .from("forecast_hourly")
-    .select("place_id, target_ts, level, places!inner(id, tier, name, name_en, gu, serve_state)")
+    .select("place_id, target_ts, level, places!inner(id, tier, name, name_en, gu, category, serve_state)")
     .eq("source", "live")
     .gte("target_ts", since)
     .lt("target_ts", dayEnd)

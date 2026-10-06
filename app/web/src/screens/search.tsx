@@ -5,10 +5,10 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { AppBar, LevelDot, Phone, PlaceName, StateBox } from "@/components/ui";
+import { AppBar, KindChip, LevelDot, Phone, PlaceName, StateBox } from "@/components/ui";
 import { useLoad } from "@/lib/use-load";
 
-type Place = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; serve_state: string; level: number | null };
+type Place = { id: string; tier: string; name: string; name_en: string | null; gu: string | null; category: string | null; serve_state: string; level: number | null };
 
 export function SearchScreen() {
   const t = useTranslations();
@@ -45,7 +45,10 @@ export function SearchScreen() {
             <Link prefetch={false} href={`/${locale}/p/${place.id}`} data-row className="row flex items-center justify-between">
               <span>
                 <span className="body block font-semibold"><PlaceName name={place.name} nameEn={place.name_en} /></span>
-                <span className="caption text-text-3" lang="ko">{place.gu}</span>
+                <span className="caption flex items-center gap-1.5 text-text-3">
+                  <span lang="ko">{place.gu}</span>
+                  <KindChip category={place.category} />
+                </span>
               </span>
               {place.tier === "B" ? <span className="label">{t("badge.experimental")}</span> : place.level === null ? null : (
                 <span data-search-status className="caption flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold">

@@ -286,8 +286,9 @@ test("search field sits in the bar and an off day says its state once", async ({
     }),
   );
   await page.goto("/ko/p/POI001");
-  const off = page.locator("[data-row]", { hasText: "준비 중" });
-  await expect(off.getByText("준비 중")).toHaveCount(1);
+  // A day the engine could not forecast says why in the strip's place, once, and no time on the right.
+  const off = page.locator("[data-row]", { hasText: "기록이 모자라" });
+  await expect(off.getByText("기록이 모자라 아직 예상할 수 없어요")).toHaveCount(1);
   await expect(off.locator("[data-week-time]")).toHaveText("");
   expect(errors).toEqual([]);
 });

@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 
 // The database is read directly only to compare it with what the screens and routes show, or to find a row in a given state.
-config({ path: path.resolve(__dirname, "../../../.env"), quiet: true });
+// A run against a deployment (PLAYWRIGHT_BASE_URL) compares with the hosted database; a local run with the local one.
+config({ path: path.resolve(__dirname, process.env.PLAYWRIGHT_BASE_URL ? "../../../.env.cloud" : "../../../.env"), quiet: true });
 export const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 /** A KST calendar date `offset` days from today, as YYYY-MM-DD. */

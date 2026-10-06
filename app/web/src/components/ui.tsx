@@ -9,12 +9,25 @@ import { useEffect, useRef, useState } from "react";
 import { formatHourRange, formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import type { HourCell } from "@/lib/strip";
 import { busiestRange, cellFill, cellSentence } from "@/lib/strip";
+import { kindKey } from "@/lib/kind";
 import type { Favorite, Purpose, Tolerance } from "@/lib/storage";
 
 export function PlaceName({ name, nameEn }: { name: string; nameEn?: string | null }) {
   const locale = useLocale();
   if (locale === "en" && nameEn) return <span>{nameEn}</span>;
   return <span lang="ko">{name}</span>;
+}
+
+/** The place kind (Seoul's category) as a small chip next to the district; nothing when the row has no category. */
+export function KindChip({ category }: { category: string | null | undefined }) {
+  const t = useTranslations();
+  const key = kindKey(category);
+  if (!key) return null;
+  return (
+    <span data-kind className="inline-flex h-[18px] shrink-0 items-center whitespace-nowrap rounded-[var(--r-pill)] bg-bg-soft px-1.5 text-[11px] font-semibold text-text-2">
+      {t(key)}
+    </span>
+  );
 }
 
 export function Phone({ children }: { children: React.ReactNode }) {
@@ -384,7 +397,8 @@ export function WeekList({
       <ul>
         {days.map((day) => {
           const best = day.state !== "off" && day.windows && day.windows.length > 0;
-          const offLabel = day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("about.preparing");
+          // A day the engine could not forecast says why, in the strip's place; no date is promised.
+          const offLabel = day.off_reason === "myeongjeol" ? t("state.myeongjeolShort") : t("state.dayPreparing");
           const time = day.state === "off" ? "" : best ? formatStoredWindows(day.windows, locale, mark.suffix)[0] : t("week.none");
           const holiday = day.holiday
             ? locale === "en"

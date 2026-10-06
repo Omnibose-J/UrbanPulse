@@ -1,9 +1,10 @@
-# UrbanPulse 구현 설계서 v7.7 (2026-10-06)
+# UrbanPulse 구현 설계서 v7.8 (2026-10-06)
 
 > 서비스정의서 v3을 어떻게 만드는지 정리한 문서입니다. 무엇을 왜 만드는지는 `docs/specs/UrbanPulse_서비스정의서.md`에 있습니다.
 > 구현은 팀원이 Cursor로 하고, 이 문서를 작업 지시서(작업 단위별 문서)로 쪼개서 넘깁니다.
 > 수치의 근거는 서비스정의서 부록과 `analysis/scripts/`에 있습니다.
 > 이 문서에 나오는 SOW-M0 ~ SOW-L1(작업 지시서)과 criteria-*(검수 기록)는 작업이 끝나 2026-10-02에 저장소에서 지웠습니다. 깃 기록에 남아 있습니다. 남은 것은 `docs/sow/SOW-MC.md`(클라우드)와 `docs/tracking/findings.md`입니다.
+> v7.8: 홈·검색 API의 장소 행에 서울시 분류 `category`를 실어 화면이 종류 칩과 홈 순서에 씁니다(6장). 계산은 없습니다(저장된 열 그대로).
 > v7.7: 관측 보존 정책 확정(사용자 결정, 2026-10-06): `live_obs`·`commerce_obs`·`forecast_log`는 전체 보존, `archive` 작업 삭제(4.7). 클라우드 이전 완료(SOW-MC, 2026-10-05).
 > v7.6: 로컬 완성(SOW-L1) 반영. 클라우드 이전 스크립트와 예행연습(1.2 아래), 관리 화면은 토큰을 주소가 아니라 입력 창으로 받음(6.1), 대체 날짜는 점수가 같으면 가까운 날 먼저, 지도 워커는 정적 파일. 클라우드 계정 작업은 뒤로 미룸.
 > v7.5: 전체 리뷰와 e2e에 따른 하드닝(SOW-H1) 반영. 정합성 점검 작업 `integrity`(4.9), 작업 실패 기록과 한 번에 커밋(4.8 아래), API 입력 검증과 1,000행 제한 대응(6.4), 테스트 원칙(7.3).
@@ -411,8 +412,8 @@ A1·A2 장소마다 오늘부터 7일 뒤까지 시간대 예측을 만듭니다
 
 | 요청 | 응답 |
 |---|---|
-| `GET /api/places?q=&tier=` | 장소 목록 (id, 이름, 등급, 유형, 좌표) |
-| `GET /api/home?tolerance=&purpose=` | 홈 두 목록: `busy_top`(A1·A2 5곳, 지금 단계·인구 범위·오늘 1순위 창) + `open_quiet`(최대 5곳, 같은 필드 + 오늘 `hours` 띠). "지금"은 장소별 가장 최근 실측 시간(`source = live`)의 `forecast_hourly` 행. `open_quiet`의 A1은 실측 활동값(`a_actual`)이 0.5 이상인 곳만. 기대값으로 고르지 않음(실험 16). 캐시 `s-maxage=300` |
+| `GET /api/places?q=&tier=` | 장소 목록 (id, 이름, 등급, 서울시 분류 `category`, 구, 지금 단계) |
+| `GET /api/home?tolerance=&purpose=` | 홈 두 목록: `busy_top`(A1·A2 5곳, 지금 단계·인구 범위·오늘 1순위 창) + `open_quiet`(최대 5곳, 같은 필드 + 오늘 `hours` 띠) + 밤에 쓰는 `tomorrow_morning`. 세 목록의 장소 행에 서울시 분류 `category`(디자인명세서 5.7의 종류 칩·순서). "지금"은 장소별 가장 최근 실측 시간(`source = live`)의 `forecast_hourly` 행. `open_quiet`의 A1은 실측 활동값(`a_actual`)이 0.5 이상인 곳만. 기대값으로 고르지 않음(실험 16). 캐시 `s-maxage=300` |
 | `GET /api/flags` | 오늘 추천의 상태별 개수(등급·외국인 많은 장소·목적·허용도별). `/about`의 켜진 기능 표 |
 | `GET /api/places/[id]/day?date=` | 09~23시 `forecast_hourly` + 지금 관측 + 데이터 기준 시각 + stale·ready 여부 |
 | `GET /api/places/[id]/recommend?date=&tolerance=&purpose=` | `recommendations` 한 행 (창, no_window, `hours`, `strip_mode`, 대안 날짜, 대안 장소). ⑤ 하루 상세 |

@@ -67,12 +67,12 @@ test("search to week to day, conditions, back chain, favourite and share link", 
   await expect(sentence).not.toContainText("피하는 게 좋아요");
   const plain = page.locator("[data-cell][data-tone=bad]").first();
   await plain.click();
-  await expect(sentence).toHaveText(/^\d+시는 추천 시간이 아니에요\.$/);
+  await expect(sentence).toHaveText(/^\d+시는 추천 시간이 아니에요\. .+\.$/);
   await plain.click();
   await expect(sentence).toHaveText(hint);
   await plain.focus();
   await page.keyboard.press("Enter");
-  await expect(sentence).toHaveText(/^\d+시는 추천 시간이 아니에요\.$/);
+  await expect(sentence).toHaveText(/^\d+시는 추천 시간이 아니에요\. .+\.$/);
 
   // ④ conditions: closing changes nothing and sends nothing
   const field = page.locator("[data-field-label]").first();

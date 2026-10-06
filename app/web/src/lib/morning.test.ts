@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { isNight, morningPicks } from "./morning.ts";
 
-const row = (id: string, start: number, score: number, extra: Partial<{ state: string; serve_state: string; tier: string }> = {}) => ({
+const row = (id: string, start: number, score: number, extra: Partial<{ state: string; serve_state: string; tier: string; category: string }> = {}) => ({
   id,
   state: "on",
   serve_state: "on",
@@ -53,4 +53,12 @@ test("night is 20:00 to 05:59 KST", () => {
   assert.equal(isNight(6), false);
   assert.equal(isNight(12), false);
   assert.equal(isNight(19), false);
+});
+
+test("morning picks put a commuter station after the other kinds even with the best score", () => {
+  const rows = [row("station", 10, 0.99, { category: "인구밀집지역" }), row("palace", 9, 0.3, { category: "고궁·문화유산" }), row("park", 11, 0.5, { category: "공원" })];
+  assert.deepEqual(
+    morningPicks(rows).map((item) => item.id),
+    ["park", "palace", "station"],
+  );
 });

@@ -16,15 +16,15 @@ async function mockVisitor(page: Page, overrides?: { week?: unknown; home?: unkn
     as_of: "2026-10-01T10:00:00+09:00",
     stale: false,
     busy_top: [
-      { id: "POI001", name: "Alpha", name_en: null, gu: "Gangnam", level: 3, window: { hours: [18] } },
+      { id: "POI001", name: "Alpha", name_en: null, gu: "Gangnam", category: "관광특구", level: 3, window: { hours: [18] } },
       { id: "POI002", name: "Beta", name_en: null, gu: "Mapo", level: 2, window: { hours: [19] } },
       { id: "POI003", name: "Gamma", name_en: null, gu: "Jongno", level: 2, window: { hours: [13] } },
       { id: "POI004", name: "Delta", name_en: null, gu: "Songpa", level: 2, window: null },
       { id: "POI005", name: "Epsilon", name_en: null, gu: "Seocho", level: 2, window: { hours: [11] } },
     ],
     open_quiet: [
-      { id: "POI006", name: "Quiet A", name_en: null, gu: "Yongsan", level: 1, tier: "A1", window: { hours: [13] }, hours: hours(), strip_mode: "windows_only" },
-      { id: "POI007", name: "Quiet B", name_en: null, gu: "Nowon", level: 0, tier: "A2", window: { hours: [10] }, hours: hours(), strip_mode: "windows_only" },
+      { id: "POI006", name: "Quiet A", name_en: null, gu: "Yongsan", category: "발달상권", level: 1, tier: "A1", window: { hours: [13] }, hours: hours(), strip_mode: "windows_only" },
+      { id: "POI007", name: "Quiet B", name_en: null, gu: "Nowon", category: null, level: 0, tier: "A2", window: { hours: [10] }, hours: hours(), strip_mode: "windows_only" },
     ],
     tomorrow_morning: [
       { id: "POI008", name: "Morning A", name_en: null, gu: "Jongno", date: kstDate(1), window: { hours: [10], score: 0.8 }, hours: hours(), strip_mode: "windows_only" },
@@ -325,12 +325,34 @@ test("D12 home draws the rows in the order served, each with its level and pick"
   await expect(rows.nth(0)).toContainText("Alpha");
   await expect(rows.nth(0)).toContainText("붐빔");
   await expect(rows.nth(0)).toContainText("추천 18~19시");
+  await expect(rows.nth(0).locator("[data-kind]")).toHaveText("관광특구");
+  await expect(rows.nth(1).locator("[data-kind]")).toHaveCount(0);
   await expect(rows.nth(3)).toContainText("오늘은 추천 없음");
   await expect(rows.nth(4)).toContainText("Epsilon");
   await expect(page.locator("[data-quiet]")).toHaveCount(2);
   // A pick that includes the current hour is "지금 가기 좋아요"; the fixture's pick is 13.
   const hourNow = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "numeric", hourCycle: "h23" }).format(new Date()));
   await expect(page.locator("[data-quiet]").first()).toContainText(hourNow === 13 ? "지금 가기 좋아요13~14시" : "오늘 추천13~14시");
+  await expect(page.locator("[data-quiet]").first().locator("[data-kind]")).toHaveText("발달상권");
+  await expect(page.locator("[data-quiet]").nth(1).locator("[data-kind]")).toHaveCount(0);
+});
+
+test("D19 home sections run saved places, open and uncrowded, tomorrow morning, busiest", async ({ page }) => {
+  await mockVisitor(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("urbanpulse.favorites", JSON.stringify([{ id: "POI009", name: "Saved", nameEn: null, gu: "Jongno" }]));
+  });
+  await page.clock.setFixedTime(kstInstant(22));
+  await page.goto("/ko");
+  await expect(page.locator("[data-busy] [data-row]").first()).toBeVisible();
+  const tops = await page.evaluate(() => {
+    const top = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().top;
+    return { saved: top("[data-favorites]"), quiet: top("[data-quiet-section]"), tomorrow: top("[data-tomorrow-section]"), busy: top("[data-busy]") };
+  });
+  expect(tops.saved).toBeLessThan(tops.quiet);
+  expect(tops.quiet).toBeLessThan(tops.tomorrow);
+  expect(tops.tomorrow).toBeLessThan(tops.busy);
+  await expect(page.locator("[data-favorites] [data-row]")).toHaveText("Saved");
 });
 
 test("live smoke: home answers, and a listed place opens its week", async ({ page }) => {

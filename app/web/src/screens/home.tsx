@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { AppBar, LevelDot, MiniStrip, Phone, PlaceName, StateBox } from "@/components/ui";
+import { AppBar, KindChip, LevelDot, MiniStrip, Phone, PlaceName, StateBox } from "@/components/ui";
 import { formatClock, formatStoredWindows } from "@/lib/format";
 import { kstNow } from "@/lib/kst";
 import { isNight } from "@/lib/morning";
@@ -16,9 +16,9 @@ import { useLoad } from "@/lib/use-load";
 type HomeBody = {
   as_of: string | null;
   stale: boolean;
-  busy_top: { id: string; name: string; name_en: string | null; gu: string | null; level: number; window: { hours: number[] } | null }[];
-  open_quiet: { id: string; name: string; name_en: string | null; gu: string | null; level: number; hours: HourCell[] | null; strip_mode: string | null; window: { hours: number[] } | null }[];
-  tomorrow_morning: { id: string; name: string; name_en: string | null; gu: string | null; date: string; window: { hours: number[] }; hours: HourCell[] | null; strip_mode: string | null }[];
+  busy_top: { id: string; name: string; name_en: string | null; gu: string | null; category: string | null; level: number; window: { hours: number[] } | null }[];
+  open_quiet: { id: string; name: string; name_en: string | null; gu: string | null; category: string | null; level: number; hours: HourCell[] | null; strip_mode: string | null; window: { hours: number[] } | null }[];
+  tomorrow_morning: { id: string; name: string; name_en: string | null; gu: string | null; category: string | null; date: string; window: { hours: number[] }; hours: HourCell[] | null; strip_mode: string | null }[];
 };
 
 /** The horizontal card of the home (design spec 5.7): name, level dot, gu, a label with one range, a mini strip. */
@@ -28,6 +28,7 @@ function PlaceCard({
   name,
   nameEn,
   gu,
+  category,
   level,
   label,
   range,
@@ -41,6 +42,7 @@ function PlaceCard({
   name: string;
   nameEn: string | null;
   gu: string | null;
+  category: string | null;
   level: number | null;
   label: string;
   range: string | null;
@@ -62,7 +64,10 @@ function PlaceCard({
           </span>
         )}
       </span>
-      <span className="caption -mt-2 text-text-3" lang="ko">{gu}</span>
+      <span className="caption -mt-2 flex items-center gap-1.5 text-text-3">
+        <span lang="ko">{gu}</span>
+        <KindChip category={category} />
+      </span>
       {range ? (
         <span className="label text-text-2">
           {label}
@@ -109,44 +114,20 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
         </Link>
       </div>
       <div className="mt-6 flex flex-col gap-6">
-      <section data-busy>
-        <h2 className="section mb-2">{t("home.busyTop")}</h2>
-        {late ? <StateBox kind={lateText ? "stale" : "preparing"} text={lateText} /> : null}
-        {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
-        {!loaded.data && !loaded.error ? (
-          <div data-state="skeleton" className="flex flex-col gap-2">
-            {[0, 1, 2].map((key) => (
-              <div key={key} className="row rounded-[12px] bg-bg-soft" />
+      {favs.length ? (
+        <section data-favorites>
+          <h2 className="section mb-2">{t("home.favorites")}</h2>
+          <ul>
+            {favs.map((row) => (
+              <li key={row.id}>
+                <Link prefetch={false} href={`/${locale}/p/${row.id}`} data-row className="row flex items-center">
+                  <PlaceName name={row.name} nameEn={row.nameEn} />
+                </Link>
+              </li>
             ))}
-          </div>
-        ) : null}
-        {loaded.data && !late && loaded.data.busy_top.length === 0 ? <p data-busy-empty className="body">{t("home.busyTopEmpty")}</p> : null}
-        <ol>
-          {busy.map((row, index) => {
-            const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
-            return (
-            <li key={row.id}>
-              <Link prefetch={false} href={`/${locale}/p/${row.id}`} data-row className="row flex items-center justify-between">
-                <span className="flex items-center gap-3">
-                  <span className="w-5 text-[20px] font-extrabold text-text-3">{index + 1}</span>
-                  <span>
-                    <span className="body block font-semibold"><PlaceName name={row.name} nameEn={row.name_en} /></span>
-                    <span className="caption text-text-3" lang="ko">{row.gu}</span>
-                  </span>
-                </span>
-                <span className="caption text-right">
-                  <span className="flex items-center justify-end gap-1.5 text-text">
-                    <LevelDot level={row.level} />
-                    {t(`level.l${row.level}`)}
-                  </span>
-                  <span className="block">{range ? `${t("week.recommended")} ${range}` : t("home.noPickToday")}</span>
-                </span>
-              </Link>
-            </li>
-            );
-          })}
-        </ol>
-      </section>
+          </ul>
+        </section>
+      ) : null}
       <section data-quiet-section>
         <h2 className="section mb-2">{t("home.openQuiet")}</h2>
         {!loaded.data && !loaded.error ? (
@@ -166,6 +147,7 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
               name={row.name}
               nameEn={row.name_en}
               gu={row.gu}
+              category={row.category}
               level={row.level}
               label={row.window?.hours.includes(clock.hour) ? t("home.nowLabel") : t("home.todayLabel")}
               range={row.window ? formatStoredWindows([row.window], locale, suffix)[0] : null}
@@ -190,6 +172,7 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
                 name={row.name}
                 nameEn={row.name_en}
                 gu={row.gu}
+                category={row.category}
                 level={null}
                 label={t("home.tomorrowLabel")}
                 range={formatStoredWindows([row.window], locale, suffix)[0]}
@@ -201,20 +184,47 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
           </div>
         </section>
       ) : null}
-      {favs.length ? (
-        <section>
-          <h2 className="section mb-2">{t("home.favorites")}</h2>
-          <ul>
-            {favs.map((row) => (
-              <li key={row.id}>
-                <Link prefetch={false} href={`/${locale}/p/${row.id}`} data-row className="row flex items-center">
-                  <PlaceName name={row.name} nameEn={row.nameEn} />
-                </Link>
-              </li>
+      <section data-busy>
+        <h2 className="section mb-2">{t("home.busyTop")}</h2>
+        {late ? <StateBox kind={lateText ? "stale" : "preparing"} text={lateText} /> : null}
+        {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
+        {!loaded.data && !loaded.error ? (
+          <div data-state="skeleton" className="flex flex-col gap-2">
+            {[0, 1, 2].map((key) => (
+              <div key={key} className="row rounded-[12px] bg-bg-soft" />
             ))}
-          </ul>
-        </section>
-      ) : null}
+          </div>
+        ) : null}
+        {loaded.data && !late && loaded.data.busy_top.length === 0 ? <p data-busy-empty className="body">{t("home.busyTopEmpty")}</p> : null}
+        <ol>
+          {busy.map((row, index) => {
+            const range = row.window ? formatStoredWindows([row.window], locale, suffix)[0] : "";
+            return (
+            <li key={row.id}>
+              <Link prefetch={false} href={`/${locale}/p/${row.id}`} data-row className="row flex items-center justify-between">
+                <span className="flex items-center gap-3">
+                  <span className="w-5 text-[20px] font-extrabold text-text-3">{index + 1}</span>
+                  <span>
+                    <span className="body block font-semibold"><PlaceName name={row.name} nameEn={row.name_en} /></span>
+                    <span className="caption flex items-center gap-1.5 text-text-3">
+                      <span lang="ko">{row.gu}</span>
+                      <KindChip category={row.category} />
+                    </span>
+                  </span>
+                </span>
+                <span className="caption text-right">
+                  <span className="flex items-center justify-end gap-1.5 text-text">
+                    <LevelDot level={row.level} />
+                    {t(`level.l${row.level}`)}
+                  </span>
+                  <span className="block">{range ? `${t("week.recommended")} ${range}` : t("home.noPickToday")}</span>
+                </span>
+              </Link>
+            </li>
+            );
+          })}
+        </ol>
+      </section>
       </div>
     </Phone>
   );

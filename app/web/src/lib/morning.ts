@@ -1,9 +1,12 @@
 /** Home, at night: the places whose first recommendation window of tomorrow starts in the morning. Pure selection
  * over stored recommendation rows; the engine computed every window. */
+import { kindRank } from "./kind.ts";
+
 export type MorningCandidate = {
   state: string;
   serve_state: string;
   tier: string;
+  category?: string | null;
   windows: { hours: number[]; score: number }[] | null;
 };
 
@@ -20,7 +23,7 @@ export function morningPicks<T extends MorningCandidate>(rows: T[]): T[] {
       const start = first.hours[0];
       return start >= MORNING_FIRST_HOUR && start <= MORNING_LAST_START;
     })
-    .sort((a, b) => b.windows![0].score - a.windows![0].score)
+    .sort((a, b) => kindRank(a.category) - kindRank(b.category) || b.windows![0].score - a.windows![0].score)
     .slice(0, MORNING_LIMIT);
 }
 
