@@ -56,7 +56,7 @@ reminder exist.
 - [x] T3.3 Compare: `/[locale]/compare?a=&b=` shows two places' best time and 8 week rows side by side; entry from
       the week screen ("다른 장소와 비교" → search in compare mode).
       → verify: Playwright screens D23 (mocked two weeks), D5 flow
-- [ ] T3.4 Weekend reminder: browser push. `push_subscriptions` table (RLS, no anon grants), `POST/DELETE
+- [x] T3.4 Weekend reminder: browser push. `push_subscriptions` table (RLS, no anon grants), `POST/DELETE
       /api/push/subscribe`, `public/sw.js`, Vercel cron Friday 18:00 KST → `/api/push/weekend` (CRON_SECRET) sends
       each subscriber the best Sat/Sun pick of their saved places. VAPID keys in Vercel env (names only in logs).
       → verify: `npm test` (push message builder), `supabase db push` exit 0 + `dbtool check-schema`, cron route 401
@@ -66,8 +66,8 @@ reminder exist.
 
 - [x] D1 Design spec v3.0 (§0, §2.1, §5.4, §5.5, §5.7, §5.8, §5.12–5.15, §6.1, §7.3, §9.2, §9.3, §10),
       build contract (push table, cron, API list), RUNBOOK (env names, cron), project map, findings rows.
-- [ ] D2 Gates: `npm run lint`, `npx tsc --noEmit`, `npm test`, full Playwright on the deployment, `90_verify`.
-- [ ] D3 Korean commits per tier, pushed; Vercel deploys from `main`.
+- [x] D2 Gates: `npm run lint`, `npx tsc --noEmit`, `npm test`, full Playwright on the deployment, `90_verify`.
+- [x] D3 Korean commits per tier, pushed; Vercel deploys from `main`.
 
 ## Out of scope
 
@@ -84,3 +84,23 @@ reminder exist.
   `supabase db reset`.
 - Files: `app/web/src/{components,screens,lib,app}`, `app/web/messages`, `app/web/e2e`, `app/web/public/sw.js`,
   `app/web/vercel.json`, `app/supabase/migrations/*push*`, `docs/**`, `scripts/cloud/90_verify.ps1`.
+
+## Report (2026-10-06, all three tiers)
+
+Commits on `main`: 99606c7 (tier 1), c6bf2c7 (tier 2), c8c72a0 + 7baf0e3 (tier 3), 02ea1b6 (ruff). Deployed with
+`vercel deploy --prod` after each tier; the last production deployment serves 7baf0e3.
+
+| Gate | Command | Exit | Evidence |
+|---|---|---|---|
+| Unit | `npm test` | 0 | 52 passed (strip, kind, near, best, push, …) |
+| Types / lint | `npx tsc --noEmit -p .`, `npm run lint` | 0 / 0 | clean |
+| Build | `npm run build` | 0 | after `allowImportingTsExtensions` |
+| Messages | `node scripts/check-messages.mjs` | 0 | 183 keys, ko = en, no dashes |
+| Engine | `python -m pytest app/engine/tests -q`, `ruff check app/engine scripts/cloud` | 0 / 0 | 134 passed; clean |
+| Schema | `scripts/cloud/30_db_push.ps1` | 0 | `Applying migration 20261006000000_push_subscriptions.sql`, `tables 20 (source 20)`, `schema OK` |
+| Playwright on the deployment | `PLAYWRIGHT_BASE_URL=https://urbanpulse-swart.vercel.app npx playwright test -c playwright.config.ts` (from `app/web`) | 0 | 64 passed |
+| Site verification | `scripts/cloud/90_verify.ps1 https://urbanpulse-swart.vercel.app` | 1 | every product line OK incl. `/sw.js 200`, `/api/push/weekend without secret 401`, `/api/push/subscribe malformed 400`, `/ko/compare 200`; the one FAIL is the raw-snapshot count, a tooling gap recorded in `findings.md` (no `RAW_DIR`/ADC on this laptop; the bucket has today's 44 folders) |
+
+Not proven: a real push delivery end to end (Chromium headless has no push service; the subscribe/send path is
+covered by the API round trip, the stubbed browser flow and the cron route's 200 with counts). The first real check
+is the Friday 18:00 KST cron run or a by-hand call with the secret after one browser has turned the switch on.
