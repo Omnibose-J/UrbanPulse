@@ -126,9 +126,9 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
       ) : null}
       {rec?.hours && rec.state !== "off" ? (
         <div>
-          <DayStrip hours={rec.hours} mode={rec.strip_mode} tier={place?.tier} purpose={cond.purpose} selected={picked?.h} onPick={setPicked} />
-          <Legend mode={rec.strip_mode} />
-          <p data-hour-sentence className="body mt-4 min-h-12 rounded-[12px] bg-bg-soft p-3">{picked ? <HourSentence mode={rec.strip_mode} hour={picked.h} cell={picked} locale={locale} tier={place?.tier} purpose={cond.purpose} /> : t("day.tapHint")}</p>
+          <DayStrip hours={rec.hours} mode={rec.strip_mode} tier={place?.tier} purpose={cond.purpose} selected={picked?.h} nowHour={date === clock.date ? clock.hour : undefined} onPick={setPicked} />
+          <Legend mode={rec.strip_mode} outside={rec.hours.some((cell) => cell.reason === "outside_hours")} />
+          <p data-hour-sentence className="body mt-4 min-h-12 rounded-[12px] bg-bg-soft p-3">{picked ? <HourSentence mode={rec.strip_mode} hour={picked.h} cell={picked} locale={locale} tier={place?.tier} purpose={cond.purpose} hours={rec.hours} /> : t("day.tapHint")}</p>
         </div>
       ) : null}
       {myeongjeol ? <div className="hatch mt-4 h-12 rounded-[6px]" data-state="myeongjeol" /> : null}

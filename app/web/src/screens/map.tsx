@@ -232,7 +232,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
       <span className="text-[18px] font-extrabold"><PlaceName name={current.name} nameEn={current.name_en} /></span>
       <span className="text-[14px] text-text-2">
         <b className="text-text" data-hour-sentence>
-          <HourSentence mode={current.strip_mode} hour={clock} cell={clockCell} locale={locale} tier={current.tier} purpose={cond.purpose} />
+          <HourSentence mode={current.strip_mode} hour={clock} cell={clockCell} locale={locale} tier={current.tier} purpose={cond.purpose} hours={current.hours} />
         </b>
       </span>
       <span className="text-[14px] text-text-2">{pickLine(current)}</span>

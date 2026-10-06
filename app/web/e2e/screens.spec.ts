@@ -244,14 +244,76 @@ test("D10 slider does not refetch and back restores the map hour", async ({ page
   await expect(page).toHaveURL(/hour=18/);
 });
 
-test("D11 windows_only uses two tones", async ({ page }) => {
-  await mockVisitor(page);
+test("D11 windows_only never paints the two-step verdict; the other cells are shaded by forecast crowd", async ({ page }) => {
+  const shaded = hours().map((cell) => {
+    if (cell.h === 9) return { ...cell, reason: "outside_hours", crowd: 0 };
+    if (cell.h >= 14 && cell.h <= 16) return { ...cell, crowd: 3 };
+    if (cell.h === 11) return { ...cell, crowd: 0 };
+    return cell;
+  });
+  await mockVisitor(page, {
+    recommend: {
+      recommendation: { state: "on", off_reason: null, windows: [{ hours: [13] }], no_window: false, hours: shaded, strip_mode: "windows_only" },
+      place,
+      holiday: null,
+      combos: week.combos,
+      alt_dates: [],
+      alt_places: [],
+    },
+  });
   await page.goto(`/ko/p/POI001/${day}`);
   await expect(page.locator("[data-cell]").first()).toBeVisible();
-  const tones = await page.locator("[data-cell]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-tone")));
-  expect(tones).toContain("go");
-  expect(tones).toContain("bad");
-  expect(tones).not.toContain("ok");
+  const cells = await page.locator("[data-cell]").evaluateAll((nodes) =>
+    nodes.map((node) => ({ tone: node.getAttribute("data-tone"), crowd: node.getAttribute("data-crowd"), bg: getComputedStyle(node).backgroundColor })),
+  );
+  expect(cells.map((cell) => cell.tone)).toContain("go");
+  expect(cells.map((cell) => cell.tone)).not.toContain("ok");
+  expect(cells[13 - 9]).toMatchObject({ tone: "go", crowd: null });
+  expect(cells[9 - 9]).toMatchObject({ tone: "bad", crowd: null });
+  expect(cells[11 - 9].crowd).toBe("0");
+  expect(cells[12 - 9].crowd).toBe("1");
+  expect(cells[14 - 9].crowd).toBe("3");
+  // Four distinct paints among the non-window cells: the hollow one and three crowd shades.
+  expect(new Set(cells.filter((cell) => cell.tone === "bad").map((cell) => cell.bg)).size).toBe(4);
+  const legend = page.locator("[data-legend-row] [data-legend-item]");
+  await expect(legend).toHaveText(["추천", "예상 혼잡한산붐빔", "운영 시간 아님"]);
+});
+
+test("D17 today's strips dim the hours gone by and ring the current hour", async ({ page }) => {
+  const days = week.days.map((row, index) => ({ ...row, date: kstDate(index) }));
+  await mockVisitor(page, { week: { ...week, days } });
+  await page.clock.setFixedTime(kstInstant(14));
+  await page.goto("/ko/p/POI001");
+  const today = page.locator("[data-row]", { hasText: "오늘" });
+  await expect(today.locator("[data-mini-strip] [data-past]")).toHaveCount(5);
+  await expect(today.locator("[data-mini-strip] [data-now]")).toHaveCount(1);
+  await expect(page.locator("[data-row]").nth(1).locator("[data-mini-strip] [data-past]")).toHaveCount(0);
+  await expect(page.locator("[data-week-axis] span")).toHaveText(["9", "12", "15", "18", "21"]);
+  await page.goto(`/ko/p/POI001/${kstDate(0)}`);
+  await expect(page.locator("[data-cell][data-past]")).toHaveCount(5);
+  await expect(page.locator("[data-cell][data-now]")).toHaveAttribute("data-hour", "14");
+  await expect(page.locator("[data-axis-now]")).toHaveText("지금");
+  await page.goto(`/ko/p/POI001/${kstDate(2)}`);
+  await expect(page.locator("[data-cell]").first()).toBeVisible();
+  await expect(page.locator("[data-cell][data-past]")).toHaveCount(0);
+  await expect(page.locator("[data-axis-now]")).toHaveCount(0);
+});
+
+test("D18 a holiday row and the best row keep their date", async ({ page }) => {
+  const days = week.days.map((row, index) => (index === 2 ? { ...row, holiday: { name: "개천절", name_en: "National Foundation Day", kind: "holiday" } } : row));
+  await mockVisitor(page, { week: { ...week, days } });
+  await page.goto("/ko/p/POI001");
+  const rows = page.locator("[data-row]");
+  await expect(rows.nth(2).locator("[data-week-third]")).toHaveText("개천절");
+  await expect(rows.nth(2)).toContainText("10/3");
+  // The first day scores highest in the fixture, so it is the best row: its date stays and "추천" is the third line.
+  await expect(rows.nth(0).locator("[data-week-third]")).toHaveText("추천");
+  await expect(rows.nth(0)).toContainText("10/1");
+  await expect(rows.nth(1).locator("[data-week-third]")).toHaveCount(0);
+  const heights = await rows.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(1);
+  await page.goto("/en/p/POI001");
+  await expect(page.locator("[data-row]").nth(2).locator("[data-week-third]")).toHaveText("National Foundation Day");
 });
 
 test("D12 home draws the rows in the order served, each with its level and pick", async ({ page }) => {
@@ -266,7 +328,9 @@ test("D12 home draws the rows in the order served, each with its level and pick"
   await expect(rows.nth(3)).toContainText("오늘은 추천 없음");
   await expect(rows.nth(4)).toContainText("Epsilon");
   await expect(page.locator("[data-quiet]")).toHaveCount(2);
-  await expect(page.locator("[data-quiet]").first()).toContainText("오늘 추천13~14시");
+  // A pick that includes the current hour is "지금 가기 좋아요"; the fixture's pick is 13.
+  const hourNow = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "numeric", hourCycle: "h23" }).format(new Date()));
+  await expect(page.locator("[data-quiet]").first()).toContainText(hourNow === 13 ? "지금 가기 좋아요13~14시" : "오늘 추천13~14시");
 });
 
 test("live smoke: home answers, and a listed place opens its week", async ({ page }) => {
@@ -359,6 +423,7 @@ test("D15 the answer card and the week rows name the busiest hours and their lev
   await expect(page.locator("[data-week-avoid]").first()).toHaveAttribute("aria-label", "가장 붐빌 때 14~17시 · 붐빔");
   await expect(page.locator("[data-week-avoid] [data-status-dot]").first()).toHaveCount(1);
   await expect(page.locator("[data-week-avoid]")).toHaveCount(8);
+  await expect(page.locator("[data-legend-busiest]")).toHaveText("가장 붐빌 때");
   await page.goto(`/ko/p/POI001/${day}`);
   await expect(page.locator("[data-answer-card] [data-avoid]")).toHaveText("가장 붐빌 때 14~17시 · 붐빔");
   await page.goto("/en/p/POI001");
@@ -373,4 +438,5 @@ test("D16 no busiest line when no hour of the day is too busy", async ({ page })
   await expect(page.locator("[data-answer-card]")).toBeVisible();
   await expect(page.locator("[data-avoid]")).toHaveCount(0);
   await expect(page.locator("[data-week-avoid]")).toHaveCount(0);
+  await expect(page.locator("[data-legend-busiest]")).toHaveCount(0);
 });

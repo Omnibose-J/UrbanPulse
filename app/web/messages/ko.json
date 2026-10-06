@@ -4,8 +4,8 @@
     "subtitle": "오늘 저녁이든 다음 주말이든",
     "search": "장소나 역 이름으로 찾기",
     "busyTop": "지금 가장 붐비는 곳",
-    "openQuiet": "지금 열려 있고 한산한 곳",
-    "openQuietEmpty": "지금은 열려 있고 한산한 곳이 없어요",
+    "openQuiet": "지금 열려 있고 여유로운 곳",
+    "openQuietEmpty": "지금은 열려 있고 여유로운 곳이 없어요",
     "noPickToday": "오늘은 추천 없음",
     "todayLabel": "오늘 추천",
     "busyTopEmpty": "지금은 붐비는 곳이 없어요",
@@ -13,7 +13,8 @@
     "popular": "장소 목록",
     "tomorrowMorning": "내일 아침 가기 좋은 곳",
     "tomorrowMorningEmpty": "내일 아침에 추천할 곳이 없어요",
-    "tomorrowLabel": "내일 추천"
+    "tomorrowLabel": "내일 추천",
+    "nowLabel": "지금 가기 좋아요"
   },
   "week": {
     "bestWhen": "이번 주 가장 좋은 때",
@@ -105,7 +106,10 @@
     "crowdOnly0": "사람이 적어요",
     "crowdOnly1": "사람이 적당해요",
     "crowdOnly2": "조금 붐벼요",
-    "crowdOnly3": "꽤 붐벼요"
+    "crowdOnly3": "꽤 붐벼요",
+    "notPickWhy": "{hour}시는 추천 시간이 아니에요. {why}.",
+    "pickFrom": "{time}부터 추천 시간이에요.",
+    "pickWas": "이날 추천은 {time}이에요."
   },
   "now": {
     "l0": "지금은 사람이 적어요",
@@ -184,5 +188,13 @@
     "busiest": "가장 붐빌 때",
     "line": "{label} {range} · {state}",
     "b": "평소보다 붐빔"
+  },
+  "legend": {
+    "crowd": "예상 혼잡",
+    "low": "한산",
+    "high": "붐빔",
+    "busiest": "가장 붐빌 때",
+    "outside": "운영 시간 아님",
+    "now": "지금"
   }
 }

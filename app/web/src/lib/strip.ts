@@ -45,7 +45,20 @@ function knownWhy(reason: string): string {
   return `reason.${key}`;
 }
 
-/** One sentence plan for the day strip and the map card. `windows_only` never states the two-step verdict. */
+/** The next recommended hour after `hour` on this day (`from`), or, when every window is already behind it, the day's
+ * first window (`day`). Null when the day has no window. Both are stated as a run of adjacent window hours. */
+export function nextPick(hours: HourCell[] | null | undefined, hour: number): { kind: "from" | "day"; start: number; end: number } | null {
+  if (!hours || hours.length === 0) return null;
+  const sorted = [...hours].filter((cell) => cell.in_window).sort((a, b) => a.h - b.h);
+  if (sorted.length === 0) return null;
+  const first = sorted.find((cell) => cell.h > hour) ?? sorted[0];
+  let end = first.h + 1;
+  while (sorted.some((cell) => cell.h === end)) end += 1;
+  return { kind: first.h > hour ? "from" : "day", start: first.h, end };
+}
+
+/** One sentence plan for the day strip and the map card. `windows_only` never states the two-step verdict: a cell
+ * outside the windows says the forecast crowd level (or that the place is outside its hours) and the next pick. */
 export function cellSentence(input: {
   mode: string | null;
   inWindow: boolean;
@@ -57,12 +70,20 @@ export function cellSentence(input: {
   purpose?: string;
   crowd?: number;
   act?: string | null;
+  hours?: HourCell[] | null;
 }):
-  | { kind: "notPick"; hour: string }
+  | { kind: "notPick"; hour: string; whys: string[]; next: { kind: "from" | "day"; start: number; end: number } | null }
   | { kind: "verdict"; hour: string; verdict: "window" | "ok" | "avoid"; whys: string[] } {
   const hour = hourLabel(input.hour, input.locale);
   if (input.mode !== "two_step" && !input.inWindow) {
-    return { kind: "notPick", hour };
+    const whys =
+      input.reason === "outside_hours"
+        ? ["reason.outsideHours"]
+        : input.tier === "B"
+          ? reasonMessageIds("B", { crowd: input.crowd })
+          : reasonMessageIds("", { crowd: input.crowd });
+    if (whys.length === 0) throw new Error(`cell ${input.hour} without a crowd level`);
+    return { kind: "notPick", hour, whys, next: nextPick(input.hours, input.hour) };
   }
   const verdict = input.inWindow ? "window" : input.mode === "two_step" && input.rating === 1 ? "ok" : "avoid";
   if (input.inWindow || input.reason === "fit") {
@@ -109,4 +130,18 @@ export function toneColor(tone: "go" | "ok" | "bad", pin = false): string {
   if (tone === "go") return "var(--go)";
   if (tone === "ok") return "var(--ok)";
   return pin ? "var(--bad-pin)" : "var(--bad)";
+}
+
+export type CellFill = { tone: "go" | "ok" | "bad"; crowd: number | null; hollow: boolean; color: string };
+
+/** How a strip cell is painted. A window cell is `--go`. In `two_step` the rest is the verified verdict colour.
+ * In `windows_only` the rest states the forecast crowd level (a product promise, unlike the verdict): one of four
+ * neutral shades `--crowd-0..3`; an hour outside the place's opening hours is hollow (background, hairline). */
+export function cellFill(cell: { in_window?: boolean; rating?: number; reason?: string; crowd?: number }, mode: string | null): CellFill {
+  const tone = cellTone(cell, mode);
+  if (tone !== "bad" || mode === "two_step") return { tone, crowd: null, hollow: false, color: toneColor(tone) };
+  if (cell.reason === "outside_hours") return { tone, crowd: null, hollow: true, color: "var(--bg)" };
+  if (typeof cell.crowd !== "number") throw new Error("cell without a crowd level");
+  const crowd = Math.min(Math.max(Math.round(cell.crowd), 0), 3);
+  return { tone, crowd, hollow: false, color: `var(--crowd-${crowd})` };
 }

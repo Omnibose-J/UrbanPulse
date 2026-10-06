@@ -34,6 +34,7 @@ function PlaceCard({
   noPick,
   hours,
   mode,
+  nowHour,
 }: {
   href: string;
   marker: Record<string, string | number>;
@@ -46,6 +47,8 @@ function PlaceCard({
   noPick: string;
   hours: HourCell[] | null;
   mode: string | null;
+  /** Today's cards dim the hours gone by and ring the current one. */
+  nowHour?: number;
 }) {
   const t = useTranslations();
   return (
@@ -68,7 +71,7 @@ function PlaceCard({
       ) : (
         <span className="label text-text-2">{noPick}</span>
       )}
-      {hours ? <MiniStrip hours={hours} mode={mode} /> : null}
+      {hours ? <MiniStrip hours={hours} mode={mode} nowHour={nowHour} /> : null}
     </Link>
   );
 }
@@ -164,11 +167,12 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
               nameEn={row.name_en}
               gu={row.gu}
               level={row.level}
-              label={t("home.todayLabel")}
+              label={row.window?.hours.includes(clock.hour) ? t("home.nowLabel") : t("home.todayLabel")}
               range={row.window ? formatStoredWindows([row.window], locale, suffix)[0] : null}
               noPick={t("home.noPickToday")}
               hours={row.hours}
               mode={row.strip_mode}
+              nowHour={clock.hour}
             />
           ))}
         </div>

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { formatHourRange, formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import type { HourCell } from "@/lib/strip";
-import { busiestRange, cellSentence, cellTone, toneColor } from "@/lib/strip";
+import { busiestRange, cellFill, cellSentence } from "@/lib/strip";
 import type { Favorite, Purpose, Tolerance } from "@/lib/storage";
 
 export function PlaceName({ name, nameEn }: { name: string; nameEn?: string | null }) {
@@ -273,28 +273,75 @@ export function avoidTexts(
   return { line: t("avoid.line", { label: t("avoid.busiest"), range, state }), range, crowd };
 }
 
-export function MiniStrip({ hours, mode }: { hours: HourCell[]; mode: string | null }) {
+/** `nowHour` is passed for today only: hours before it are dimmed, the current hour carries a ring. */
+export function MiniStrip({ hours, mode, nowHour }: { hours: HourCell[]; mode: string | null; nowHour?: number }) {
   return (
     <div data-mini-strip className="flex h-[18px] w-full gap-px">
       {hours.map((cell) => (
-        <span key={cell.h} className="h-full flex-1" style={{ background: toneColor(cellTone(cell, mode)) }} />
+        <span
+          key={cell.h}
+          className="h-full flex-1"
+          style={cellStyle(cellFill(cell, mode), cell.h, nowHour)}
+          data-past={nowHour !== undefined && cell.h < nowHour ? "1" : undefined}
+          data-now={cell.h === nowHour ? "1" : undefined}
+        />
       ))}
     </div>
   );
 }
 
-export function Legend({ mode }: { mode: string | null }) {
+function cellStyle(fill: ReturnType<typeof cellFill>, hour: number, nowHour: number | undefined): React.CSSProperties {
+  const past = nowHour !== undefined && hour < nowHour;
+  const rings = [fill.hollow ? "inset 0 0 0 1px var(--line)" : null, hour === nowHour ? "inset 0 0 0 2px var(--ink)" : null].filter(Boolean);
+  return { background: fill.color, opacity: past ? 0.35 : undefined, boxShadow: rings.length ? rings.join(", ") : undefined };
+}
+
+/** `two_step`: the three verdict colours. `windows_only`: the pick colour, the four crowd shades (quiet to busy),
+ * the hollow closed-hours cell when `outside` is set, and the busiest dot when `busiest` is set (week list). */
+export function Legend({ mode, busiest, outside }: { mode: string | null; busiest?: boolean; outside?: boolean }) {
   const t = useTranslations();
-  const items = mode === "two_step" ? (["win", "1", "0"] as const) : (["win"] as const);
-  const colors = { win: "var(--go)", "1": "var(--ok)", "0": "var(--bad)" };
+  if (mode === "two_step") {
+    const items = ["win", "1", "0"] as const;
+    const colors = { win: "var(--go)", "1": "var(--ok)", "0": "var(--bad)" };
+    return (
+      <p data-legend-row className="caption mt-2 flex flex-wrap gap-x-3 gap-y-1 text-text-3">
+        {items.map((key) => (
+          <span key={key} data-legend-item className="inline-flex items-center gap-1">
+            <i className="inline-block h-2 w-2" style={{ background: colors[key] }} />
+            {t(`rate.${key}`)}
+          </span>
+        ))}
+      </p>
+    );
+  }
   return (
-    <p className="caption mt-2 flex gap-3 text-text-3">
-      {items.map((key) => (
-        <span key={key} className="inline-flex items-center gap-1">
-          <i className="inline-block h-2 w-2" style={{ background: colors[key] }} />
-          {t(`rate.${key}`)}
+    <p data-legend-row className="caption mt-2 flex flex-wrap gap-x-3 gap-y-1 text-text-3">
+      <span data-legend-item className="inline-flex items-center gap-1">
+        <i className="inline-block h-2 w-2" style={{ background: "var(--go)" }} />
+        {t("rate.win")}
+      </span>
+      <span data-legend-item data-legend-crowd className="inline-flex items-center gap-1">
+        {t("legend.crowd")}
+        <span className="inline-flex items-center gap-0.5">
+          <span>{t("legend.low")}</span>
+          {[0, 1, 2, 3].map((level) => (
+            <i key={level} className="inline-block h-2 w-2" style={{ background: `var(--crowd-${level})` }} />
+          ))}
+          <span>{t("legend.high")}</span>
         </span>
-      ))}
+      </span>
+      {outside ? (
+        <span data-legend-item className="inline-flex items-center gap-1">
+          <i className="inline-block h-2 w-2" style={{ background: "var(--bg)", boxShadow: "inset 0 0 0 1px var(--line)" }} />
+          {t("legend.outside")}
+        </span>
+      ) : null}
+      {busiest ? (
+        <span data-legend-item data-legend-busiest className="inline-flex items-center gap-1">
+          <LevelDot level={3} />
+          {t("legend.busiest")}
+        </span>
+      ) : null}
     </p>
   );
 }
@@ -305,6 +352,7 @@ export function WeekList({
   today,
   bestDate,
   tier,
+  nowHour,
   hrefFor,
 }: {
   days: { date: string; state: string; off_reason: string | null; windows: { hours: number[]; score: number }[] | null; hours: HourCell[] | null; strip_mode: string | null; holiday: { name: string; name_en?: string | null; kind: string } | null }[];
@@ -312,13 +360,27 @@ export function WeekList({
   today: string;
   bestDate?: string | null;
   tier?: string;
+  /** The current KST hour: today's row dims the hours before it and rings the current one. */
+  nowHour?: number;
   hrefFor: (date: string) => string;
 }) {
   const t = useTranslations();
   const mark = marks(t);
+  const columns = locale === "en" ? "56px minmax(0,1fr) 104px" : "56px minmax(0,1fr) 72px";
   return (
     <section className="mt-6">
       <h2 className="section mb-2">{t("week.glance")}</h2>
+      <div className="grid gap-3" style={{ gridTemplateColumns: columns }} aria-hidden>
+        <span />
+        <span data-week-axis className="relative block h-4 text-[11px] leading-4 text-text-3">
+          {[9, 12, 15, 18, 21].map((hour) => (
+            <span key={hour} className="absolute" style={{ left: `${((hour - 9) / 15) * 100}%` }}>
+              {hour}
+            </span>
+          ))}
+        </span>
+        <span />
+      </div>
       <ul>
         {days.map((day) => {
           const best = day.state !== "off" && day.windows && day.windows.length > 0;
@@ -331,28 +393,38 @@ export function WeekList({
             : null;
           const recommended = Boolean(best) && day.date === bestDate;
           const avoid = day.state === "off" ? null : avoidTexts(day.hours, tier ?? "", locale, t);
-          const lower = holiday ?? (recommended ? t("week.recommended") : formatShortDate(day.date));
-          const lowerColor = holiday ? "var(--hol)" : recommended ? "var(--go-text)" : "var(--text-3)";
+          // The date is always there; a holiday name or "추천" is a third line under it.
+          const third = holiday ?? (recommended ? t("week.recommended") : null);
+          const thirdColor = holiday ? "var(--hol)" : "var(--go-text)";
           return (
             <li key={day.date}>
               <Link prefetch={false}
                 href={hrefFor(day.date)}
                 className="row relative grid h-14 items-center gap-3"
-                style={{ gridTemplateColumns: locale === "en" ? "56px minmax(0,1fr) 104px" : "56px minmax(0,1fr) 72px" }}
+                style={{ gridTemplateColumns: columns }}
                 data-row
               >
                 {recommended ? <span className="absolute inset-y-0 -left-2 -right-2 rounded-[12px]" style={{ background: "var(--go-soft)" }} /> : null}
                 <span className="relative caption">
                   <span className="block text-[15px] font-bold">{formatShortWeekday(day.date, mark.weekdays, t("time.today"), today)}</span>
-                  <span className="block truncate text-[11px] font-medium" style={{ color: lowerColor }} lang={holiday && locale === "en" && !day.holiday?.name_en ? "ko" : undefined}>
-                    {lower}
-                  </span>
+                  <span className="block text-[11px] font-medium leading-[14px] text-text-3">{formatShortDate(day.date)}</span>
+                  {third ? (
+                    <span
+                      data-week-third
+                      className="block truncate text-[11px] font-medium leading-[14px]"
+                      style={{ color: thirdColor }}
+                      title={third}
+                      lang={holiday && locale === "en" && !day.holiday?.name_en ? "ko" : undefined}
+                    >
+                      {third}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="relative">
                   {day.state === "off" ? (
                     <span className="caption text-text-3">{offLabel}</span>
                   ) : day.hours ? (
-                    <MiniStrip hours={day.hours} mode={day.strip_mode} />
+                    <MiniStrip hours={day.hours} mode={day.strip_mode} nowHour={day.date === today ? nowHour : undefined} />
                   ) : null}
                 </span>
                 <span className="relative min-w-0 text-right">
@@ -382,6 +454,7 @@ export function DayStrip({
   purpose,
   hidden,
   selected,
+  nowHour,
   onPick,
 }: {
   hours: HourCell[];
@@ -390,30 +463,36 @@ export function DayStrip({
   purpose?: string;
   hidden?: boolean;
   selected?: number | null;
+  /** The current KST hour, for today only. */
+  nowHour?: number;
   onPick: (cell: HourCell | null) => void;
 }) {
   const t = useTranslations();
   const locale = useLocale() as "ko" | "en";
   const say = useCellText();
   if (hidden) return <p className="body">{t("state.foreignStrip")}</p>;
-  const labels = hours.map((cell) => say({ mode, hour: cell.h, cell, locale, tier, purpose }));
+  const labels = hours.map((cell) => say({ mode, hour: cell.h, cell, locale, tier, purpose, hours }));
   return (
     <section className="mt-6">
       <h2 className="section mb-2">{t("day.byHour")}</h2>
       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
         {hours.map((cell, index) => {
-          const tone = cellTone(cell, mode);
+          const fill = cellFill(cell, mode);
           const label = labels[index];
           const on = selected === cell.h;
+          const past = nowHour !== undefined && cell.h < nowHour;
           return (
             <button
               key={cell.h}
               type="button"
               data-cell
               data-hour={cell.h}
-              data-tone={tone}
+              data-tone={fill.tone}
+              data-crowd={fill.crowd ?? undefined}
+              data-past={past ? "1" : undefined}
+              data-now={cell.h === nowHour ? "1" : undefined}
               className="h-12 rounded-[6px]"
-              style={{ background: toneColor(tone), outline: on ? "2px solid var(--ink)" : undefined, outlineOffset: on ? "2px" : undefined }}
+              style={{ ...cellStyle(fill, cell.h, nowHour), outline: on ? "2px solid var(--ink)" : undefined, outlineOffset: on ? "2px" : undefined }}
               aria-label={label}
               onClick={() => onPick(on ? null : cell)}
               aria-pressed={on}
@@ -423,8 +502,13 @@ export function DayStrip({
       </div>
       <div className="mt-1.5 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px] text-[11px] text-text-3">
         {hours.map((cell, index) => (
-          <span key={cell.h} data-axis-label={index % 3 === 0 ? "1" : undefined}>
-            {index % 3 === 0 ? cell.h : ""}
+          <span
+            key={cell.h}
+            data-axis-label={index % 3 === 0 ? "1" : undefined}
+            data-axis-now={cell.h === nowHour ? "1" : undefined}
+            className={cell.h === nowHour ? "font-bold text-text" : undefined}
+          >
+            {cell.h === nowHour ? t("legend.now") : index % 3 === 0 ? cell.h : ""}
           </span>
         ))}
       </div>
@@ -444,12 +528,14 @@ type CellTextInput = {
   locale: "ko" | "en";
   tier?: string;
   purpose?: string;
+  /** Every cell of the day, so a not-picked hour can name the next pick. */
+  hours?: HourCell[] | null;
 };
 
 /** The one place a cell becomes a sentence: the strip, its screen-reader list and the map card all use it. */
 export function useCellText() {
   const t = useTranslations();
-  return ({ mode, hour, cell, locale, tier, purpose }: CellTextInput): string => {
+  return ({ mode, hour, cell, locale, tier, purpose, hours }: CellTextInput): string => {
     const sentence = cellSentence({
       mode,
       inWindow: cell.in_window,
@@ -461,8 +547,16 @@ export function useCellText() {
       purpose,
       crowd: cell.crowd,
       act: cell.act,
+      hours,
     });
-    if (sentence.kind === "notPick") return t("reason.notPick", { hour: sentence.hour });
+    if (sentence.kind === "notPick") {
+      // "운영 시간이 아니에요." already ends its clause; the template adds the full stop for a crowd sentence.
+      const why = sentence.whys.map((id) => t(id)).join(" ").replace(/\.$/, "");
+      const head = t("reason.notPickWhy", { hour: sentence.hour, why });
+      if (!sentence.next) return head;
+      const time = formatHourRange(sentence.next.start, sentence.next.end, locale, t("time.hour"));
+      return `${head} ${t(sentence.next.kind === "from" ? "reason.pickFrom" : "reason.pickWas", { time })}`;
+    }
     return t("reason.cell", {
       hour: sentence.hour,
       verdict: t(`reason.${sentence.verdict}`),

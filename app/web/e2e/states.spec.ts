@@ -98,14 +98,14 @@ test("late data on home is said as late data, not as a calm city", async ({ page
   await page.goto("/ko");
   await expect(page.locator("[data-state=stale]")).toHaveText("데이터가 늦어지고 있어요 (마지막 14:30)");
   await expect(page.getByText("지금은 붐비는 곳이 없어요")).toHaveCount(0);
-  await expect(page.getByText("지금은 열려 있고 한산한 곳이 없어요")).toHaveCount(0);
+  await expect(page.getByText("지금은 열려 있고 여유로운 곳이 없어요")).toHaveCount(0);
 });
 
 test("fresh data with nothing busy says so", async ({ page }) => {
   await page.route("**/api/home**", (route) => route.fulfill(json({ as_of: new Date().toISOString(), stale: false, busy_top: [], open_quiet: [], tomorrow_morning: [] })));
   await page.goto("/ko");
   await expect(page.locator("[data-busy-empty]")).toHaveText("지금은 붐비는 곳이 없어요");
-  await expect(page.locator("[data-quiet-empty]")).toHaveText("지금은 열려 있고 한산한 곳이 없어요");
+  await expect(page.locator("[data-quiet-empty]")).toHaveText("지금은 열려 있고 여유로운 곳이 없어요");
 });
 
 test("a late observation on the week screen shows the stale line and a dimmed list", async ({ page }) => {

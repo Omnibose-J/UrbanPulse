@@ -4,8 +4,8 @@
     "subtitle": "Tonight or next weekend",
     "search": "Search a place or station",
     "busyTop": "Busiest right now",
-    "openQuiet": "Open and quiet right now",
-    "openQuietEmpty": "Nothing open and quiet right now",
+    "openQuiet": "Open and uncrowded right now",
+    "openQuietEmpty": "Nothing open and uncrowded right now",
     "noPickToday": "No pick today",
     "todayLabel": "Today",
     "busyTopEmpty": "Nothing is busy right now",
@@ -13,7 +13,8 @@
     "popular": "All places",
     "tomorrowMorning": "Good tomorrow morning",
     "tomorrowMorningEmpty": "Nothing to recommend tomorrow morning",
-    "tomorrowLabel": "Tomorrow"
+    "tomorrowLabel": "Tomorrow",
+    "nowLabel": "Good right now"
   },
   "week": {
     "bestWhen": "Best time this week",
@@ -70,7 +71,7 @@
   },
   "tol": {
     "calm": "Quiet",
-    "moderate": "A bit lively",
+    "moderate": "Moderate",
     "busy_ok": "Busy is fine"
   },
   "badge": {
@@ -105,7 +106,10 @@
     "crowdOnly0": "It is quiet",
     "crowdOnly1": "It is moderately busy",
     "crowdOnly2": "It is a bit busy",
-    "crowdOnly3": "It is quite busy"
+    "crowdOnly3": "It is quite busy",
+    "notPickWhy": "{hour} is not one of the best times. {why}.",
+    "pickFrom": "Recommended from {time}.",
+    "pickWas": "This day's pick is {time}."
   },
   "now": {
     "l0": "It is quiet right now",
@@ -184,5 +188,13 @@
     "busiest": "Busiest",
     "line": "{label} {range} · {state}",
     "b": "Busier than usual"
+  },
+  "legend": {
+    "crowd": "Forecast crowd",
+    "low": "Quiet",
+    "high": "Busy",
+    "busiest": "Busiest",
+    "outside": "Closed hours",
+    "now": "Now"
   }
 }

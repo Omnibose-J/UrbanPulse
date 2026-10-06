@@ -132,9 +132,15 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
       {showList ? (
         <>
           <div className={now?.stale ? "opacity-50" : undefined}>
-            <WeekList days={days} locale={locale} today={today} bestDate={best?.date} tier={place?.tier} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
+            <WeekList days={days} locale={locale} today={today} bestDate={best?.date} tier={place?.tier} nowHour={clock.hour} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
           </div>
-          {comboOff ? null : <Legend mode={days.find((day) => day.strip_mode)?.strip_mode ?? "windows_only"} />}
+          {comboOff ? null : (
+            <Legend
+              mode={days.find((day) => day.strip_mode)?.strip_mode ?? "windows_only"}
+              busiest={days.some((day) => day.state !== "off" && avoidTexts(day.hours, place?.tier ?? "", locale, t) !== null)}
+              outside={days.some((day) => day.hours?.some((cell) => cell.reason === "outside_hours"))}
+            />
+          )}
         </>
       ) : null}
       {place ? (

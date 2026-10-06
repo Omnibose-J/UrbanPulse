@@ -27,7 +27,8 @@ test("windows_only does not state an unverified verdict", async ({ page }) => {
   await page.goto(`/ko/p/POI001/${kstDate(2)}`);
   await page.locator("[data-hour='12']").click();
   const sentence = page.locator("[data-hour-sentence]");
-  await expect(sentence).toHaveText("12시는 추천 시간이 아니에요.");
+  // The forecast crowd level and the next pick, never the two-step verdict (design spec 9.3, v3.0).
+  await expect(sentence).toHaveText("12시는 추천 시간이 아니에요. 사람이 적당해요. 13~14시부터 추천 시간이에요.");
   await expect(page.getByText("피하는 게 좋아요")).toHaveCount(0);
   await expect(page.getByText("가도 괜찮아요")).toHaveCount(0);
   // The recommended cell says how busy and how lively it is, not the two-step verdict.
@@ -62,7 +63,7 @@ test("windows_only does not state an unverified verdict", async ({ page }) => {
     }),
   );
   await page.goto(`/ko/map?date=${kstDate(2)}&hour=12`);
-  await expect(page.locator("[data-map-card] [data-hour-sentence]")).toHaveText("12시는 추천 시간이 아니에요.");
+  await expect(page.locator("[data-map-card] [data-hour-sentence]")).toHaveText("12시는 추천 시간이 아니에요. 사람이 적당해요. 13~14시부터 추천 시간이에요.");
   await expect(page.locator("[data-map-card]").getByText("피하는 게 좋아요")).toHaveCount(0);
   await expect(page.locator("[data-map-card]").getByText("가도 괜찮아요")).toHaveCount(0);
   await expect(page.locator("[data-legend]")).toHaveCount(1);
