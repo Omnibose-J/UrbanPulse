@@ -462,3 +462,101 @@ test("D16 no busiest line when no hour of the day is too busy", async ({ page })
   await expect(page.locator("[data-week-avoid]")).toHaveCount(0);
   await expect(page.locator("[data-legend-busiest]")).toHaveCount(0);
 });
+
+const nearMap = {
+  places: [
+    { ...place, id: "POI011", name: "Far", lat: 37.6, lon: 127.1, state: "on", windows: [{ hours: [23] }], hours: hours(), strip_mode: "windows_only", category: "공원" },
+    { ...place, id: "POI012", name: "Near", lat: 37.5005, lon: 127.0005, state: "on", windows: [{ hours: [23] }], hours: hours(), strip_mode: "windows_only", category: "관광특구" },
+    { ...place, id: "POI013", name: "Gone", lat: 37.5001, lon: 127.0001, state: "on", windows: [{ hours: [9] }], hours: hours(), strip_mode: "windows_only", category: null },
+    { ...place, id: "STN001", tier: "B", name: "Station", lat: 37.5, lon: 127.0, state: "on", windows: [{ hours: [23] }], hours: hours(), strip_mode: "windows_only" },
+  ],
+  holidays: [],
+};
+
+test("D20 nearby now lists the places with a pick left, nearest first, after the visitor asks", async ({ page, context }) => {
+  await mockVisitor(page);
+  await page.route("**/api/map**", (route) => json(route, nearMap));
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 37.5, longitude: 127.0 });
+  await page.clock.setFixedTime(kstInstant(12));
+  await page.goto("/ko");
+  const section = page.locator("[data-nearby]");
+  await expect(section.locator("h2")).toHaveText("내 주변에서 가기 좋은 곳");
+  await expect(section.locator("[data-near-row]")).toHaveCount(0);
+  await section.locator("[data-near-find]").click();
+  const rows = section.locator("[data-near-row]");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("Near");
+  await expect(rows.nth(0).locator("[data-near-distance]")).toHaveText(/^\d+ m$/);
+  await expect(rows.nth(0).locator("[data-kind]")).toHaveText("관광특구");
+  await expect(rows.nth(0)).toContainText("오늘 추천");
+  await expect(rows.nth(0)).toContainText("23~24시");
+  await expect(rows.nth(1)).toContainText("Far");
+  await expect(rows.nth(1).locator("[data-near-distance]")).toHaveText(/^\d+\.\d km$/);
+  await expect(rows.nth(0)).toHaveAttribute("href", `/ko/p/POI012/${kstDate(0)}`);
+});
+
+test("D21 nearby now says so when the permission is refused", async ({ page, context }) => {
+  await mockVisitor(page);
+  await context.clearPermissions();
+  await page.goto("/ko");
+  await page.locator("[data-near-find]").click();
+  await expect(page.locator("[data-near-state='denied']")).toHaveText("위치 권한이 없어 찾을 수 없어요");
+  await expect(page.locator("[data-state=error]")).toHaveCount(0);
+});
+
+test("D22 share uses the system sheet when there is one, otherwise copies the link and says so", async ({ page }) => {
+  await mockVisitor(page);
+  await page.addInitScript(() => {
+    const shared: unknown[] = [];
+    (window as unknown as { __shared: unknown[] }).__shared = shared;
+    Object.defineProperty(navigator, "share", { configurable: true, value: (data: unknown) => { shared.push(data); return Promise.resolve(); } });
+  });
+  await page.goto(`/ko/p/POI001/${day}`);
+  await page.getByRole("button", { name: "공유" }).click();
+  const shared = await page.evaluate(() => (window as unknown as { __shared: { text: string; url: string }[] }).__shared);
+  expect(shared).toHaveLength(1);
+  expect(shared[0].url).toMatch(new RegExp(`/ko/p/POI001/${day}$`));
+  expect(shared[0].text).toContain("Sample");
+  expect(shared[0].text).toContain("18~20시");
+  await expect(page.locator("[data-toast]")).toHaveCount(0);
+
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+    const copied: string[] = [];
+    (window as unknown as { __copied: string[] }).__copied = copied;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (text: string) => { copied.push(text); return Promise.resolve(); } } });
+  });
+  await page.goto("/ko/p/POI001");
+  await page.getByRole("button", { name: "공유" }).click();
+  await expect(page.locator("[data-toast]")).toHaveText("링크를 복사했어요");
+  const copied = await page.evaluate(() => (window as unknown as { __copied: string[] }).__copied);
+  expect(copied[0]).toMatch(/\/ko\/p\/POI001$/);
+});
+
+test("D23 compare shows two weeks side by side, entered from the week screen through the search", async ({ page }) => {
+  await mockVisitor(page);
+  const other = { ...week, place: { ...place, id: "POI002", name: "Beta2" } };
+  await page.route("**/api/places/POI002/week**", (route) => json(route, other));
+  await page.route("**/api/places?**", (route) => json(route, { places: [{ ...place, name: "Alpha", level: 1 }, { ...place, id: "POI002", name: "Beta2", level: 0 }] }));
+  await page.goto("/ko/p/POI001");
+  await page.locator("[data-compare-link]").click();
+  await expect(page).toHaveURL(/\/ko\/search\?compare=POI001$/);
+  await expect(page.locator("[data-compare-pick]")).toHaveText("비교할 장소를 고르세요");
+  const rows = page.locator("[data-row]");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Beta2");
+  await rows.first().click();
+  await expect(page).toHaveURL(/\/ko\/compare\?a=POI001&b=POI002$/);
+  await expect(page.locator("[data-compare-head='a']")).toContainText("Sample");
+  await expect(page.locator("[data-compare-head='b']")).toContainText("Beta2");
+  await expect(page.locator("[data-compare-best]").first()).toContainText("13~15시");
+  await expect(page.locator("[data-compare-row]")).toHaveCount(8);
+  await expect(page.locator("[data-compare-row] [data-mini-strip]")).toHaveCount(16);
+  await expect(page.locator("[data-compare-time]").first()).toHaveText("13~15시");
+  await expect(page.locator("h1")).toHaveText("비교");
+  await page.goto("/ko/compare?a=POI001");
+  await expect(page).toHaveURL(/\/ko\/search\?compare=POI001$/);
+  await page.goto("/ko/compare?a=nope&b=POI002");
+  await expect(page).toHaveURL(/\/ko$/);
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Clock, Map, SlidersHorizontal, Star, X } from "lucide-react";
+import { ChevronLeft, Clock, Map, Share2, SlidersHorizontal, Star, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -42,6 +42,7 @@ export function AppBar({
   onStar,
   mapHref,
   onCond,
+  onShare,
   children,
 }: {
   backHref?: string;
@@ -51,6 +52,7 @@ export function AppBar({
   onStar?: () => void;
   mapHref?: string;
   onCond?: () => void;
+  onShare?: () => void;
   children?: React.ReactNode;
 }) {
   const t = useTranslations();
@@ -94,6 +96,11 @@ export function AppBar({
             <SlidersHorizontal aria-hidden />
           </button>
         ) : null}
+        {onShare ? (
+          <button type="button" data-share className="icon-hit flex items-center justify-center" onClick={onShare} aria-label={t("share.action")}>
+            <Share2 aria-hidden />
+          </button>
+        ) : null}
         {onStar ? (
           <button type="button" className="icon-hit" onClick={onStar} aria-pressed={star} aria-label={t("home.favorites")}>
             <Star fill={star ? "var(--star)" : "none"} color="var(--star)" />
@@ -105,6 +112,40 @@ export function AppBar({
       </div>
     </header>
   );
+}
+
+/** Share a screen: the system share sheet when the browser has one, otherwise the link goes to the clipboard and a
+ * toast says so. A cancelled share sheet is not a failure; a failed copy is said as one. */
+export function useShare() {
+  const t = useTranslations();
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+  const share = async (text: string, url: string) => {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ text, url });
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") setToast(t("share.failed"));
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setToast(t("share.copied"));
+    } catch {
+      setToast(t("share.failed"));
+    }
+  };
+  const node = toast ? (
+    <p role="status" data-toast className="label fixed bottom-6 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-[var(--r-pill)] bg-ink px-4 py-2 text-on-ink">
+      {toast}
+    </p>
+  ) : null;
+  return { share, toast: node };
 }
 
 export function StateBox({ kind, onRetry, text }: { kind: "preparing" | "error" | "skeleton" | "missing" | "comboOff" | "stale"; onRetry?: () => void; text?: string }) {

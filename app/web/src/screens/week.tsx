@@ -13,9 +13,13 @@ import {
   Phone,
   StateBox,
   WeekList,
+  useShare,
 } from "@/components/ui";
+import Link from "next/link";
+
+import { bestDay, withTodayTrimmed } from "@/lib/best";
 import { formatClock, formatShortWeekday, formatStoredWindows } from "@/lib/format";
-import { kstNow, stillAhead } from "@/lib/kst";
+import { kstNow } from "@/lib/kst";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
 import { readConditions, readFavorites, toggleFavorite, writeConditions, type Purpose, type Tolerance } from "@/lib/storage";
@@ -58,19 +62,16 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
   const loaded = useLoad<Body>(ready ? `/api/places/${id}/week?tolerance=${cond.tolerance}&purpose=${purpose}` : null);
   const place = loaded.data?.place;
   const clock = kstNow();
+  const { share, toast } = useShare();
   // A window of today that has already ended is not a recommendation any more.
-  const days = (loaded.data?.days ?? []).map((day) =>
-    day.date === clock.date && day.windows ? { ...day, windows: stillAhead(day.windows, true, clock.hour) } : day,
-  );
+  const days = withTodayTrimmed(loaded.data?.days ?? [], clock.date, clock.hour);
   // Three different "nothing to show" states, each said as what it is.
   const placePreparing = place?.serve_state === "preparing";
   const allOff = days.every((day) => day.state === "off");
   const myeongjeolWeek = days.length > 0 && days.every((day) => day.off_reason === "myeongjeol");
   const dataPreparing = !placePreparing && (days.length === 0 || (allOff && days.every((day) => day.off_reason === "preparing")));
   const comboOff = !placePreparing && !dataPreparing && !myeongjeolWeek && allOff;
-  const ranked = days.filter((day) => day.windows && day.windows.length > 0 && day.state !== "off");
-  ranked.sort((a, b) => (b.windows![0].score - a.windows![0].score) || a.date.localeCompare(b.date));
-  const best = ranked[0];
+  const best = bestDay(days);
   const suffix = t("time.hour");
   const weekdays = t.raw("time.weekdays") as string[];
   const today = clock.date;
@@ -92,6 +93,15 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
       <AppBar
         backHref={`/${locale}`}
         star={star}
+        onShare={
+          place
+            ? () => {
+                const name = locale === "en" && place.name_en ? place.name_en : place.name;
+                const text = range && weekday ? t("share.textWeek", { place: name, day: weekday, time: range }) : t("share.textPlain", { place: name });
+                void share(text, `${window.location.origin}/${locale}/p/${id}`);
+              }
+            : undefined
+        }
         onStar={
           place
             ? () => {
@@ -129,6 +139,13 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
           onClick={() => setOpen(true)}
         />
       ) : null}
+      {place && showList ? (
+        <Link prefetch={false} href={`/${locale}/search?compare=${id}`} data-press data-compare-link className="press body mt-2 flex items-center justify-between gap-3 rounded-[12px] bg-bg-soft px-4 font-semibold">
+          <span data-field-label className="truncate">{t("compare.action")}</span>
+          <span aria-hidden>›</span>
+        </Link>
+      ) : null}
+      {toast}
       {showList ? (
         <>
           <div className={now?.stale ? "opacity-50" : undefined}>

@@ -73,9 +73,10 @@ test("an off week row shows the preparing text and no strip", async ({ page }) =
     }),
   );
   await page.goto("/ko/p/POI001");
-  const off = page.locator("[data-row]", { hasText: "준비 중" });
+  // The row says why (design spec 5.4, v3.0), once, with no time on the right.
+  const off = page.locator("[data-row]", { hasText: "기록이 모자라" });
   await expect(off).toBeVisible();
   await expect(off.locator("[data-week-time]")).toHaveText("");
-  await expect(off.getByText("준비 중")).toHaveCount(1);
+  await expect(off.getByText("기록이 모자라 아직 예상할 수 없어요")).toHaveCount(1);
   await expect(off.locator("[data-mini-strip]")).toHaveCount(0);
 });

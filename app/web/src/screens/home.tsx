@@ -9,6 +9,7 @@ import { AppBar, KindChip, LevelDot, MiniStrip, Phone, PlaceName, StateBox } fro
 import { formatClock, formatStoredWindows } from "@/lib/format";
 import { kstNow } from "@/lib/kst";
 import { isNight } from "@/lib/morning";
+import { distanceParts, nearbyPicks, type NearCandidate } from "@/lib/near";
 import type { HourCell } from "@/lib/strip";
 import { readConditions, readFavorites, type Favorite } from "@/lib/storage";
 import { useLoad } from "@/lib/use-load";
@@ -81,6 +82,90 @@ function PlaceCard({
   );
 }
 
+type Pin = NearCandidate & { gu?: string | null };
+type NearState =
+  | { kind: "idle" }
+  | { kind: "locating" }
+  | { kind: "denied" }
+  | { kind: "failed" }
+  | { kind: "error" }
+  | { kind: "done"; rows: ReturnType<typeof nearbyPicks<Pin>> };
+
+/** "Near me, good now" (design spec 5.12): nothing happens until the visitor asks; the position never leaves the
+ * device (the distance is computed here from today's map payload). No geolocation API: no section. */
+function NearbyNow({ locale, cond }: { locale: "ko" | "en"; cond: { purpose: string; tolerance: string } }) {
+  const t = useTranslations();
+  const [supported, setSupported] = useState(false);
+  const [state, setState] = useState<NearState>({ kind: "idle" });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSupported("geolocation" in navigator), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const suffix = t("time.hour");
+  const find = () => {
+    setState({ kind: "locating" });
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const clock = kstNow();
+        try {
+          const response = await fetch(`/api/map?date=${clock.date}&tolerance=${cond.tolerance}&purpose=${cond.purpose}&stations=0`);
+          if (!response.ok) throw new Error(`map ${response.status}`);
+          const body = (await response.json()) as { places: Pin[] };
+          setState({ kind: "done", rows: nearbyPicks(body.places, position.coords.latitude, position.coords.longitude, clock.hour) });
+        } catch {
+          setState({ kind: "error" });
+        }
+      },
+      (error) => setState({ kind: error.code === error.PERMISSION_DENIED ? "denied" : "failed" }),
+      { timeout: 10000, maximumAge: 300000 },
+    );
+  };
+  if (!supported) return null;
+  const clock = kstNow();
+  return (
+    <section data-nearby>
+      <h2 className="section mb-2">{t("near.title")}</h2>
+      {state.kind === "idle" ? (
+        <>
+          <button type="button" data-near-find data-press className="press body flex w-full items-center justify-center rounded-[12px] font-semibold" style={{ background: "var(--go-soft)", color: "var(--go-text)" }} onClick={find}>
+            {t("near.find")}
+          </button>
+          <p className="caption mt-2 text-text-3">{t("near.note")}</p>
+        </>
+      ) : null}
+      {state.kind === "locating" ? <p data-near-state="locating" className="body text-text-2">{t("near.locating")}</p> : null}
+      {state.kind === "denied" ? <p data-near-state="denied" className="body">{t("near.denied")}</p> : null}
+      {state.kind === "failed" ? <p data-near-state="failed" className="body">{t("near.failed")}</p> : null}
+      {state.kind === "error" ? <StateBox kind="error" onRetry={find} /> : null}
+      {state.kind === "done" && state.rows.length === 0 ? <p data-near-empty className="body">{t("near.empty")}</p> : null}
+      {state.kind === "done" && state.rows.length > 0 ? (
+        <ol>
+          {state.rows.map((row) => {
+            const distance = distanceParts(row.km);
+            return (
+              <li key={row.id}>
+                <Link prefetch={false} href={`/${locale}/p/${row.id}/${clock.date}`} data-near-row data-row className="row flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="body block truncate font-semibold"><PlaceName name={row.name} nameEn={row.name_en} /></span>
+                    <span className="caption flex items-center gap-1.5 text-text-3">
+                      <span data-near-distance>{t(distance.unit === "km" ? "near.km" : "near.m", { value: distance.value })}</span>
+                      <KindChip category={row.category} />
+                    </span>
+                  </span>
+                  <span className="caption shrink-0 text-right">
+                    <span className="block font-semibold" style={{ color: row.now ? "var(--go-text)" : undefined }}>{row.now ? t("home.nowLabel") : t("home.todayLabel")}</span>
+                    <span className="block">{formatStoredWindows([row.window], locale, suffix)[0]}</span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+    </section>
+  );
+}
+
 export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
   const t = useTranslations();
   const [cond, setCond] = useState({ purpose: "sight", tolerance: "moderate" });
@@ -128,6 +213,7 @@ export function HomeScreen({ locale }: { locale: "ko" | "en" }) {
           </ul>
         </section>
       ) : null}
+      <NearbyNow locale={locale} cond={cond} />
       <section data-quiet-section>
         <h2 className="section mb-2">{t("home.openQuiet")}</h2>
         {!loaded.data && !loaded.error ? (

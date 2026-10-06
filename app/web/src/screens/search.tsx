@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppBar, KindChip, LevelDot, Phone, PlaceName, StateBox } from "@/components/ui";
@@ -15,6 +16,8 @@ export function SearchScreen() {
   const locale = useLocale();
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
+  // `?compare=<id>`: the list picks the second place of a comparison instead of opening a week.
+  const compare = useSearchParams().get("compare");
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(q.trim()), 200);
     return () => window.clearTimeout(timer);
@@ -37,12 +40,13 @@ export function SearchScreen() {
       </AppBar>
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
       {loaded.loading ? <StateBox kind="skeleton" /> : null}
+      {compare ? <p data-compare-pick className="label mt-4 text-text-2">{t("compare.pick")}</p> : null}
       {!q && loaded.data ? <h2 className="section mb-2 mt-4">{t("home.popular")}</h2> : null}
       {q && loaded.data && loaded.data.places.length === 0 ? <p className="body mt-4">{t("search.empty")}</p> : null}
       <ul>
-        {(loaded.data?.places ?? []).map((place) => (
+        {(loaded.data?.places ?? []).filter((place) => place.id !== compare).map((place) => (
           <li key={place.id}>
-            <Link prefetch={false} href={`/${locale}/p/${place.id}`} data-row className="row flex items-center justify-between">
+            <Link prefetch={false} href={compare ? `/${locale}/compare?a=${compare}&b=${place.id}` : `/${locale}/p/${place.id}`} data-row className="row flex items-center justify-between">
               <span>
                 <span className="body block font-semibold"><PlaceName name={place.name} nameEn={place.name_en} /></span>
                 <span className="caption flex items-center gap-1.5 text-text-3">

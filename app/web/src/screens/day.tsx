@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, HourSentence, Legend, Phone, StateBox, avoidTexts } from "@/components/ui";
+import { AltButton, AnswerCard, AppBar, ConditionField, ConditionSheet, DayStrip, HourSentence, Legend, Phone, StateBox, avoidTexts, useShare } from "@/components/ui";
 import { formatLongDate, formatShortDate, formatShortWeekday, formatStoredWindows } from "@/lib/format";
 import { reasonMessageIds } from "@/lib/reason";
 import type { HourCell } from "@/lib/strip";
@@ -53,6 +53,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
   const loaded = useLoad<Rec>(ready ? `/api/places/${id}/recommend?date=${date}&tolerance=${cond.tolerance}&purpose=${cond.purpose}` : null);
   const place = loaded.data?.place;
   const clock = kstNow();
+  const { share, toast } = useShare();
   const stored = loaded.data?.recommendation;
   // A window of today that has already ended is not a recommendation any more.
   const rec = stored && stored.windows ? { ...stored, windows: stillAhead(stored.windows, date === clock.date, clock.hour) } : stored;
@@ -80,6 +81,15 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
         backHref={back}
         backLabel={fromMap ? t("map.title") : t("week.back")}
         star={star}
+        onShare={
+          place
+            ? () => {
+                const name = locale === "en" && place.name_en ? place.name_en : place.name;
+                const text = ranges[0] ? t("share.textDay", { place: name, date: dateLine, time: ranges[0] }) : t("share.textPlain", { place: name });
+                void share(text, `${window.location.origin}/${locale}/p/${id}/${date}`);
+              }
+            : undefined
+        }
         onStar={
           place
             ? () => {
@@ -132,6 +142,7 @@ export function DayScreen({ id, date, fromMap, hour }: { id: string; date: strin
         </div>
       ) : null}
       {myeongjeol ? <div className="hatch mt-4 h-12 rounded-[6px]" data-state="myeongjeol" /> : null}
+      {toast}
       {place ? (
         <ConditionSheet
           open={open}

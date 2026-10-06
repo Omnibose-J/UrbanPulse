@@ -205,5 +205,30 @@
     "park": "공원",
     "dense": "인구 밀집 지역",
     "station": "역세권"
+  },
+  "share": {
+    "action": "공유",
+    "copied": "링크를 복사했어요",
+    "failed": "링크를 복사하지 못했어요",
+    "textWeek": "{place} 이번 주 추천 {day} {time}",
+    "textDay": "{place} {date} 추천 {time}",
+    "textPlain": "{place}"
+  },
+  "near": {
+    "title": "내 주변에서 가기 좋은 곳",
+    "find": "내 위치로 찾기",
+    "note": "위치는 기기 안에서만 쓰고 저장하지 않아요",
+    "locating": "위치를 확인하고 있어요",
+    "denied": "위치 권한이 없어 찾을 수 없어요",
+    "failed": "위치를 확인하지 못했어요",
+    "empty": "가까운 곳에 오늘 남은 추천이 없어요",
+    "km": "{value} km",
+    "m": "{value} m"
+  },
+  "compare": {
+    "title": "비교",
+    "action": "다른 장소와 비교",
+    "pick": "비교할 장소를 고르세요",
+    "best": "이번 주 가장 좋은 때"
   }
 }

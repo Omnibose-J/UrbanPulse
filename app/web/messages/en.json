@@ -205,5 +205,30 @@
     "park": "Park",
     "dense": "Dense area",
     "station": "Station area"
+  },
+  "share": {
+    "action": "Share",
+    "copied": "Link copied",
+    "failed": "Could not copy the link",
+    "textWeek": "{place}: best this week {day} {time}",
+    "textDay": "{place} on {date}: {time}",
+    "textPlain": "{place}"
+  },
+  "near": {
+    "title": "Good near me",
+    "find": "Use my location",
+    "note": "Your location stays on this device and is not stored",
+    "locating": "Finding your location",
+    "denied": "Location permission was not given",
+    "failed": "Could not find your location",
+    "empty": "No place nearby has a pick left today",
+    "km": "{value} km",
+    "m": "{value} m"
+  },
+  "compare": {
+    "title": "Compare",
+    "action": "Compare with another place",
+    "pick": "Pick a place to compare with",
+    "best": "Best this week"
   }
 }
