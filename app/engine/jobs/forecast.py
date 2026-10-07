@@ -733,14 +733,20 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
         norms = {row[0]: row[1:] for row in cur.fetchall()}
         stored = []
         if only_today and places:
+            # The pool for alternatives: the refreshed places' other dates (their alt dates point at
+            # today), and today's rows of every place this refresh did not re-score, whose alt places may
+            # point at a window the refresh just removed. Both get their alternatives rewritten below;
+            # nothing else of theirs changes.
+            refreshed = [place["id"] for place in places]
             cur.execute(
                 """
                 select r.place_id, r.date, r.tolerance, r.purpose, r.state, r.windows, p.tier
                 from recommendations r
                 join places p on p.id = r.place_id
-                where r.place_id = any(%s) and r.date > %s and r.date <= %s
+                where (r.place_id = any(%s) and r.date > %s and r.date <= %s)
+                   or (r.date = %s and not r.place_id = any(%s))
                 """,
-                ([place["id"] for place in places], today, today + timedelta(days=7)),
+                (refreshed, today, today + timedelta(days=7), today, refreshed),
             )
             stored = [
                 {
@@ -751,6 +757,9 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
                     "state": row[4],
                     "windows": row[5],
                     "tier": row[6],
+                    # Another place's today row: the pool holds none of its other dates, so only its
+                    # alt places are rewritten (its alt dates would come out empty).
+                    "places_only": row[1] == today and row[0] not in refreshed,
                 }
                 for row in cur.fetchall()
             ]
@@ -800,7 +809,20 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
             """,
             payload,
         )
-        dated = [row for row in stored if row["state"] != "off"]
+        dated = [row for row in stored if row["state"] != "off" and not row["places_only"]]
+        neighbours_only = [row for row in stored if row["state"] != "off" and row["places_only"]]
+        if neighbours_only:
+            cur.executemany(
+                """
+                update recommendations
+                set alt_places = %s
+                where place_id = %s and date = %s and tolerance = %s and purpose = %s
+                """,
+                [
+                    (Jsonb(row["alt_places"]), row["place_id"], row["date"], row["tolerance"], row["purpose"])
+                    for row in neighbours_only
+                ],
+            )
         if dated:
             cur.executemany(
                 """
