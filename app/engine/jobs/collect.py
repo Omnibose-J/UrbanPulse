@@ -28,6 +28,13 @@ from engine.seoul_api import SeoulError, fetch
 JOB = "collect"
 NEEDS = ("DATABASE_URL", "SEOUL_API_KEY")
 WORKERS = 10
+# Connection-level failures cluster in the opening burst (2026-10-07: 17 of 98 runs lost 1-5 of the
+# first places to ConnectTimeout after three quick attempts). Those places get one more pass after a
+# pause, three at a time.
+# An HTTP error status is the server's answer and is not retried again.
+SECOND_PASS_ERRORS = ("ConnectTimeout", "ConnectError", "ReadTimeout", "PoolTimeout", "RemoteProtocolError")
+SECOND_PASS_PAUSE_S = 15.0
+SECOND_PASS_WORKERS = 3
 FAIL_AFTER = 20
 
 _LIVE_UPSERT = """
@@ -285,23 +292,43 @@ def run(
                 }
             return _one(place, client, env["SEOUL_API_KEY"], run_ts, raw_dir, storage)
 
-        pool = ThreadPoolExecutor(max_workers=WORKERS)
-        try:
-            futures = {pool.submit(work, place): place for place in places}
-            done, pending = wait(futures, timeout=deadline_s)
-            results = [future.result() for future in done]
-            for future in pending:
-                place = futures[future]
-                results.append(
-                    {
-                        "id": place["id"],
-                        "serve_state": place["serve_state"],
-                        "outcome": "failed",
-                        "error": "deadline",
-                    }
-                )
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+        def run_pool(batch: list[dict[str, str]], workers: int) -> list[dict[str, Any]]:
+            pool = ThreadPoolExecutor(max_workers=workers)
+            try:
+                futures = {pool.submit(work, place): place for place in batch}
+                left = max(0.0, deadline_at - time.monotonic())
+                done, pending = wait(futures, timeout=left)
+                out = [future.result() for future in done]
+                for future in pending:
+                    place = futures[future]
+                    out.append(
+                        {
+                            "id": place["id"],
+                            "serve_state": place["serve_state"],
+                            "outcome": "failed",
+                            "error": "deadline",
+                        }
+                    )
+                return out
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
+
+        results = run_pool(places, WORKERS)
+        second_pass = {"tried": 0, "recovered": 0}
+        retry_ids = {
+            row["id"]
+            for row in results
+            if row["outcome"] == "failed"
+            and any(name in row.get("error", "") for name in SECOND_PASS_ERRORS)
+        }
+        # Only when the pause and a full attempt (three tries at the 20 s read timeout) fit the deadline.
+        if retry_ids and deadline_at - time.monotonic() > SECOND_PASS_PAUSE_S + 70:
+            time.sleep(SECOND_PASS_PAUSE_S)
+            again = run_pool([place for place in places if place["id"] in retry_ids], SECOND_PASS_WORKERS)
+            by_id = {row["id"]: row for row in again}
+            recovered = sum(1 for row in again if row["outcome"] == "ok")
+            second_pass = {"tried": len(retry_ids), "recovered": recovered}
+            results = [by_id.get(row["id"], row) for row in results]
     finally:
         if own_client:
             client.close()
@@ -378,6 +405,7 @@ def run(
                         if row["outcome"] == "failed"
                     },
                     "raw_dir": raw_rel,
+                    "second_pass": second_pass,
                     "unknown_categories": sorted(
                         {
                             name

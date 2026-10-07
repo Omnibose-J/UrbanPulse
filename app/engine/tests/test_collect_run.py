@@ -289,3 +289,46 @@ def test_one_storage_client_per_run(tmp_path, monkeypatch):
     assert row["status"] == "ok"
     assert len(created) == 1
     assert seen == [created[0], created[0], created[0]]
+
+
+def test_places_lost_to_connection_timeouts_get_one_later_pass(tmp_path, monkeypatch):
+    """The opening burst loses POI001-POI005 to ConnectTimeout on every quick attempt; the later pass
+    gets them."""
+    monkeypatch.setattr(collect, "SECOND_PASS_PAUSE_S", 0.0)
+    monkeypatch.setattr("engine.seoul_api.BACKOFF_S", (0.0, 0.0, 0.0))
+    first_pass = {"open": True}
+    calls: dict[str, int] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        code = request.url.path.rstrip("/").split("/")[-1]
+        calls[code] = calls.get(code, 0) + 1
+        if int(code.removeprefix("POI")) <= 5 and first_pass["open"]:
+            if calls[code] == 3:
+                # The third quick attempt of the last burst place closes the burst window.
+                if all(calls.get(f"POI{n:03d}", 0) >= 3 for n in range(1, 6)):
+                    first_pass["open"] = False
+            raise httpx.ConnectTimeout("burst", request=request)
+        return httpx.Response(200, json=_ok_body(code))
+
+    runs = _Runs()
+    code = collect.run(
+        env=ENV,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        places=_places(),
+        raw_dir=tmp_path,
+        ledger=runs.job_run,
+        store=lambda live, commerce, forecasts: None,
+        now=datetime(2026, 10, 1, 9, 20, 30, tzinfo=KST),
+    )
+    row = runs.rows[-1]
+    assert code == 0
+    assert row["status"] == "ok"
+    assert row["detail"]["failed"] == 0
+    assert row["detail"]["second_pass"] == {"tried": 5, "recovered": 5}
+    assert len(list(tmp_path.rglob("*.json.gz"))) == 121
+
+
+def test_an_http_error_is_not_retried_in_a_later_pass(tmp_path):
+    code, row, files = _run(tmp_path, 5)
+    assert row["detail"]["second_pass"] == {"tried": 0, "recovered": 0}
+    assert row["detail"]["failed"] == 5
