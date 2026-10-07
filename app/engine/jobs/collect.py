@@ -35,6 +35,9 @@ WORKERS = 10
 SECOND_PASS_ERRORS = ("ConnectTimeout", "ConnectError", "ReadTimeout", "PoolTimeout", "RemoteProtocolError")
 SECOND_PASS_PAUSE_S = 15.0
 SECOND_PASS_WORKERS = 3
+# The first WORKERS places open their connections STAGGER_S apart instead of all at once: every one of the 64
+# connection failures seen on 2026-10-05..07 hit one of the first eleven places.
+STAGGER_S = 0.5
 FAIL_AFTER = 20
 
 _LIVE_UPSERT = """
@@ -282,7 +285,12 @@ def run(
 
         deadline_at = time.monotonic() + deadline_s
 
+        opening = {place["id"]: index for index, place in enumerate(places[:WORKERS])}
+
         def work(place: dict[str, str]) -> dict[str, Any]:
+            delay = opening.pop(place["id"], 0) * STAGGER_S
+            if delay:
+                time.sleep(delay)
             if time.monotonic() >= deadline_at:
                 return {
                     "id": place["id"],

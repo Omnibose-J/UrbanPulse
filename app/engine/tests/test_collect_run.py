@@ -13,6 +13,12 @@ from engine.jobs import collect
 from engine.parsers import KST
 
 SENTINEL = "SEOULKEY-collect-9f3a1c7e"
+
+
+@pytest.fixture(autouse=True)
+def _no_stagger(monkeypatch):
+    """The opening stagger is a production pacing; tests that do not measure it run without it."""
+    monkeypatch.setattr(collect, "STAGGER_S", 0.0)
 ENV = {"DATABASE_URL": "postgresql://example", "SEOUL_API_KEY": SENTINEL}
 
 
@@ -332,3 +338,30 @@ def test_an_http_error_is_not_retried_in_a_later_pass(tmp_path):
     code, row, files = _run(tmp_path, 5)
     assert row["detail"]["second_pass"] == {"tried": 0, "recovered": 0}
     assert row["detail"]["failed"] == 5
+
+
+def test_the_opening_burst_is_spread_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "STAGGER_S", 0.05)
+    first_seen: dict[str, float] = {}
+    lock = threading.Lock()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        code = request.url.path.rstrip("/").split("/")[-1]
+        with lock:
+            first_seen.setdefault(code, time.monotonic())
+        return httpx.Response(200, json=_ok_body(code))
+
+    runs = _Runs()
+    collect.run(
+        env=ENV,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        places=_places(),
+        raw_dir=tmp_path,
+        ledger=runs.job_run,
+        store=lambda live, commerce, forecasts: None,
+        now=datetime(2026, 10, 1, 9, 20, 30, tzinfo=KST),
+    )
+    opening = sorted(first_seen[f"POI{n:03d}"] for n in range(1, collect.WORKERS + 1))
+    # Ten opening requests at 0.05 s steps span at least 0.45 s (all at once would span a few milliseconds).
+    assert opening[-1] - opening[0] >= 0.4
+    assert runs.rows[-1]["status"] == "ok"
