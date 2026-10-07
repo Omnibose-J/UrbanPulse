@@ -154,3 +154,36 @@ def test_the_job_exits_1_and_records_what_it_found(monkeypatch, capsys):
                 "select status, detail->'found' from job_runs where job = 'integrity' order by id"
             ).fetchall()
         assert rows == [("ok", {}), ("warn", {"thresholds out of order": 1})]
+
+
+def test_the_hourly_job_also_names_data_that_stopped_arriving():
+    """Nothing stored for two hours, no forecast issued today: a paused scheduler fails no run itself."""
+    now = datetime.now(KST)
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    with schema() as dsn, psycopg.connect(dsn, connect_timeout=5) as conn:
+        conn.execute(
+            "insert into places (id, tier, name, foreign_heavy, serve_state) "
+            "values ('POI001', 'A1', 'One', false, 'on')"
+        )
+        conn.execute(
+            "insert into live_obs (place_id, ts, pop_min, pop_max, level) values ('POI001', %s, 1, 2, 0)",
+            (now - timedelta(hours=3),),
+        )
+        conn.execute(
+            "insert into forecast_hourly (place_id, target_ts, issued_ts, source, level, ready) "
+            "values ('POI001', %s, %s, 'profile', 1, true)",
+            (midnight + timedelta(hours=13), midnight - timedelta(days=1)),
+        )
+        conn.commit()
+        assert integrity.sweep(conn) == {}
+        found = integrity.sweep(conn, fresh=True)
+        assert found["no observation stored in the last two hours"] == 1
+        late_name = "served A1/A2 place without a forecast issued today (after 07:00)"
+        assert found.get(late_name, 0) == (1 if now.hour >= 7 else 0)
+        conn.execute(
+            "insert into live_obs (place_id, ts, pop_min, pop_max, level) values ('POI001', %s, 1, 2, 0)",
+            (now - timedelta(minutes=20),),
+        )
+        conn.execute("update forecast_hourly set issued_ts = %s", (midnight,))
+        conn.commit()
+        assert integrity.sweep(conn, fresh=True) == {}

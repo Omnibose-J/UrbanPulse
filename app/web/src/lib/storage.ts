@@ -13,6 +13,15 @@ const DEFAULTS = { purpose: "sight" as Purpose, tolerance: "moderate" as Toleran
 const PURPOSES = new Set<Purpose>(["sight", "food", "shop"]);
 const TOLERANCES = new Set<Tolerance>(["calm", "moderate", "busy_ok"]);
 
+/** Saved choices are a convenience: with storage blocked or full the choice still applies on this page. */
+function persist(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // storage unavailable: nothing to keep
+  }
+}
+
 export function normalizeConditions(parsed: { purpose?: string; tolerance?: string } | null) {
   const purpose = parsed && PURPOSES.has(parsed.purpose as Purpose) ? (parsed.purpose as Purpose) : DEFAULTS.purpose;
   const tolerance = parsed && TOLERANCES.has(parsed.tolerance as Tolerance) ? (parsed.tolerance as Tolerance) : DEFAULTS.tolerance;
@@ -33,13 +42,14 @@ export function readConditions(): { purpose: Purpose; tolerance: Tolerance } {
 }
 
 export function writeConditions(value: { purpose: Purpose; tolerance: Tolerance }) {
-  localStorage.setItem(COND, JSON.stringify(value));
+  persist(COND, JSON.stringify(value));
 }
 
 export function readFavorites(): Favorite[] {
   try {
     const raw = localStorage.getItem(FAV);
-    return raw ? (JSON.parse(raw) as Favorite[]) : [];
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as Favorite[]) : [];
   } catch {
     return [];
   }
@@ -50,7 +60,7 @@ export function toggleFavorite(place: Favorite): Favorite[] {
   const next = current.some((item) => item.id === place.id)
     ? current.filter((item) => item.id !== place.id)
     : [...current, place];
-  localStorage.setItem(FAV, JSON.stringify(next));
+  persist(FAV, JSON.stringify(next));
   return next;
 }
 
@@ -63,5 +73,5 @@ export function readStations(): boolean {
 }
 
 export function writeStations(on: boolean) {
-  localStorage.setItem(STATIONS, on ? "1" : "0");
+  persist(STATIONS, on ? "1" : "0");
 }

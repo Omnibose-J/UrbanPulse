@@ -70,8 +70,11 @@ def test_partial_refresh_recomputes_the_alternatives_of_rows_it_did_not_rescore(
             )
             _row(conn, "POI076", [{"hours": [20], "score": 0.9, "crowd": 1}], False, [])
             kept_dates = [{"date": "2026-10-08", "hours": [13], "score": 0.8}]
+            # Built by yesterday's forecast, the row also offers yesterday; after midnight that date is gone.
+            past = {"date": "2026-10-06", "hours": [15], "score": 0.9}
             conn.execute(
-                "update recommendations set alt_dates = %s where place_id = 'POI003'", (Jsonb(kept_dates),)
+                "update recommendations set alt_dates = %s where place_id = 'POI003'",
+                (Jsonb([past, *kept_dates]),),
             )
             conn.commit()
             started = datetime(2026, 10, 7, 20, 30, tzinfo=KST)
@@ -88,5 +91,6 @@ def test_partial_refresh_recomputes_the_alternatives_of_rows_it_did_not_rescore(
     # Precondition: the refresh really removed POI076's window (otherwise the test proves nothing).
     assert near_now[0] == "off" or near_now[1] is True
     assert all(item["place_id"] != "POI076" for item in alt or [])
-    # The row that was not re-scored keeps its alternative dates (the pool held none of its other days).
+    # The row that was not re-scored keeps its alternative dates (the pool held none of its other days),
+    # except one that is now in the past.
     assert alt_dates == kept_dates

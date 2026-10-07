@@ -11,6 +11,8 @@ import ko from "../../../../../messages/ko.json";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+// web-push sets no timeout of its own; one push service that never answers would otherwise hold the whole run.
+const SEND_TIMEOUT_MS = 8000;
 
 /** Friday 18:00 KST (Vercel Cron, `vercel.json`): one notification per subscriber naming the best weekend pick of
  * each saved place under the subscriber's own conditions. A subscriber whose places have no weekend pick gets
@@ -49,14 +51,20 @@ export async function GET(request: Request) {
       const first = picks[0];
       const url = `${origin}/${row.locale}/p/${first.place_id}/${first.date}`;
       try {
-        await webpush.sendNotification(row.subscription, JSON.stringify({ ...message, url }), { TTL: 60 * 60 * 24 });
+        await webpush.sendNotification(row.subscription, JSON.stringify({ ...message, url }), { TTL: 60 * 60 * 24, timeout: SEND_TIMEOUT_MS });
         await markSent(row.endpoint);
         counts.sent += 1;
       } catch (error) {
         const status = (error as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) {
-          await deleteSubscription(row.endpoint);
-          counts.removed += 1;
+          try {
+            await deleteSubscription(row.endpoint);
+            counts.removed += 1;
+          } catch (deleteError) {
+            // One row that cannot be removed must not stop the reminders of everyone after it.
+            logApiError("push/weekend", deleteError);
+            counts.failed += 1;
+          }
         } else {
           logApiError("push/weekend", error);
           counts.failed += 1;

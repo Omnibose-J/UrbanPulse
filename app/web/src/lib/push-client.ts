@@ -20,7 +20,11 @@ export function readPushOn(): boolean {
 }
 
 function writePushOn(on: boolean) {
-  localStorage.setItem(KEY, on ? "1" : "0");
+  try {
+    localStorage.setItem(KEY, on ? "1" : "0");
+  } catch {
+    // storage unavailable: the switch reads off again on the next visit
+  }
 }
 
 function keyBytes(base64url: string): Uint8Array {

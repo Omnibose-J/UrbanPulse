@@ -53,3 +53,29 @@ def test_failure_before_recommendations_leaves_the_visible_tables_unchanged(monk
     assert norms == 0
     assert similar == 0
     assert recommendations == 0
+
+
+def test_a_broken_invariant_after_the_build_fails_the_execution_and_keeps_the_rows(monkeypatch):
+    """Spec 4.9: the alert policy watches failed executions only, so the forecast's own sweep must fail it."""
+    with schema() as dsn:
+        monkeypatch.setenv("ENGINE_SKIP_DOTENV", "1")
+        monkeypatch.setenv("DATABASE_URL", dsn)
+
+        def build(conn, started, today):
+            conn.execute(
+                "insert into places (id, tier, name, serve_state) values ('POI001', 'A1', 'One', 'on')"
+            )
+            conn.commit()  # the real build commits the web-visible tables itself
+            return {"places": 1}
+
+        monkeypatch.setattr(forecast, "_build", build)
+        found = {"thresholds out of order": 1}
+        monkeypatch.setattr(forecast.integrity, "sweep", lambda conn, full=False: found)
+        assert forecast.run() == 1
+        with psycopg.connect(dsn, connect_timeout=5) as conn:
+            kept = conn.execute("select count(*) from places").fetchone()[0]
+            ledger = conn.execute(
+                "select status, detail->'integrity' from job_runs where job = 'forecast'"
+            ).fetchone()
+    assert kept == 1
+    assert ledger == ("warn", {"thresholds out of order": 1})

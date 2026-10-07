@@ -122,10 +122,29 @@ AFTER_FORECAST: dict[str, str] = {
     """,
 }
 
+_SERVED = "exists (select 1 from places where serve_state = 'on' and tier <> 'B')"
+_MIDNIGHT = "date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul'"
 
-def sweep(conn, full: bool = False) -> dict[str, int]:
+# Freshness, for the hourly job only: a paused scheduler or a stopped job fails no execution of its
+# own, so the data would age silently. collect runs every 30 minutes; forecast at 05:10 KST.
+FRESHNESS: dict[str, str] = {
+    "no observation stored in the last two hours": f"""
+        select count(*) from (select 1) one where {_SERVED}
+          and not exists (select 1 from live_obs where ts >= now() - interval '2 hours')
+    """,
+    "served A1/A2 place without a forecast issued today (after 07:00)": f"""
+        select count(*) from places p where p.serve_state = 'on' and p.tier <> 'B'
+          and extract(hour from now() at time zone 'Asia/Seoul') >= 7
+          and not exists (
+            select 1 from forecast_hourly f where f.place_id = p.id and f.issued_ts >= {_MIDNIGHT}
+          )
+    """,
+}
+
+
+def sweep(conn, full: bool = False, fresh: bool = False) -> dict[str, int]:
     """Run the checks and return only the ones that are not 0."""
-    checks = {**ALWAYS, **AFTER_FORECAST} if full else ALWAYS
+    checks = {**ALWAYS, **(AFTER_FORECAST if full else {}), **(FRESHNESS if fresh else {})}
     found: dict[str, int] = {}
     with conn.cursor() as cur:
         for name, sql in checks.items():
@@ -140,11 +159,11 @@ def run(full: bool = False) -> int:
     settings.load_env()
     env = settings.require(("DATABASE_URL",))
     with db.ledger(env["DATABASE_URL"], JOB) as (conn, ctx):
-        found = sweep(conn, full)
+        found = sweep(conn, full, fresh=True)
         conn.rollback()
         ctx["detail"] = {
             "full": full,
-            "checks": len(ALWAYS) + (len(AFTER_FORECAST) if full else 0),
+            "checks": len(ALWAYS) + len(FRESHNESS) + (len(AFTER_FORECAST) if full else 0),
             "found": found,
         }
         ctx["status"] = "warn" if found else "ok"

@@ -136,6 +136,12 @@ test("the admin page refuses a repeated token", async ({ request }) => {
   expect((await request.get("/admin/eval")).status()).toBe(404);
 });
 
+test("a login with a body that is not a form goes back to the login page, not a server error", async ({ request }) => {
+  const response = await request.post("/admin/session", { data: "token=wrong", headers: { "content-type": "text/plain" }, maxRedirects: 0 });
+  expect(response.status()).toBe(303);
+  expect(new URL(response.headers()["location"]).pathname).toBe("/admin");
+});
+
 test("english pages keep Hangul inside lang=ko", async ({ page }) => {
   for (const path of ["/en", "/en/search", "/en/p/POI014", `/en/p/POI014/${kstDate(1)}`, "/en/map", "/en/about"]) {
     await page.goto(path);

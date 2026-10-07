@@ -40,6 +40,9 @@ test("bad input gets 400, 404 or 410, never 500, and an error is never cacheable
     [`/api/places/NOPE/week?${cond}`, 404],
     ["/api/places/POI001/week?tolerance=moderate", 400],
     [`/api/places/${q("POI001' or '1'='1")}/week?${cond}`, 404],
+    // The database gateway answers this one with a 403 page; the id shape check ends it before the round trip.
+    [`/api/places/${q("POI003' or 1=1--")}/week?${cond}`, 404],
+    [`/api/places/${q("POI003' or 1=1--")}/day?date=${today}`, 404],
     [`/api/places/POI001/recommend?date=${kstDate(-1)}&${cond}`, 410],
     [`/api/places/POI001/recommend?date=${kstDate(8)}&${cond}`, 400],
     [`/api/places/POI001/recommend?date=2026-13-45&${cond}`, 400],
@@ -142,8 +145,12 @@ test("push subscribe refuses a malformed body, accepts a real one once, and dele
   const bad = await request.post("/api/push/subscribe", { data: { subscription: { endpoint: "http://x" } } });
   expect(bad.status()).toBe(400);
   expect((await bad.json()).error).toMatch(/endpoint|subscription/);
-  const endpoint = `https://push.invalid/urbanpulse-test-${Date.now()}`;
-  const body = { subscription: { endpoint, keys: { p256dh: "test-p256dh", auth: "test-auth" } }, locale: "ko", place_ids: ["POI001"], tolerance: "moderate", purpose: "sight" };
+  // Only the browsers' push services are accepted; this address has the real shape and is removed below.
+  const endpoint = `https://fcm.googleapis.com/fcm/send/urbanpulse-test-${Date.now()}`;
+  const keys = { p256dh: "Bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", auth: "aaaaaaaaaaaaaaaaaaaaaa" };
+  const elsewhere = await request.post("/api/push/subscribe", { data: { subscription: { endpoint: "https://attacker.example/x", keys }, locale: "ko", place_ids: ["POI001"], tolerance: "moderate", purpose: "sight" } });
+  expect(elsewhere.status()).toBe(400);
+  const body = { subscription: { endpoint, keys }, locale: "ko", place_ids: ["POI001"], tolerance: "moderate", purpose: "sight" };
   const first = await request.post("/api/push/subscribe", { data: body });
   expect(first.status()).toBe(200);
   const again = await request.post("/api/push/subscribe", { data: { ...body, place_ids: ["POI001", "POI002"] } });

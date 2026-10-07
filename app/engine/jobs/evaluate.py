@@ -263,15 +263,21 @@ def _forecasts(conn, target: date) -> pd.DataFrame:
     return _forecasts_between(conn, target, target)
 
 
+def _kst_span(start: date, end: date) -> tuple[datetime, datetime]:
+    """KST days start..end as a half-open timestamp range, so the ts indexes apply (a date cast does not)."""
+    first = datetime.combine(start, datetime.min.time()).replace(tzinfo=KST)
+    return first, datetime.combine(end + timedelta(days=1), datetime.min.time()).replace(tzinfo=KST)
+
+
 def _forecasts_between(conn, start: date, end: date) -> pd.DataFrame:
     with conn.cursor() as cur:
         cur.execute(
             """
             select place_id, target_ts, horizon_d, pred, baseline
             from forecast_log
-            where (target_ts at time zone 'Asia/Seoul')::date between %s and %s
+            where target_ts >= %s and target_ts < %s
             """,
-            (start, end),
+            _kst_span(start, end),
         )
         rows = cur.fetchall()
     frame = pd.DataFrame(rows, columns=["place_id", "target_ts", "horizon_d", "pred", "baseline"])
@@ -291,9 +297,9 @@ def _live_between(conn, start: date, end: date) -> pd.DataFrame:
             """
             select place_id, ts, (pop_min + pop_max) / 2.0, level
             from live_obs
-            where (ts at time zone 'Asia/Seoul')::date between %s and %s
+            where ts >= %s and ts < %s
             """,
-            (start, end),
+            _kst_span(start, end),
         )
         rows = cur.fetchall()
     frame = pd.DataFrame(rows, columns=["place_id", "ts", "value", "level"])
@@ -309,9 +315,9 @@ def _commerce(conn, target: date) -> pd.DataFrame:
                    coalesce((cat_counts->>'유통')::float8, 0)
                      + coalesce((cat_counts->>'패션·뷰티')::float8, 0)
             from commerce_obs
-            where (ts at time zone 'Asia/Seoul')::date = %s
+            where ts >= %s and ts < %s
             """,
-            (target,),
+            _kst_span(target, target),
         )
         rows = cur.fetchall()
     frame = pd.DataFrame(rows, columns=["place_id", "ts", "all", "food", "shop"])

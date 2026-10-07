@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseSubscribeBody, weekendDates, weekendMessage } from "./push.ts";
+import { isPushEndpoint, parseSubscribeBody, weekendDates, weekendMessage } from "./push.ts";
 
+// Real shapes: a 65-byte key and a 16-byte secret in base64url.
+const KEYS = { p256dh: "Bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", auth: "aaaaaaaaaaaaaaaaaaaaaa" };
 const good = {
-  subscription: { endpoint: "https://push.example/abc", keys: { p256dh: "p", auth: "a" } },
+  subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: KEYS },
   locale: "ko",
   place_ids: ["POI001", "STN016", "POI001"],
   tolerance: "moderate",
@@ -26,6 +28,11 @@ test("each malformed field is refused with its name", () => {
     [{ ...good, subscription: undefined }, /subscription missing/],
     [{ ...good, subscription: { endpoint: "http://insecure", keys: good.subscription.keys } }, /endpoint/],
     [{ ...good, subscription: { endpoint: good.subscription.endpoint, keys: { p256dh: "" } } }, /keys/],
+    [{ ...good, subscription: { endpoint: "https://attacker.example/x", keys: KEYS } }, /endpoint/],
+    [{ ...good, subscription: { endpoint: "https://fcm.googleapis.com.attacker.example/x", keys: KEYS } }, /endpoint/],
+    [{ ...good, subscription: { endpoint: "https://fcm.googleapis.com:8443/x", keys: KEYS } }, /endpoint/],
+    [{ ...good, subscription: { endpoint: good.subscription.endpoint, keys: { ...KEYS, p256dh: "x".repeat(5000) } } }, /keys/],
+    [{ ...good, subscription: { endpoint: good.subscription.endpoint, keys: { ...KEYS, auth: "a b" } } }, /keys/],
     [{ ...good, locale: "fr" }, /locale/],
     [{ ...good, place_ids: [] }, /place_ids/],
     [{ ...good, place_ids: ["drop table"] }, /place_ids/],
@@ -57,4 +64,16 @@ test("the message has one line per place with a pick, uses the English name when
   assert.deepEqual(weekendMessage(picks, "ko", copy, "2026-10-10"), { title: "T", body: "경복궁 토 10~12시\n성수 일 13~15시" });
   assert.equal(weekendMessage(picks, "en", copy, "2026-10-10")!.body.split("\n")[0], "Gyeongbokgung 토 10~12시");
   assert.equal(weekendMessage([], "ko", copy, "2026-10-10"), null);
+});
+
+test("only the browsers' push services are endpoints", () => {
+  for (const ok of [
+    "https://fcm.googleapis.com/fcm/send/abc",
+    "https://web.push.apple.com/QJx",
+    "https://updates.push.services.mozilla.com/wpush/v2/abc",
+    "https://wns2-par02p.notify.windows.com/w/?token=abc",
+  ]) assert.equal(isPushEndpoint(ok), true, ok);
+  for (const bad of ["http://fcm.googleapis.com/x", "https://169.254.169.254/latest", "https://localhost/x", "https://evilpush.apple.com.example/x", "nope", 42]) {
+    assert.equal(isPushEndpoint(bad), false, String(bad));
+  }
 });

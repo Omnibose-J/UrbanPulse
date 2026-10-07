@@ -133,10 +133,11 @@ def apply_overlay(conn, now: datetime, place_ids: list[str]) -> None:
             """
             select place_id, max(ts)
             from live_obs
-            where place_id = any(%s)
+            where place_id = any(%s) and ts >= %s
             group by place_id
             """,
-            (ids,),
+            # Only "newer than 90 minutes?" is asked of it; a day bounds the scan (full retention).
+            (ids, now - timedelta(days=1)),
         )
         newest = dict(cur.fetchall())
         if not live_rows.empty:
@@ -237,7 +238,8 @@ def run() -> int:
         log(JOB, "fail", reason=type(exc).__name__)
         raise
     log(JOB, "done", places=detail.get("places"), transitions=len(detail.get("transitions", {})))
-    return 0
+    # The rows stay committed; a broken invariant fails the execution so the alert policy sees it (spec 4.9).
+    return 1 if detail.get("integrity") else 0
 
 
 def _lap(mark: list[float], timing: dict, name: str) -> None:
@@ -365,6 +367,7 @@ def _build(conn, started: datetime, today) -> dict:
         "timing": timing,
     }
 
+
 def _write_profiles(conn, today) -> None:
     with conn.cursor() as cur:
         cur.execute("select date, kind from holidays")
@@ -435,8 +438,10 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
         places = cur.fetchall()
         cur.execute(
             """
-            select place_id, max(ts) from live_obs group by place_id
-            """
+            select place_id, max(ts) from live_obs where ts >= %s group by place_id
+            """,
+            # Only "newer than 90 minutes?" is asked of it; a day bounds the scan (full retention).
+            (started - timedelta(days=1),),
         )
         newest = dict(cur.fetchall())
         cur.execute("select place_id, t1, t2, t3 from level_thresholds")
@@ -489,9 +494,7 @@ def _write_forecasts(conn, started, today, model, passing, version: str, ready_i
             )
             for hour, target in enumerate(targets):
                 base = baseline(place_series, pd.Timestamp(target), offset)
-                activity = activity_for(
-                    tier, profiles.get((place_id, dtype, hour), (None, None, None))
-                )
+                activity = activity_for(tier, profiles.get((place_id, dtype, hour), (None, None, None)))
                 pop = None
                 level = None
                 ready = False
@@ -708,9 +711,7 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
         if place_ids is not None:
             wanted = set(place_ids)
             places = [
-                place
-                for place in places
-                if place["id"] in wanted or (only_today and place["tier"] == "B")
+                place for place in places if place["id"] in wanted or (only_today and place["tier"] == "B")
             ]
         cur.execute("select date, kind from holidays")
         kinds = {row[0]: row[1] for row in cur.fetchall()}
@@ -815,11 +816,24 @@ def refresh_recommendations(conn, started: datetime, today, place_ids=None, only
             cur.executemany(
                 """
                 update recommendations
-                set alt_places = %s
+                set alt_places = %s,
+                    -- Built by an earlier forecast, the row may offer a date now past (after midnight).
+                    alt_dates = (
+                      select coalesce(jsonb_agg(item order by position), '[]'::jsonb)
+                      from jsonb_array_elements(alt_dates) with ordinality as kept(item, position)
+                      where (item->>'date')::date >= %s
+                    )
                 where place_id = %s and date = %s and tolerance = %s and purpose = %s
                 """,
                 [
-                    (Jsonb(row["alt_places"]), row["place_id"], row["date"], row["tolerance"], row["purpose"])
+                    (
+                        Jsonb(row["alt_places"]),
+                        today,
+                        row["place_id"],
+                        row["date"],
+                        row["tolerance"],
+                        row["purpose"],
+                    )
                     for row in neighbours_only
                 ],
             )

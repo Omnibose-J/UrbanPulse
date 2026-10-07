@@ -13,8 +13,25 @@ export type SubscribeBody = {
   purpose: "sight" | "food" | "shop";
 };
 
-const PLACE_ID = /^[A-Z]{3}\d{3}$/;
+export const PLACE_ID = /^[A-Z]{3}\d{3}$/;
 const MAX_PLACES = 20;
+// The browsers' own push services (Chrome/Edge-on-Android/Samsung: FCM, Safari: Apple, Firefox: Mozilla, Edge on
+// Windows: WNS). Any other host would make the Friday cron POST to an address of the caller's choosing, or hang it.
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /(^|\.)push\.apple\.com$/, /(^|\.)push\.services\.mozilla\.com$/, /(^|\.)notify\.windows\.com$/];
+// p256dh: a 65-byte P-256 point, auth: a 16-byte secret, both base64url (padding tolerated).
+const P256DH = /^[A-Za-z0-9_-]{86,88}={0,2}$/;
+const AUTH = /^[A-Za-z0-9_-]{21,24}={0,2}$/;
+
+export function isPushEndpoint(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 2000) return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && url.port === "" && PUSH_HOSTS.some((host) => host.test(url.hostname));
+}
 
 /** The body of `POST /api/push/subscribe`. Anything missing or malformed is a 400 with the field named. */
 export function parseSubscribeBody(input: unknown): { ok: true; body: SubscribeBody } | { ok: false; error: string } {
@@ -22,9 +39,9 @@ export function parseSubscribeBody(input: unknown): { ok: true; body: SubscribeB
   const raw = input as Record<string, unknown>;
   const sub = raw.subscription as Record<string, unknown> | undefined;
   if (!sub || typeof sub !== "object") return { ok: false, error: "subscription missing" };
-  if (typeof sub.endpoint !== "string" || !/^https:\/\/\S{1,2000}$/.test(sub.endpoint)) return { ok: false, error: "subscription.endpoint invalid" };
+  if (!isPushEndpoint(sub.endpoint)) return { ok: false, error: "subscription.endpoint invalid" };
   const keys = sub.keys as Record<string, unknown> | undefined;
-  if (!keys || typeof keys.p256dh !== "string" || typeof keys.auth !== "string" || !keys.p256dh || !keys.auth) return { ok: false, error: "subscription.keys invalid" };
+  if (!keys || typeof keys.p256dh !== "string" || typeof keys.auth !== "string" || !P256DH.test(keys.p256dh) || !AUTH.test(keys.auth)) return { ok: false, error: "subscription.keys invalid" };
   if (raw.locale !== "ko" && raw.locale !== "en") return { ok: false, error: "locale invalid" };
   if (!Array.isArray(raw.place_ids) || raw.place_ids.length === 0 || raw.place_ids.length > MAX_PLACES || !raw.place_ids.every((id) => typeof id === "string" && PLACE_ID.test(id))) {
     return { ok: false, error: `place_ids must be 1 to ${MAX_PLACES} place ids` };

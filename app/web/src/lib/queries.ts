@@ -6,7 +6,7 @@ import { pickBusy, pickQuiet } from "@/lib/home-rules";
 import { driverMessage } from "@/lib/api-log";
 import { GatewayRejected, isGatewayRejection } from "@/lib/gateway";
 import { morningPicks } from "@/lib/morning";
-import type { SubscribeBody, Subscription } from "@/lib/push";
+import { PLACE_ID, type SubscribeBody, type Subscription } from "@/lib/push";
 import { likePattern, namedAltPlaces, nowFromLive, quietSelection, requireForeignHeavy, selectAll } from "@/lib/shape";
 
 type Place = {
@@ -29,6 +29,9 @@ async function must<T>(query: PromiseLike<{ data: T | null; error: { message: st
 }
 
 export async function findPlace(id: string): Promise<Place | null> {
+  // Every place id has this shape; anything else is unknown without a round trip (the gateway in front of the
+  // database answers SQL-looking text with a 403 page, which would surface as a 500).
+  if (!PLACE_ID.test(id)) return null;
   const { data, error } = await supabaseServer()
     .from("places")
     .select("id, tier, name, name_en, gu, category, serve_state, foreign_heavy, lat, lon")
