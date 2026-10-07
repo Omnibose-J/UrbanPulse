@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { supabaseServer } from "@/lib/supabase-server";
 import { addDays, dayBounds, hourBounds, kstHour, kstNow, stillAhead } from "@/lib/kst";
 import { pickBusy, pickQuiet } from "@/lib/home-rules";
@@ -28,7 +30,9 @@ async function must<T>(query: PromiseLike<{ data: T | null; error: { message: st
   return data;
 }
 
-export async function findPlace(id: string): Promise<Place | null> {
+// The place pages ask for the place twice in one render (metadata and page). The database client carries a timeout
+// signal, which opts its fetches out of Next's request memoization, so the lookup is memoized here instead.
+export const findPlace = cache(async (id: string): Promise<Place | null> => {
   // Every place id has this shape; anything else is unknown without a round trip (the gateway in front of the
   // database answers SQL-looking text with a 403 page, which would surface as a 500).
   if (!PLACE_ID.test(id)) return null;
@@ -40,7 +44,7 @@ export async function findPlace(id: string): Promise<Place | null> {
   if (error) throw new Error(driverMessage(error));
   if (!data) return null;
   return { ...data, foreign_heavy: requireForeignHeavy(data.foreign_heavy) };
-}
+});
 
 export function purposeFor(tier: string, purpose: string): string {
   return tier === "A1" ? purpose : "none";
