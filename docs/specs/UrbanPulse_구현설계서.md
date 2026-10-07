@@ -1,9 +1,10 @@
-# UrbanPulse 구현 설계서 v8.1 (2026-10-07)
+# UrbanPulse 구현 설계서 v8.2 (2026-10-07)
 
 > 서비스정의서 v3을 어떻게 만드는지 정리한 문서입니다. 무엇을 왜 만드는지는 `docs/specs/UrbanPulse_서비스정의서.md`에 있습니다.
 > 구현은 팀원이 Cursor로 하고, 이 문서를 작업 지시서(작업 단위별 문서)로 쪼개서 넘깁니다.
 > 수치의 근거는 서비스정의서 부록과 `analysis/scripts/`에 있습니다.
 > 이 문서에 나오는 SOW-M0 ~ SOW-L1(작업 지시서)과 criteria-*(검수 기록)는 작업이 끝나 2026-10-02에 저장소에서 지웠습니다. 깃 기록에 남아 있습니다. 남은 것은 `docs/sow/SOW-MC.md`(클라우드)와 `docs/tracking/findings.md`입니다.
+> v8.2: collect 재시도 수정. 클라우드에서 측정해 보니 서울시 API는 몇 분 동안 새 연결 대부분이 막히고 이미 열린 연결은 계속 응답하는 구간이 있음(동시 연결 수와는 무관). 그래서 첫 연결 간격 벌리기(0.5초)를 없애고, 연결 단계에서 실패한 장소는 첫 회차 직후 쉬지 않고 3개씩 한 번 더 가져와 열려 있는 연결을 다시 씀(httpx는 5초 쉰 연결을 닫음).
 > v8.1: collect 견고화. 첫 묶음 10개 연결을 0.5초 간격으로 열고, 연결 단계 오류(ConnectTimeout 등)로 실패한 장소는 15초 뒤 3개씩 한 번 더 가져옴(HTTP 오류 상태는 재시도 안 함, 장부 `detail.second_pass`). 부분 갱신(`refresh_recommendations(only_today)`)은 다시 계산하지 않은 장소의 오늘 행 대안 장소도 다시 고름(대안 날짜는 그대로).
 > v8.0: 공개 단계. `X-Robots-Tag: noindex` 제거, `/robots.txt`(api·admin 제외), `/sitemap.xml`(정적 화면 + 켜진 A1·A2의 ③, 두 언어), `/manifest.webmanifest`, 공유 카드 메타데이터(6.6). 요청마다 nonce를 만드는 Content-Security-Policy(6.6). 홈 API는 독립 질의를 병렬로(6.4). `integrity`를 Cloud Run 잡으로 두고 매시 45분에 실행해 깨진 불변식이 실패 실행 알림으로 이어지게 함(4.9).
 > v7.9: 주말 알림(브라우저 푸시). 표 `push_subscriptions`(3장), `POST/DELETE /api/push/subscribe`, 금요일 18:00 KST Vercel Cron → `GET /api/push/weekend`(6장), 환경 변수 `VAPID_*`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `CRON_SECRET`. 지도 API 행에 `category`. 엔진 변경 없음.

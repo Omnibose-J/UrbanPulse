@@ -14,11 +14,6 @@ from engine.parsers import KST
 
 SENTINEL = "SEOULKEY-collect-9f3a1c7e"
 
-
-@pytest.fixture(autouse=True)
-def _no_stagger(monkeypatch):
-    """The opening stagger is a production pacing; tests that do not measure it run without it."""
-    monkeypatch.setattr(collect, "STAGGER_S", 0.0)
 ENV = {"DATABASE_URL": "postgresql://example", "SEOUL_API_KEY": SENTINEL}
 
 
@@ -298,16 +293,20 @@ def test_one_storage_client_per_run(tmp_path, monkeypatch):
 
 
 def test_places_lost_to_connection_timeouts_get_one_later_pass(tmp_path, monkeypatch):
-    """The opening burst loses POI001-POI005 to ConnectTimeout on every quick attempt; the later pass
-    gets them."""
-    monkeypatch.setattr(collect, "SECOND_PASS_PAUSE_S", 0.0)
+    """The opening requests lose POI001-POI005 to ConnectTimeout on every quick attempt; the later pass
+    gets them, and starts at once (httpx drops a pooled connection idle for 5 s, and reusing those
+    connections is the point of the pass)."""
     monkeypatch.setattr("engine.seoul_api.BACKOFF_S", (0.0, 0.0, 0.0))
     first_pass = {"open": True}
     calls: dict[str, int] = {}
+    seen: list[tuple[float, str, int]] = []
+    lock = threading.Lock()
 
     def handler(request: httpx.Request) -> httpx.Response:
         code = request.url.path.rstrip("/").split("/")[-1]
-        calls[code] = calls.get(code, 0) + 1
+        with lock:
+            calls[code] = calls.get(code, 0) + 1
+            seen.append((time.monotonic(), code, calls[code]))
         if int(code.removeprefix("POI")) <= 5 and first_pass["open"]:
             if calls[code] == 3:
                 # The third quick attempt of the last burst place closes the burst window.
@@ -332,6 +331,10 @@ def test_places_lost_to_connection_timeouts_get_one_later_pass(tmp_path, monkeyp
     assert row["detail"]["failed"] == 0
     assert row["detail"]["second_pass"] == {"tried": 5, "recovered": 5}
     assert len(list(tmp_path.rglob("*.json.gz"))) == 121
+    # A fourth call to a lost place is the later pass; it follows the last first-pass request without a pause.
+    later_starts = min(at for at, _, n in seen if n == 4)
+    first_ends = max(at for at, _, n in seen if at < later_starts)
+    assert later_starts - first_ends < 1.0
 
 
 def test_an_http_error_is_not_retried_in_a_later_pass(tmp_path):
@@ -339,29 +342,3 @@ def test_an_http_error_is_not_retried_in_a_later_pass(tmp_path):
     assert row["detail"]["second_pass"] == {"tried": 0, "recovered": 0}
     assert row["detail"]["failed"] == 5
 
-
-def test_the_opening_burst_is_spread_out(tmp_path, monkeypatch):
-    monkeypatch.setattr(collect, "STAGGER_S", 0.05)
-    first_seen: dict[str, float] = {}
-    lock = threading.Lock()
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        code = request.url.path.rstrip("/").split("/")[-1]
-        with lock:
-            first_seen.setdefault(code, time.monotonic())
-        return httpx.Response(200, json=_ok_body(code))
-
-    runs = _Runs()
-    collect.run(
-        env=ENV,
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        places=_places(),
-        raw_dir=tmp_path,
-        ledger=runs.job_run,
-        store=lambda live, commerce, forecasts: None,
-        now=datetime(2026, 10, 1, 9, 20, 30, tzinfo=KST),
-    )
-    opening = sorted(first_seen[f"POI{n:03d}"] for n in range(1, collect.WORKERS + 1))
-    # Ten opening requests at 0.05 s steps span at least 0.45 s (all at once would span a few milliseconds).
-    assert opening[-1] - opening[0] >= 0.4
-    assert runs.rows[-1]["status"] == "ok"

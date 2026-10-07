@@ -101,3 +101,13 @@ Found and fixed during the pass (not in the original list):
   removed (caught by the first hourly `integrity`).
 - Engine: 17 of 98 collects in two days lost 1–5 of the first eleven places to `ConnectTimeout`; the opening burst
   is now staggered and connection-level failures get one later pass (`detail.second_pass`).
+
+## Follow-up (2026-10-07, re-check requested by the user)
+
+The opening stagger rested on a wrong cause. Probes from a throwaway Cloud Run job (`urbanpulse-netprobe`, same
+image, Seoul's public `sample` key, deleted afterwards) showed: 20 simultaneous raw connects all succeed in a normal
+window; in a degraded window (12:45-12:48 UTC) 8-9 of 10 NEW connections time out at 5 s with both a shared and a
+fresh client, while requests over already-open pooled connections answer; the same probe minutes later fails 0 of 40.
+The 15 s pause before the later pass outlived httpx's 5 s keep-alive, so the later pass had to open new connections
+in the same window (21:15 KST run: recovered 1 of 3). Fix: no stagger; the later pass runs at once over the pooled
+connections. Regression test: the gap between the passes is under 1 s (RED on 01a0ae0: 15 s).

@@ -28,16 +28,15 @@ from engine.seoul_api import SeoulError, fetch
 JOB = "collect"
 NEEDS = ("DATABASE_URL", "SEOUL_API_KEY")
 WORKERS = 10
-# Connection-level failures cluster in the opening burst (2026-10-07: 17 of 98 runs lost 1-5 of the
-# first places to ConnectTimeout after three quick attempts). Those places get one more pass after a
-# pause, three at a time.
+# The Seoul API has windows of a few minutes in which most NEW connections from Cloud Run time out while
+# connections already open keep answering (probe 2026-10-07: 8-9 of 10 fresh connects failed at 5 s in one
+# window, 0 of 40 minutes later; requests over pooled connections succeeded throughout). A run that starts in
+# such a window loses the places whose first requests had to open connections (17 of 98 runs, always the
+# first places). Those places get one more pass right after the first, three at a time, over the connections
+# the first pass left in the pool: httpx closes a connection idle for 5 s, so the pass must not wait.
 # An HTTP error status is the server's answer and is not retried again.
 SECOND_PASS_ERRORS = ("ConnectTimeout", "ConnectError", "ReadTimeout", "PoolTimeout", "RemoteProtocolError")
-SECOND_PASS_PAUSE_S = 15.0
 SECOND_PASS_WORKERS = 3
-# The first WORKERS places open their connections STAGGER_S apart instead of all at once: every one of the 64
-# connection failures seen on 2026-10-05..07 hit one of the first eleven places.
-STAGGER_S = 0.5
 FAIL_AFTER = 20
 
 _LIVE_UPSERT = """
@@ -222,11 +221,7 @@ def store_observations(
 
 
 def _status(results: list[dict[str, Any]]) -> str:
-    bad = sum(
-        1
-        for row in results
-        if row["outcome"] in ("failed", "no_data") and row["serve_state"] != "off"
-    )
+    bad = sum(1 for row in results if row["outcome"] in ("failed", "no_data") and row["serve_state"] != "off")
     if bad > FAIL_AFTER:
         return "fail"
     if bad >= 1:
@@ -285,12 +280,7 @@ def run(
 
         deadline_at = time.monotonic() + deadline_s
 
-        opening = {place["id"]: index for index, place in enumerate(places[:WORKERS])}
-
         def work(place: dict[str, str]) -> dict[str, Any]:
-            delay = opening.pop(place["id"], 0) * STAGGER_S
-            if delay:
-                time.sleep(delay)
             if time.monotonic() >= deadline_at:
                 return {
                     "id": place["id"],
@@ -326,12 +316,10 @@ def run(
         retry_ids = {
             row["id"]
             for row in results
-            if row["outcome"] == "failed"
-            and any(name in row.get("error", "") for name in SECOND_PASS_ERRORS)
+            if row["outcome"] == "failed" and any(name in row.get("error", "") for name in SECOND_PASS_ERRORS)
         }
-        # Only when the pause and a full attempt (three tries at the 20 s read timeout) fit the deadline.
-        if retry_ids and deadline_at - time.monotonic() > SECOND_PASS_PAUSE_S + 70:
-            time.sleep(SECOND_PASS_PAUSE_S)
+        # Only when a full attempt (three tries at the 20 s read timeout) still fits the deadline.
+        if retry_ids and deadline_at - time.monotonic() > 70:
             again = run_pool([place for place in places if place["id"] in retry_ids], SECOND_PASS_WORKERS)
             by_id = {row["id"]: row for row in again}
             recovered = sum(1 for row in again if row["outcome"] == "ok")
