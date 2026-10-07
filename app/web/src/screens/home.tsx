@@ -57,7 +57,7 @@ function PlaceCard({
   return (
     <Link prefetch={false} href={href} {...marker} className="flex w-[232px] shrink-0 snap-start flex-col gap-3 rounded-[16px] border border-line p-4">
       <span className="flex min-w-0 items-start justify-between gap-2">
-        <span data-place-name className="min-w-0 truncate text-[17px] font-extrabold leading-snug"><PlaceName name={name} nameEn={nameEn} /></span>
+        <span data-place-name className="line-clamp-2 min-w-0 text-[17px] font-extrabold leading-snug"><PlaceName name={name} nameEn={nameEn} /></span>
         {level === null ? null : (
           <span data-place-status className="caption flex shrink-0 items-center gap-1.5 whitespace-nowrap font-semibold" style={{ color: "var(--go-text)" }}>
             <LevelDot level={level} />

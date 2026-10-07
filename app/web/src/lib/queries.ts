@@ -276,8 +276,13 @@ export async function flagCounts() {
 export async function homePayload(tolerance: string, purpose: string) {
   const { date, hour } = kstNow();
   const sb = supabaseServer();
-  const measured = await latestMeasured(date, hour);
-  const asOfQuery = await sb.from("live_obs").select("ts").order("ts", { ascending: false }).limit(1);
+  // The three independent reads run together: the newest measurement per place, the newest observation stamp,
+  // and tomorrow's stored recommendations (needed only at night, cheap enough to always fetch in parallel).
+  const [measured, asOfQuery, tomorrow] = await Promise.all([
+    latestMeasured(date, hour),
+    sb.from("live_obs").select("ts").order("ts", { ascending: false }).limit(1),
+    tomorrowMorning(addDays(date, 1), tolerance, purpose),
+  ]);
   if (asOfQuery.error) throw new Error(driverMessage(asOfQuery.error));
   const asOf = asOfQuery.data?.[0]?.ts ?? null;
   const stale = asOf ? Date.now() - new Date(asOf).getTime() > 90 * 60 * 1000 : true;
@@ -317,8 +322,13 @@ export async function homePayload(tolerance: string, purpose: string) {
     stale,
     busy_top: busy.map((row) => ({ ...row, ...windows.get(row.id) })),
     open_quiet: quiet.map((row) => ({ ...row, ...windows.get(row.id) })),
-    tomorrow_morning: await tomorrowMorning(addDays(date, 1), tolerance, purpose),
+    tomorrow_morning: tomorrow,
   };
+}
+
+/** Every A1/A2 place that is served today, for the sitemap. */
+export async function listServedPlaces(): Promise<{ id: string }[]> {
+  return must<{ id: string }[]>(supabaseServer().from("places").select("id").in("tier", ["A1", "A2"]).eq("serve_state", "on").order("id"));
 }
 
 /** Stored recommendations of tomorrow whose first window starts in the morning (home, at night). */
@@ -385,36 +395,38 @@ async function quietPlaces(
   if (onNow.length) {
     const [since] = hourBounds(date, Math.max(clockHour - 2, 0));
     const [, dayEnd] = dayBounds(date);
-    const rows = await must(
-      sb
-        .from("forecast_hourly")
-        .select("place_id, target_ts, a_all")
-        .eq("a_actual", true)
-        .in("place_id", onNow.map((row) => row.place.id))
-        .gte("target_ts", since)
-        .lt("target_ts", dayEnd)
-        .order("target_ts", { ascending: false })
-        .limit(1000),
-    );
+    const a2 = onNow.filter((row) => row.place.tier === "A2");
+    const [rows, cells] = await Promise.all([
+      must(
+        sb
+          .from("forecast_hourly")
+          .select("place_id, target_ts, a_all")
+          .eq("a_actual", true)
+          .in("place_id", onNow.map((row) => row.place.id))
+          .gte("target_ts", since)
+          .lt("target_ts", dayEnd)
+          .order("target_ts", { ascending: false })
+          .limit(1000),
+      ),
+      a2.length
+        ? must(
+            sb
+              .from("recommendations")
+              .select("place_id, hours")
+              .eq("date", date)
+              .eq("tolerance", "moderate")
+              .eq("purpose", "none")
+              .in("place_id", a2.map((row) => row.place.id)),
+          )
+        : Promise.resolve([]),
+    ]);
     for (const row of rows as { place_id: string; target_ts: string; a_all: number | null }[]) {
       if (activity.has(row.place_id) || row.a_all === null) continue;
       activity.set(row.place_id, { hour: kstHour(row.target_ts), value: row.a_all });
     }
-    const a2 = onNow.filter((row) => row.place.tier === "A2");
-    if (a2.length) {
-      const cells = await must(
-        sb
-          .from("recommendations")
-          .select("place_id, hours")
-          .eq("date", date)
-          .eq("tolerance", "moderate")
-          .eq("purpose", "none")
-          .in("place_id", a2.map((row) => row.place.id)),
-      );
-      for (const row of cells as { place_id: string; hours: { h: number; reason: string }[] | null }[]) {
-        const cell = row.hours?.find((item) => item.h === clockHour);
-        if (cell && cell.reason !== "outside_hours") openA2.add(row.place_id);
-      }
+    for (const row of cells as { place_id: string; hours: { h: number; reason: string }[] | null }[]) {
+      const cell = row.hours?.find((item) => item.h === clockHour);
+      if (cell && cell.reason !== "outside_hours") openA2.add(row.place_id);
     }
   }
   const chosen = quietSelection(

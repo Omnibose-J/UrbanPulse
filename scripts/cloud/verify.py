@@ -96,14 +96,29 @@ def site(report: Report, client: httpx.Client, env: dict[str, str], today: str) 
     except httpx.HTTPError as exc:
         report.line(False, "/api/push/subscribe malformed", type(exc).__name__)
 
+    launch_files = (
+        ("/robots.txt", "Sitemap:"),
+        ("/sitemap.xml", "<loc>"),
+        ("/manifest.webmanifest", '"icons"'),
+        ("/og.png", None),
+        ("/icon-512.png", None),
+    )
+    for path, must_have in launch_files:
+        response = get(path)
+        if response is not None:
+            ok = response.status_code == 200 and (must_have is None or must_have in response.text)
+            report.line(ok, path, f"HTTP {response.status_code}")
+
     for path in ("/ko", "/en", "/ko/map", f"/ko/p/{PLACE}", "/ko/compare?a=POI001&b=POI002"):
         response = get(path)
         if response is not None:
+            # Launched 2026-10-07: pages carry no noindex and do carry the CSP.
             noindex = "noindex" in response.headers.get("x-robots-tag", "")
+            csp = "frame-ancestors 'none'" in response.headers.get("content-security-policy", "")
             report.line(
-                response.status_code == 200 and noindex,
+                response.status_code == 200 and not noindex and csp,
                 path,
-                f"HTTP {response.status_code} noindex={noindex}",
+                f"HTTP {response.status_code} noindex={noindex} csp={csp}",
             )
 
     response = get("/vendor/maplibre/maplibre-gl-worker.mjs")

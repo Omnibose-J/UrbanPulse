@@ -13,7 +13,8 @@ $EngineJobs = @(
     @{ Name = "urbanpulse-forecast";      JobArgs = "forecast";      Cpu = "2"; Memory = "4Gi";   Timeout = "30m" },
     @{ Name = "urbanpulse-evaluate";      JobArgs = "evaluate";      Cpu = "1"; Memory = "1Gi";   Timeout = "20m" },
     @{ Name = "urbanpulse-sync-holidays"; JobArgs = "sync_holidays"; Cpu = "1"; Memory = "512Mi"; Timeout = "10m" },
-    @{ Name = "urbanpulse-ingest-raw";    JobArgs = "ingest_raw";    Cpu = "1"; Memory = "1Gi";   Timeout = "20m" }
+    @{ Name = "urbanpulse-ingest-raw";    JobArgs = "ingest_raw";    Cpu = "1"; Memory = "1Gi";   Timeout = "20m" },
+    @{ Name = "urbanpulse-integrity";     JobArgs = "integrity";     Cpu = "1"; Memory = "512Mi"; Timeout = "10m" }
 )
 $EngineSecrets = @(
     @{ Secret = "urbanpulse-database-url";  Name = "DATABASE_URL" },

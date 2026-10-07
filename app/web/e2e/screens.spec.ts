@@ -612,3 +612,66 @@ test("D25 without a saved place the reminder switch is off and says why; without
   await expect(page.locator("[data-answer-card]")).toBeVisible();
   await expect(page.locator("[data-push-toggle]")).toHaveCount(0);
 });
+
+test("D26 a render error inside a screen shows the app's own error box with a retry, not the framework page", async ({ page }) => {
+  // A served cell without a crowd level is a data defect; painting it throws (strip.ts cellFill), and the screen's
+  // error boundary catches it.
+  const broken = hours().map((cell) => (cell.h === 15 ? { h: cell.h, rating: cell.rating, in_window: false, reason: "fit" } : cell));
+  await mockVisitor(page, {
+    recommend: {
+      recommendation: { state: "on", off_reason: null, windows: [{ hours: [13] }], no_window: false, hours: broken, strip_mode: "windows_only" },
+      place,
+      holiday: null,
+      combos: week.combos,
+      alt_dates: [],
+      alt_places: [],
+    },
+  });
+  // The boundary catches the error, so it is not an uncaught page error; error.tsx logs it to the console.
+  const thrown: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") thrown.push(message.text());
+  });
+  await page.goto(`/ko/p/POI001/${day}`);
+  const box = page.locator("[data-state=error]");
+  await expect(box).toContainText("불러오지 못했어요.");
+  await expect(box.getByRole("button", { name: "다시 시도" })).toBeVisible();
+  await expect(page.getByText(/Application error|Unhandled Runtime Error/)).toHaveCount(0);
+  expect(thrown.join(" ")).toContain("crowd");
+});
+
+test("D27 the about page opens with a summary of the settings and keeps the table behind a disclosure", async ({ page }) => {
+  await page.route("**/api/flags**", (route) =>
+    json(route, {
+      rows: [
+        { tier: "A1", foreign_heavy: false, purpose: "sight", tolerance: "moderate", state: "on", count: 68 },
+        { tier: "A1", foreign_heavy: false, purpose: "shop", tolerance: "moderate", state: "reference", count: 68 },
+        { tier: "A1", foreign_heavy: false, purpose: "sight", tolerance: "calm", state: "off", count: 71 },
+        { tier: "A2", foreign_heavy: false, purpose: "none", tolerance: "calm", state: "on", count: 22 },
+      ],
+    }),
+  );
+  await page.goto("/ko/about");
+  await expect(page.locator("[data-flags-summary]")).toHaveText("오늘 켜진 조합 2개, 참고용 1개, 준비 중·꺼짐 1개");
+  const rows = page.locator("[data-flags-details] tbody tr");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.first()).toBeHidden();
+  await page.locator("[data-flags-details] summary").click();
+  await expect(rows.first()).toBeVisible();
+});
+
+test("D28 at desktop width the phone column is centred and nothing scrolls sideways", async ({ page }) => {
+  await mockVisitor(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  for (const path of ["/ko", "/ko/p/POI001", `/ko/compare?a=POI001&b=POI002`]) {
+    await page.goto(path);
+    await expect(page.locator(".phone-shell").first()).toBeVisible();
+    const box = await page.locator(".phone-shell").first().boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(480);
+    expect(Math.abs(box!.x + box!.width / 2 - 640)).toBeLessThanOrEqual(8);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+  }
+  await page.goto("/ko/map");
+  await expect(page.locator("[data-map-list]")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+});

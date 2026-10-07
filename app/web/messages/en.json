@@ -177,7 +177,9 @@
     "tierB": "Station areas",
     "foreign": "many foreign visitors",
     "places": "{count} places",
-    "flagsNote": "The same setting on two rows means its state differs by place. On public holidays every station area is off."
+    "flagsNote": "The same setting on two rows means its state differs by place. On public holidays every station area is off.",
+    "flagsSummary": "Today: {on} settings on, {reference} for reference, {off} preparing or off",
+    "flagsOpen": "Show every setting"
   },
   "nav": {
     "logo": "UrbanPulse",
@@ -241,5 +243,9 @@
     "needStar": "Save a place first to turn this on",
     "title": "Best times this weekend",
     "line": "{place}: {day} {time}"
+  },
+  "meta": {
+    "description": "Pick a Seoul place and we tell you when to go, from today up to seven days ahead: picks that avoid closed hours and the busiest hour, live crowd levels, a weekend reminder.",
+    "ogAlt": "UrbanPulse: pick a place, we tell you when to go"
   }
 }

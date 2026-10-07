@@ -8,11 +8,14 @@ $P = $v["GCP_PROJECT"]
 $scheduler = Scheduler-Account $v
 
 # No trigger for ingest-raw, healthcheck, tier_b, rejudge: those are run by hand.
+# integrity runs hourly at :45 (after the half-hour collect) so a broken invariant fails an execution and the
+# failed-execution alert (65_alerts.ps1) reaches the operator without anyone watching the admin screen.
 $schedules = @(
     @{ Job = "urbanpulse-collect";       Cron = "*/30 * * * *" },
     @{ Job = "urbanpulse-forecast";      Cron = "10 5 * * *" },
     @{ Job = "urbanpulse-evaluate";      Cron = "0 6 * * *" },
-    @{ Job = "urbanpulse-sync-holidays"; Cron = "0 4 * * 1" }
+    @{ Job = "urbanpulse-sync-holidays"; Cron = "0 4 * * 1" },
+    @{ Job = "urbanpulse-integrity";     Cron = "45 * * * *" }
 )
 
 foreach ($item in $schedules) {

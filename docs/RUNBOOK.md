@@ -40,7 +40,7 @@ change to the engine, the migrations or the scripts, before touching the cloud.
 | Data | `scripts/cloud/31_db_copy.ps1` | a count table with every row equal, `copy OK`, the database size |
 | Raw | `scripts/cloud/40_raw_upload.ps1` | bucket object count and bytes at least the local ones |
 | Engine | `scripts/cloud/50_engine_deploy.ps1 -Execute` | six jobs deployed; `healthcheck`, `collect`, `forecast`, `evaluate` executed once |
-| Schedules | `scripts/cloud/60_schedule.ps1` | four triggers, Asia/Seoul, ENABLED |
+| Schedules | `scripts/cloud/60_schedule.ps1` | five triggers, Asia/Seoul, ENABLED (`integrity` hourly at :45 since 2026-10-07: a broken invariant fails the execution and the failed-job e-mail fires) |
 | Alerts | `scripts/cloud/65_alerts.ps1` | an e-mail channel (the gcloud account) and a policy that mails when any job execution fails |
 | Cutover | `scripts/cloud/80_cutover.ps1 -Since <date of the data copy>` | local tasks disabled, gap closed, recommendations equal |
 | Web | `scripts/cloud/70_web_deploy.ps1` | the deployment URL |
@@ -87,7 +87,7 @@ Observed on the first real run (2026-10-05):
 | Pause everything | `60_schedule.ps1 -Pause`; resume with `-Resume` |
 | A job failed (e-mail from Cloud Monitoring) | read its log (row above); the next scheduled slot is the retry; `/admin` shows the ledger row. The policy auto-closes after 30 minutes |
 | Roll back to the laptop | `60_schedule.ps1 -Pause`; `cd app; supabase start`; `Enable-ScheduledTask` for `UrbanPulse collect`, `UrbanPulse forecast`, `UrbanPulse evaluate`; `python -m engine ingest_raw --date <each missed day>` after downloading the bucket's folders for those days into `data/raw` |
-| Launch publicly | remove the `X-Robots-Tag` header in `app/web/next.config.ts` and redeploy |
+| Launch publicly | done 2026-10-07: `noindex` removed, `robots.txt`, `sitemap.xml`, manifest, OG card, nonce CSP. Left to the user: a custom domain (`vercel domains add`, then `SITE_URL` on Vercel so metadata and the sitemap name it) and submitting the sitemap to Google Search Console |
 
 ## 4 What the rehearsal measured (2026-10-02, laptop, 2 CPU limit)
 

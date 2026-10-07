@@ -462,7 +462,8 @@ export function WeekList({
                 {recommended ? <span className="absolute inset-y-0 -left-2 -right-2 rounded-[12px]" style={{ background: "var(--go-soft)" }} /> : null}
                 <span className="relative caption">
                   <span className="block text-[15px] font-bold">{formatShortWeekday(day.date, mark.weekdays, t("time.today"), today)}</span>
-                  <span className="block text-[11px] font-medium leading-[14px] text-text-3">{formatShortDate(day.date)}</span>
+                  {/* On the green best-day row --text-3 falls under 4.5:1; --text-2 keeps it readable. */}
+                  <span className={`block text-[11px] font-medium leading-[14px] ${recommended ? "text-text-2" : "text-text-3"}`}>{formatShortDate(day.date)}</span>
                   {third ? (
                     <span
                       data-week-third
@@ -487,7 +488,7 @@ export function WeekList({
                     {time}
                   </span>
                   {avoid ? (
-                    <span data-week-avoid aria-label={avoid.line} title={avoid.line} className="flex items-center justify-end gap-1 whitespace-nowrap text-[11px] font-medium leading-4 text-text-3">
+                    <span data-week-avoid aria-label={avoid.line} title={avoid.line} className={`flex items-center justify-end gap-1 whitespace-nowrap text-[11px] font-medium leading-4 ${recommended ? "text-text-2" : "text-text-3"}`}>
                       <LevelDot level={avoid.crowd} />
                       <span aria-hidden>{avoid.range}</span>
                     </span>
@@ -530,7 +531,7 @@ export function DayStrip({
   return (
     <section className="mt-6">
       <h2 className="section mb-2">{t("day.byHour")}</h2>
-      <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="list">
+      <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]" role="group" aria-label={t("day.byHour")}>
         {hours.map((cell, index) => {
           const fill = cellFill(cell, mode);
           const label = labels[index];

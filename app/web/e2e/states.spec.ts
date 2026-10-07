@@ -124,7 +124,11 @@ test("a late observation on the week screen shows the stale line and a dimmed li
   await page.goto("/ko/p/POI001");
   await expect(page.locator("[data-answer-card]")).toContainText("데이터가 늦어지고 있어요 (마지막 14:30)");
   await expect(page.locator("[data-answer-card] [data-status-dot]")).toHaveCount(0);
-  await expect(page.locator(".opacity-50 [data-week-time]")).toHaveCount(8);
+  // Only the strips fade (design spec 5.10); the times stay at full contrast.
+  const strips = page.locator("[data-stale] [data-mini-strip]");
+  await expect(strips).toHaveCount(8);
+  expect(await strips.first().evaluate((node) => getComputedStyle(node).opacity)).toBe("0.5");
+  expect(await page.locator("[data-week-time]").first().evaluate((node) => getComputedStyle(node.closest("[data-row]")!).opacity)).toBe("1");
 });
 
 test("the admin page refuses a repeated token", async ({ request }) => {

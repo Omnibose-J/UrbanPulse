@@ -16,8 +16,22 @@ export function AboutScreen() {
       <p className="body mt-4">{t("about.does")}</p>
       <p className="body mt-4">{t("about.how")}</p>
       <h2 className="section mb-2 mt-6">{t("about.flags")}</h2>
-      <p className="caption mb-2 text-text-3">{t("about.flagsNote")}</p>
       {loaded.error ? <StateBox kind="error" onRetry={loaded.retry} /> : null}
+      {loaded.data ? (
+        <p data-flags-summary className="body">
+          {t("about.flagsSummary", {
+            on: loaded.data.rows.filter((row) => row.state === "on").length,
+            reference: loaded.data.rows.filter((row) => row.state === "reference").length,
+            off: loaded.data.rows.filter((row) => row.state !== "on" && row.state !== "reference").length,
+          })}
+        </p>
+      ) : null}
+      <details data-flags-details className="mt-2">
+        <summary className="press body flex cursor-pointer items-center justify-between rounded-[12px] bg-bg-soft px-4 font-semibold">
+          {t("about.flagsOpen")}
+          <span aria-hidden>›</span>
+        </summary>
+      <p className="caption mb-2 mt-3 text-text-3">{t("about.flagsNote")}</p>
       <table className="w-full text-left">
         <tbody>
           {(loaded.data?.rows ?? []).map((row) => (
@@ -39,6 +53,7 @@ export function AboutScreen() {
           ))}
         </tbody>
       </table>
+      </details>
       <p className="body mt-6">{t("about.limits")}</p>
       <p className="body mt-4">{t("about.sources")}</p>
     </Phone>

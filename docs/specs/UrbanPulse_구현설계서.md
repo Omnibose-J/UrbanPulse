@@ -1,9 +1,10 @@
-# UrbanPulse 구현 설계서 v7.9 (2026-10-06)
+# UrbanPulse 구현 설계서 v8.0 (2026-10-07)
 
 > 서비스정의서 v3을 어떻게 만드는지 정리한 문서입니다. 무엇을 왜 만드는지는 `docs/specs/UrbanPulse_서비스정의서.md`에 있습니다.
 > 구현은 팀원이 Cursor로 하고, 이 문서를 작업 지시서(작업 단위별 문서)로 쪼개서 넘깁니다.
 > 수치의 근거는 서비스정의서 부록과 `analysis/scripts/`에 있습니다.
 > 이 문서에 나오는 SOW-M0 ~ SOW-L1(작업 지시서)과 criteria-*(검수 기록)는 작업이 끝나 2026-10-02에 저장소에서 지웠습니다. 깃 기록에 남아 있습니다. 남은 것은 `docs/sow/SOW-MC.md`(클라우드)와 `docs/tracking/findings.md`입니다.
+> v8.0: 공개 단계. `X-Robots-Tag: noindex` 제거, `/robots.txt`(api·admin 제외), `/sitemap.xml`(정적 화면 + 켜진 A1·A2의 ③, 두 언어), `/manifest.webmanifest`, 공유 카드 메타데이터(6.6). 요청마다 nonce를 만드는 Content-Security-Policy(6.6). 홈 API는 독립 질의를 병렬로(6.4). `integrity`를 Cloud Run 잡으로 두고 매시 45분에 실행해 깨진 불변식이 실패 실행 알림으로 이어지게 함(4.9).
 > v7.9: 주말 알림(브라우저 푸시). 표 `push_subscriptions`(3장), `POST/DELETE /api/push/subscribe`, 금요일 18:00 KST Vercel Cron → `GET /api/push/weekend`(6장), 환경 변수 `VAPID_*`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `CRON_SECRET`. 지도 API 행에 `category`. 엔진 변경 없음.
 > v7.8: 홈·검색 API의 장소 행에 서울시 분류 `category`를 실어 화면이 종류 칩과 홈 순서에 씁니다(6장). 계산은 없습니다(저장된 열 그대로).
 > v7.7: 관측 보존 정책 확정(사용자 결정, 2026-10-06): `live_obs`·`commerce_obs`·`forecast_log`는 전체 보존, `archive` 작업 삭제(4.7). 클라우드 이전 완료(SOW-MC, 2026-10-05).
@@ -428,6 +429,12 @@ A1·A2 장소마다 오늘부터 7일 뒤까지 시간대 예측을 만듭니다
 - **입력 검증:** 날짜는 오늘~7일 뒤만(지난 날짜 410, 그 밖 400), 검색어 50자 초과 400, 없는 장소 404. 검색어는 문자 그대로 일치(괄호·`%`·`*` 포함)
 - **행 수 제한:** PostgREST는 응답을 1,000행에서 자름. 1,000행을 넘을 수 있는 읽기(`/api/flags`, `/api/map`)는 끝까지 나눠 읽음
 - **오늘의 추천 창:** 저장된 창 중 이미 끝난 시간은 홈 API와 화면에서 내지 않음(오늘 행은 30분마다 다시 만들어져 시각이 바뀐 직후 잠깐 남기 때문)
+
+### 6.6 공개와 보안 머리글 (2026-10-07)
+- 응답 머리글: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`(next.config). `X-Powered-By` 없음. `X-Robots-Tag`는 더 이상 보내지 않음(공개).
+- Content-Security-Policy는 `src/proxy.ts`가 요청마다 nonce를 만들어 붙임(Next 안내서의 방식): `script-src 'self' 'nonce-…' 'strict-dynamic'`(개발에서만 `'unsafe-eval'`), `style-src 'self' 'unsafe-inline'`(화면이 `style=`로 색을 넣음), `img-src 'self' data: blob: https://tiles.openfreemap.org`, `connect-src 'self' https://tiles.openfreemap.org`(타일·스프라이트·글리프), `worker-src 'self' blob:`(지도 워커, 푸시 워커), `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`. 데이터 경로(`/api/*`)와 정적 파일, 프리페치 요청에는 붙이지 않음(matcher). 지도 타일 출처가 바뀌면 이 두 지시문을 함께 고침.
+- 공개 파일: `robots.ts`(허용 `/ko` `/en`, 차단 `/api/` `/admin`, 사이트맵 주소), `sitemap.ts`(force-dynamic; `places` 중 켜진 A1·A2의 `/p/{id}` × 두 언어 + 정적 화면), `manifest.ts`(이름, 아이콘 192·512 PNG, maskable, 테마색 `#0f1822`), `public/og.png`(1200×630), `public/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`(스크립트로 로고에서 그림). 절대 주소의 기준은 `SITE_URL`(있으면) 또는 Vercel의 `VERCEL_PROJECT_PRODUCTION_URL`; 둘 다 없으면 빌드 오류.
+- 오류 경계: `app/[locale]/error.tsx`(화면 단위, 메시지 키 `state.error`·`state.retry`)와 `app/global-error.tsx`(루트 레이아웃 실패, 주소의 언어로).
 
 ### 6.5 표현 규칙
 - A1·A2 단계 이름은 서울시와 같게 씁니다: 여유 / 보통 / 약간 붐빔 / 붐빔. 영어는 서울시 영문 API가 쓰는 단계 이름을 그대로 씁니다(W2에서 확인).

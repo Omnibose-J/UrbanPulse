@@ -264,7 +264,7 @@ export function MapScreen({ date, hour }: { date?: string; hour?: string }) {
                   onClick={() => setDay(item)}
                 >
                   {label}
-                  {holidayName ? <small className="text-[10px] font-semibold" style={{ color: "var(--hol)" }} lang={holidayName === holiday?.name && locale === "en" ? "ko" : undefined}>{holidayName}</small> : null}
+                  {holidayName ? <small className="text-[10px] font-semibold" style={{ color: on ? "var(--on-ink-2)" : "var(--hol)" }} lang={holidayName === holiday?.name && locale === "en" ? "ko" : undefined}>{holidayName}</small> : null}
                 </button>
               );
             })}

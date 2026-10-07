@@ -132,6 +132,11 @@ h1, h2, .balance {
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* Late data: the strips fade, the text stays readable (design spec 5.10). */
+[data-stale] [data-mini-strip] {
+  opacity: 0.5;
+}
+
 .hatch {
   background-color: var(--bad);
   background-image: repeating-linear-gradient(

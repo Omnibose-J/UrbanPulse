@@ -178,7 +178,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
               {push.on ? t("push.on") : t("push.off")}
             </button>
           </div>
-          <p data-push-note className="caption mt-1 text-text-3">
+          <p data-push-note className="caption mt-1 text-text-2">
             {push.note === "denied" ? t("push.denied") : push.note === "failed" || push.note === "unsupported" ? t("push.failed") : !push.on && !star ? t("push.needStar") : t("push.hint")}
           </p>
         </div>
@@ -186,7 +186,7 @@ export function WeekScreen({ id, notice }: { id: string; notice?: string }) {
       {toast}
       {showList ? (
         <>
-          <div className={now?.stale ? "opacity-50" : undefined}>
+          <div data-stale={now?.stale ? "1" : undefined}>
             <WeekList days={days} locale={locale} today={today} bestDate={best?.date} tier={place?.tier} nowHour={clock.hour} hrefFor={(date) => `/${locale}/p/${id}/${date}`} />
           </div>
           {comboOff ? null : (
